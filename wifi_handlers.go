@@ -105,9 +105,10 @@ func stopWpaSupplicant(interfaceName string) {
 	// Esperar a que termine
 	time.Sleep(1 * time.Second)
 
-	// Limpiar sockets
-	executeCommand(fmt.Sprintf("sudo rm -f %s/%s 2>/dev/null || true", WpaSupplicantRunDir, interfaceName))
-	executeCommand(fmt.Sprintf("sudo rm -f /run/wpa_supplicant/%s 2>/dev/null || true", interfaceName))
+	// Limpiar sockets en todos los posibles directorios
+	for _, dir := range []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"} {
+		executeCommand(fmt.Sprintf("sudo rm -f %s/%s 2>/dev/null || true", dir, interfaceName))
+	}
 }
 
 // startWpaSupplicant inicia wpa_supplicant con la configuración dada
