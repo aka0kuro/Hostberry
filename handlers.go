@@ -82,7 +82,7 @@ func logoutAPIHandler(c *fiber.Ctx) error {
 	// Pero podemos registrar el evento
 	user := c.Locals("user").(*User)
 	userID := user.ID
-	InsertLog("INFO", "Usuario cerró sesión: "+user.Username, "auth", &userID)
+	InsertLog("INFO", fmt.Sprintf("Usuario %s cerró sesión", user.Username), "auth", &userID)
 
 	// Limpiar cookie para rutas web
 	c.Cookie(&fiber.Cookie{
