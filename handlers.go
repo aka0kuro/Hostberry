@@ -894,7 +894,7 @@ func adblockEnableHandler(c *fiber.Ctx) error {
 
 	result := enableAdBlock(user.Username)
 	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("AdBlock habilitado (usuario: %s)", user.Username), "adblock", &userID)
+		InsertLog("INFO", fmt.Sprintf("AdBlock habilitado por usuario %s", user.Username), "adblock", &userID)
 		return c.JSON(result)
 	}
 
