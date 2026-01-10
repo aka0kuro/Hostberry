@@ -660,7 +660,7 @@ func wifiConnectHandler(c *fiber.Ctx) error {
 	if errorMsgVal, ok := result["error"].(string); ok && errorMsgVal != "" {
 		errorMsg = errorMsgVal
 	}
-	InsertLog("ERROR", fmt.Sprintf("Error conectando WiFi: %s (usuario: %s)", errorMsg, user.Username), "wifi", &userID)
+		InsertLog("ERROR", fmt.Sprintf("Error conectando WiFi %s: %s (usuario: %s)", req.SSID, errorMsg, user.Username), "wifi", &userID)
 	return c.Status(500).JSON(fiber.Map{
 		"success": false,
 		"error":   errorMsg,
