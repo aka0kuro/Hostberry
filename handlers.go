@@ -46,7 +46,7 @@ func loginAPIHandler(c *fiber.Ctx) error {
 
 	// Log de login
 	userID := user.ID
-	InsertLog("INFO", "Usuario autenticado: "+user.Username, "auth", &userID)
+	InsertLog("INFO", fmt.Sprintf("Usuario %s inició sesión", user.Username), "auth", &userID)
 
 	// Determinar si se requiere cambio de contraseña
 	// Se requiere si es el primer login (LoginCount == 1 después del incremento en Login)
