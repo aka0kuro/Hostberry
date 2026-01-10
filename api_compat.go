@@ -2987,7 +2987,26 @@ func wifiLegacyAutoconnectHandler(c *fiber.Ctx) error {
 }
 
 func wifiLegacyScanHandler(c *fiber.Ctx) error {
-	// Reusar el scan Lua
+	// Verificar que el usuario esté autenticado
+	userInterface := c.Locals("user")
+	if userInterface == nil {
+		log.Printf("ERROR: Usuario no encontrado en wifiLegacyScanHandler")
+		return c.Status(401).JSON(fiber.Map{
+			"success": false,
+			"error":   "No autenticado. Por favor, inicia sesión nuevamente.",
+		})
+	}
+	
+	user, ok := userInterface.(*User)
+	if !ok || user == nil {
+		log.Printf("ERROR: Usuario inválido en wifiLegacyScanHandler")
+		return c.Status(401).JSON(fiber.Map{
+			"success": false,
+			"error":   "Usuario no encontrado. Por favor, inicia sesión nuevamente.",
+		})
+	}
+	
+	// Reusar el scan
 	interfaceName := c.Query("interface", DefaultWiFiInterface)
 	result := scanWiFiNetworks(interfaceName)
 	if networks, ok := result["networks"]; ok {
