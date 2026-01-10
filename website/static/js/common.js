@@ -206,6 +206,17 @@
           try {
             const errorData = await resp.clone().json().catch(() => ({}));
             const errorMsg = errorData.error || '';
+            const errorCode = errorData.code || '';
+            
+            // Si es "Usuario no encontrado", puede ser un problema temporal - no cerrar sesión
+            if(errorCode === 'USER_NOT_FOUND' || 
+               errorMsg.toLowerCase().includes('usuario no encontrado') ||
+               errorMsg.toLowerCase().includes('user not found')){
+              console.warn('Usuario no encontrado durante operación - puede ser problema temporal');
+              // No cerrar sesión, dejar que el código de manejo de errores específico lo maneje
+              return resp;
+            }
+            
             // Si el mensaje indica que es un error de token/autenticación real, cerrar sesión
             if(errorMsg.includes('token') || errorMsg.includes('Token') || 
                errorMsg.includes('autorizado') || errorMsg.includes('authorized') ||
