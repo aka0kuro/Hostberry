@@ -686,8 +686,7 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 				// Limpiar sockets
 				executeCommand(fmt.Sprintf("sudo rm -rf /var/run/wpa_supplicant/%s 2>/dev/null || true", interfaceName))
 				executeCommand(fmt.Sprintf("sudo rm -rf /run/wpa_supplicant/%s 2>/dev/null || true", interfaceName))
-				executeCommand("sudo rm -rf /var/run/wpa_supplicant/* 2>/dev/null || true")
-				executeCommand("sudo rm -rf /run/wpa_supplicant/* 2>/dev/null || true")
+				// No borrar sockets globales; puede afectar otras interfaces/servicios.
 				
 				// Reiniciar wpa_supplicant con configuración limpia
 				log.Printf("Reiniciando wpa_supplicant con configuración limpia...")
@@ -725,13 +724,17 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 				
 				time.Sleep(1 * time.Second)
 				
-				// Verificar que wpa_cli responde ahora
-				finalTestCmd := fmt.Sprintf("sudo wpa_cli -i %s ping 2>&1", interfaceName)
+				// Verificar que wpa_cli responde ahora usando el directorio de control estándar
+				ctrlDir := "/run/wpa_supplicant"
+				if _, err := os.Stat(ctrlDir); err != nil {
+					ctrlDir = "/var/run/wpa_supplicant"
+				}
+				finalTestCmd := fmt.Sprintf("sudo wpa_cli -i %s -p %s ping 2>&1", interfaceName, ctrlDir)
 				if finalTestOut, _ := executeCommand(finalTestCmd); strings.Contains(finalTestOut, "PONG") {
 					log.Printf("✅ wpa_supplicant reiniciado exitosamente y wpa_cli responde")
 					pingSuccess = true
 					// Actualizar wpaCliCmd para usar el método que funciona
-					wpaCliCmd = fmt.Sprintf("sudo wpa_cli -i %s", interfaceName)
+					wpaCliCmd = fmt.Sprintf("sudo wpa_cli -i %s -p %s", interfaceName, ctrlDir)
 				} else {
 					log.Printf("❌ ERROR CRÍTICO: wpa_supplicant reiniciado pero wpa_cli aún no responde")
 					result["success"] = false
