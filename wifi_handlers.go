@@ -216,15 +216,6 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 		log.Printf("NetworkManager permanece activo para mantener la conexión actual")
 	}
 
-	// Evitar conflicto con wpa_supplicant gestionado por el sistema (modo -u / DBus)
-	systemWpaOut, _ := exec.Command("sh", "-c", "ps aux | grep -E '[w]pa_supplicant.* -u ' 2>/dev/null").Output()
-	if strings.TrimSpace(string(systemWpaOut)) != "" {
-		log.Printf("wpa_supplicant está siendo gestionado por el sistema (-u)")
-		// En sistemas tipo Arch (wpa_supplicant global con -O DIR=/run/wpa_supplicant),
-		// lo correcto es usar el socket global y agregar la interfaz, no parar el servicio.
-		useSystemWpa = true
-	}
-
 	// Si hostapd está corriendo, NO lo detenemos automáticamente porque puede cortar la sesión (AP).
 	// En ese caso devolvemos un error accionable.
 	hostapdRunning, _ := exec.Command("sh", "-c", "pgrep hostapd 2>/dev/null").Output()
