@@ -638,17 +638,34 @@ func wifiConnectHandler(c *fiber.Ctx) error {
 
 	result := connectWiFi(req.SSID, req.Password, interfaceName, country, user.Username)
 
+	// Asegurar que result siempre tenga success y error
+	if _, hasSuccess := result["success"]; !hasSuccess {
+		result["success"] = false
+	}
+	if _, hasError := result["error"]; !hasError {
+		if result["success"] == false {
+			result["error"] = "Error desconocido al conectar a la red WiFi"
+		} else {
+			result["error"] = ""
+		}
+	}
+
 	if success, ok := result["success"].(bool); ok && success {
 		InsertLog("INFO", fmt.Sprintf("WiFi conectado: %s (usuario: %s)", req.SSID, user.Username), "wifi", &userID)
 		return c.JSON(result)
 	}
 
-	if errorMsg, ok := result["error"].(string); ok {
-		InsertLog("ERROR", fmt.Sprintf("Error conectando WiFi: %s (usuario: %s)", errorMsg, user.Username), "wifi", &userID)
-		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
+	// Si hay error, retornar con formato consistente que incluya success y error
+	errorMsg := "Error desconocido"
+	if errorMsgVal, ok := result["error"].(string); ok && errorMsgVal != "" {
+		errorMsg = errorMsgVal
 	}
-
-	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+	InsertLog("ERROR", fmt.Sprintf("Error conectando WiFi: %s (usuario: %s)", errorMsg, user.Username), "wifi", &userID)
+	return c.Status(500).JSON(fiber.Map{
+		"success": false,
+		"error":   errorMsg,
+		"message": fmt.Sprintf("Error conectando a %s", req.SSID),
+	})
 }
 
 // Handlers de VPN
