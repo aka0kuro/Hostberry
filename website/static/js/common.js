@@ -312,6 +312,18 @@
           try {
             const errorData = await resp.json().catch(() => ({}));
             const errorMsg = (errorData.error || '').toLowerCase();
+            const errorCode = errorData.code || '';
+            
+            // Si es "Usuario no encontrado", puede ser un problema temporal - no cerrar sesión
+            if(errorCode === 'USER_NOT_FOUND' || 
+               errorMsg.includes('usuario no encontrado') ||
+               errorMsg.includes('user not found')){
+              console.warn('Usuario no encontrado durante keep-alive - puede ser problema temporal');
+              // Resetear contador ya que no es un error de autenticación real
+              consecutiveErrors = 0;
+              return;
+            }
+            
             // Solo cerrar sesión si es un error real de token/autenticación
             if(errorMsg.includes('token') || errorMsg.includes('expirado') || 
                errorMsg.includes('expired') || errorMsg.includes('invalid') ||
