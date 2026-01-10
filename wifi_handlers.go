@@ -356,10 +356,9 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	// Habilitar la red
 	enableCmd := fmt.Sprintf("%s enable_network 0", wpaCliCmd)
 	enableResult, _ := executeCommand(enableCmd)
+	log.Printf("enable_network result: %s", strings.TrimSpace(enableResult))
+
 	// Reconectar explícitamente
-	reconnectOut, _ := executeCommand(fmt.Sprintf("%s reconnect", wpaCliCmd))
-	log.Printf("reconnect result: %s", strings.TrimSpace(reconnectOut))
-	time.Sleep(2 * time.Second)
 	reconnectOut, _ := executeCommand(fmt.Sprintf("%s reconnect", wpaCliCmd))
 	log.Printf("reconnect result: %s", strings.TrimSpace(reconnectOut))
 	time.Sleep(2 * time.Second)
@@ -368,6 +367,7 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	connected := false
 	statusOutput := ""
 	maxAttempts := 15 // Aumentado de 8 a 15
+// ...
 	lastState := ""
 	authFailures := 0
 	
