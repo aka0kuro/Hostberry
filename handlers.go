@@ -320,7 +320,7 @@ func systemShutdownHandler(c *fiber.Ctx) error {
 
 	result := systemShutdown(user.Username)
 	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", "Sistema apagado por: "+user.Username, "system", &userID)
+		InsertLog("INFO", fmt.Sprintf("Sistema apagado por usuario %s", user.Username), "system", &userID)
 		return c.JSON(result)
 	}
 
