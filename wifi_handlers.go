@@ -287,28 +287,21 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	// Crear contenido completo del archivo de configuración
 	configContent := fmt.Sprintf("ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\nctrl_interface_group=netdev\nupdate_config=1\ncountry=%s\n\n%s\n", country, networkBlock)
 
-	// Escribir el archivo de configuración
-	// Usamos un archivo temporal y luego sudo mv para evitar problemas de permisos
-	tempConfigPath := fmt.Sprintf("/tmp/wpa_config_%s_%d.conf", interfaceName, time.Now().Unix())
-	err := os.WriteFile(tempConfigPath, []byte(configContent), 0644)
-	if err != nil {
-		log.Printf("Error escribiendo archivo temporal: %v", err)
+	// Escribir el archivo de configuración usando sudo tee para evitar problemas de permisos
+	// Esto es más robusto que mv o cp cuando hay restricciones de permisos
+	writeCmd := exec.Command("sudo", "tee", wpaConfigPath)
+	writeCmd.Stdin = strings.NewReader(configContent)
+	// Descartar stdout para no llenar los logs con el contenido del archivo
+	writeCmd.Stdout = nil
+	
+	if err := writeCmd.Run(); err != nil {
+		log.Printf("Error escribiendo archivo con sudo tee: %v", err)
 		result["success"] = false
-		result["error"] = "Error al crear archivo temporal de configuración"
-		return result
-	}
-
-	// Mover a la ubicación final con sudo
-	moveCmd := fmt.Sprintf("sudo mv %s %s", tempConfigPath, wpaConfigPath)
-	if out, err := executeCommand(moveCmd); err != nil {
-		log.Printf("Error moviendo archivo de configuración con sudo: %v, output: %s", err, out)
-		os.Remove(tempConfigPath) // limpiar en caso de error
-		result["success"] = false
-		result["error"] = "Error de permisos al guardar configuración wifi"
+		result["error"] = fmt.Sprintf("Error de permisos al guardar configuración wifi (tee): %v", err)
 		return result
 	}
 	
-	// Asegurar permisos correctos
+	// Asegurar permisos correctos (solo lectura/escritura para root)
 	executeCommand(fmt.Sprintf("sudo chown root:root %s", wpaConfigPath))
 	executeCommand(fmt.Sprintf("sudo chmod 600 %s", wpaConfigPath))
 
