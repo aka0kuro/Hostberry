@@ -125,7 +125,7 @@
     <script id="i18n-json" type="application/json">{{ .translations_json }}</script>
     {{ end }}
 
-    <script src="/static/js/common.js"></script>
-    <script src="/static/js/first_login.js"></script>
+    <script src="/static/js/common.js?v={{ .last_update }}"></script>
+    <script src="/static/js/first_login.js?v={{ .last_update }}"></script>
 </body>
 </html>
