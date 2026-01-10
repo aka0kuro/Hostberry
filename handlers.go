@@ -304,7 +304,7 @@ func updatePreferencesAPIHandler(c *fiber.Ctx) error {
 	}
 
 	userID := user.ID
-	InsertLog("INFO", "Usuario actualizó sus preferencias", "auth", &userID)
+		InsertLog("INFO", fmt.Sprintf("Usuario %s actualizó sus preferencias", user.Username), "auth", &userID)
 	return c.JSON(fiber.Map{"message": "Preferencias actualizadas"})
 }
 
