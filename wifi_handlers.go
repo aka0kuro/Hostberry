@@ -474,13 +474,14 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 
 	// Crear contenido del archivo de configuración
 	// ctrl_interface apunta al directorio de socket
+	runDir := getRunDir()
 	configContent := fmt.Sprintf(`ctrl_interface=DIR=%s GROUP=netdev
 ctrl_interface_group=netdev
 update_config=1
 country=%s
 
 %s
-`, WpaSupplicantRunDir, country, networkBlock)
+`, runDir, country, networkBlock)
 
 	log.Printf("Contenido de configuración:\n%s", configContent)
 
