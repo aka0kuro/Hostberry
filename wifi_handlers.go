@@ -5,11 +5,52 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
+
+func selectConfigDir() string {
+	candidates := []string{
+		"/var/wpa_supplicant",
+		"/run/wpa_supplicant",
+		"/tmp/hostberry/wpa_supplicant",
+	}
+
+	for _, dir := range candidates {
+		if err := ensureDirForConfig(dir); err == nil {
+			log.Printf("Usando directorio de configuración de wpa_supplicant: %s", dir)
+			return dir
+		} else {
+			log.Printf("No se pudo preparar %s como directorio de configuración: %v", dir, err)
+		}
+	}
+
+	fallback := "/tmp/hostberry/wpa_supplicant"
+	if err := os.MkdirAll(fallback, 0o755); err != nil {
+		log.Printf("WARN: No se pudo crear el directorio temporal %s: %v", fallback, err)
+	}
+	log.Printf("Usando directorio temporal para configuración de wpa_supplicant: %s", fallback)
+	return fallback
+}
+
+func ensureDirForConfig(dir string) error {
+	if fi, err := os.Stat(dir); err == nil {
+		if !fi.IsDir() {
+			return fmt.Errorf("%s existe y no es un directorio", dir)
+		}
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	if _, err := executeCommand(fmt.Sprintf("sudo mkdir -p %s", dir)); err != nil {
+		return err
+	}
+	return nil
+}
 
 // scanWiFiNetworks escanea redes WiFi disponibles (reemplaza wifi_scan.lua)
 func scanWiFiNetworks(interfaceName string) map[string]interface{} {
@@ -245,15 +286,15 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null", interfaceName))
 	time.Sleep(2 * time.Second)
 
-	// Asegurar que el directorio de configuración existe
-	executeCommand("sudo mkdir -p /var/wpa_supplicant")
-
 	// Sanitizar SSID para usarlo en el nombre del archivo
 	safeSSID := regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(ssid, "_")
 
+	// Seleccionar directorio de configuración writable
+	configDir := selectConfigDir()
+
 	// Crear archivo de configuración wpa_supplicant usando el SSID
 	// Usamos /var/wpa_supplicant y el nombre del SSID como solicitado
-	wpaConfigPath := fmt.Sprintf("/var/wpa_supplicant/wpa_supplicant-%s.conf", safeSSID)
+	wpaConfigPath := filepath.Join(configDir, fmt.Sprintf("wpa_supplicant-%s.conf", safeSSID))
 	log.Printf("Creando archivo de configuración en: %s", wpaConfigPath)
 
 	// Eliminar archivo existente para evitar problemas de permisos si fue creado por root anteriormente
@@ -300,8 +341,7 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	exec.Command("sudo", "rm", "-f", wpaConfigPath).Run()
 
 	// 2. Escribir contenido
-	// Usamos mkdir -p dentro del mismo comando para asegurar que el directorio existe justo antes de escribir
-	writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("mkdir -p $(dirname %s) && cat > %s", wpaConfigPath, wpaConfigPath))
+	writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", wpaConfigPath))
 	writeCmd.Stdin = strings.NewReader(configContent)
 	
 	if out, err := writeCmd.CombinedOutput(); err != nil {
