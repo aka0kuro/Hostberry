@@ -248,9 +248,12 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	// Asegurar que el directorio de configuración existe
 	executeCommand("sudo mkdir -p /var/wpa_supplicant")
 
-	// Crear archivo de configuración wpa_supplicant para la interfaz
-	// Usamos /var/wpa_supplicant como solicitado
-	wpaConfigPath := fmt.Sprintf("/var/wpa_supplicant/wpa_supplicant-%s.conf", interfaceName)
+	// Sanitizar SSID para usarlo en el nombre del archivo
+	safeSSID := regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(ssid, "_")
+
+	// Crear archivo de configuración wpa_supplicant usando el SSID
+	// Usamos /var/wpa_supplicant y el nombre del SSID como solicitado
+	wpaConfigPath := fmt.Sprintf("/var/wpa_supplicant/wpa_supplicant-%s.conf", safeSSID)
 	log.Printf("Creando archivo de configuración en: %s", wpaConfigPath)
 
 	// Eliminar archivo existente para evitar problemas de permisos si fue creado por root anteriormente
