@@ -131,7 +131,11 @@ install_dependencies() {
             
             # Intentar instalar con salida visible para diagnóstico
             local install_output
-            if install_output=$(apt-get install -y "${package}" 2>&1); then
+            local install_exit_code
+            install_output=$(apt-get install -y "${package}" 2>&1)
+            install_exit_code=$?
+            
+            if [ $install_exit_code -eq 0 ]; then
                 # Verificar que realmente se instaló
                 local verify_installed=false
                 if dpkg -l | grep -q "^ii.*${package} "; then
