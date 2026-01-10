@@ -588,7 +588,6 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 
 	// Verificar que wpa_cli esté respondiendo (con múltiples intentos y métodos alternativos)
 	pingSuccess := false
-	socketPathForPing := "" // Ya no usamos rutas de socket; usamos ctrlDir
 	
 	for pingAttempt := 0; pingAttempt < 8; pingAttempt++ {
 		// Intentar con el comando configurado
