@@ -79,11 +79,16 @@ function showToast(title, message, type = 'info') {
 
 // Función para hacer peticiones HTTP
 async function apiRequest(url, options = {}) {
+    const token = localStorage.getItem('access_token');
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+    if (token && token !== 'null' && token !== 'undefined') {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
     const defaultOptions = {
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
+        credentials: 'include',
+        headers
     };
     
     const finalOptions = { ...defaultOptions, ...options };
