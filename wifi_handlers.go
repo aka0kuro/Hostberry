@@ -252,12 +252,24 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	// Generar bloque de red usando wpa_passphrase
 	var networkBlock string
 	if password != "" {
+		// Verificar que wpa_passphrase esté disponible
+		checkCmd := exec.Command("sh", "-c", "which wpa_passphrase 2>/dev/null || echo 'not found'")
+		checkOut, _ := checkCmd.Output()
+		if strings.Contains(string(checkOut), "not found") {
+			log.Printf("ERROR: wpa_passphrase no está instalado en el sistema")
+			result["success"] = false
+			result["error"] = "wpa_passphrase no está disponible. Instala el paquete wpa_supplicant"
+			return result
+		}
+		
 		passphraseCmd := fmt.Sprintf("wpa_passphrase '%s' '%s'", ssid, password)
 		passphraseOut, err := executeCommand(passphraseCmd)
 		if err != nil || !strings.Contains(passphraseOut, "network=") {
-			log.Printf("Error generando PSK con wpa_passphrase: %s", passphraseOut)
+			log.Printf("ERROR: wpa_passphrase falló. Comando: %s", passphraseCmd)
+			log.Printf("ERROR: Salida: %s", passphraseOut)
+			log.Printf("ERROR: Error: %v", err)
 			result["success"] = false
-			result["error"] = "Error al generar la clave PSK"
+			result["error"] = fmt.Sprintf("Error al generar la clave PSK: %s", strings.TrimSpace(passphraseOut))
 			return result
 		}
 		networkBlock = strings.TrimSpace(passphraseOut)
