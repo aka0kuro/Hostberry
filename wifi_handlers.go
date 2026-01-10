@@ -719,8 +719,12 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 				executeCommand("sudo chgrp netdev /var/run/wpa_supplicant 2>/dev/null || sudo chgrp hostberry /var/run/wpa_supplicant 2>/dev/null || true")
 				executeCommand("sudo chgrp netdev /run/wpa_supplicant 2>/dev/null || sudo chgrp hostberry /run/wpa_supplicant 2>/dev/null || true")
 				
-				// Iniciar wpa_supplicant
-				startCmd := fmt.Sprintf("sudo wpa_supplicant -B -i %s -c %s -D nl80211,wext", interfaceName, wpaConfig)
+				// Iniciar wpa_supplicant con directorio de control explícito (-C)
+				ctrlDir := "/run/wpa_supplicant"
+				if _, err := os.Stat(ctrlDir); err != nil {
+					ctrlDir = "/var/run/wpa_supplicant"
+				}
+				startCmd := fmt.Sprintf("sudo wpa_supplicant -B -i %s -c %s -D nl80211,wext -C %s", interfaceName, wpaConfig, ctrlDir)
 				startOut, _ := executeCommand(startCmd)
 				log.Printf("wpa_supplicant reiniciado: %s", strings.TrimSpace(startOut))
 				
