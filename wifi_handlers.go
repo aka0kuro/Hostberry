@@ -152,10 +152,15 @@ func startWpaSupplicant(interfaceName, configPath string) error {
 func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, error) {
 	log.Printf("Esperando conexión con wpa_cli para %s...", interfaceName)
 
-	// Intentar encontrar el socket
+	// Intentar encontrar el socket en todos los posibles directorios
 	socketPaths := []string{
-		fmt.Sprintf("%s/%s", WpaSupplicantRunDir, interfaceName),
 		fmt.Sprintf("/run/wpa_supplicant/%s", interfaceName),
+		fmt.Sprintf("/var/run/wpa_supplicant/%s", interfaceName),
+		fmt.Sprintf("/tmp/wpa_supplicant/%s", interfaceName),
+	}
+	// Agregar el directorio activo al inicio si está configurado
+	if activeRunDir != "" {
+		socketPaths = append([]string{fmt.Sprintf("%s/%s", activeRunDir, interfaceName)}, socketPaths...)
 	}
 
 	var workingSocketDir string
