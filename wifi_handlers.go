@@ -776,6 +776,14 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	maxAttempts := 15 // Aumentado de 8 a 15
 	lastState := ""
 	authFailures := 0
+	
+	// Asegurar que result siempre tenga success y error inicializados
+	if _, hasSuccess := result["success"]; !hasSuccess {
+		result["success"] = false
+	}
+	if _, hasError := result["error"]; !hasError {
+		result["error"] = ""
+	}
 
 	for attempt := 0; attempt < maxAttempts && !connected; attempt++ {
 		time.Sleep(2 * time.Second) // Reducido de 3 a 2 segundos para más intentos
