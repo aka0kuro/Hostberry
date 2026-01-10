@@ -543,12 +543,64 @@
         const item = document.createElement('div');
         item.className = 'log-item';
         const levelLabel = (log.level || log.log_level || 'INFO').toUpperCase();
-        const ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : (log.created_at ? new Date(log.created_at).toLocaleString() : '--');
+        const ts = log.timestamp ? new Date(log.timestamp) : (log.created_at ? new Date(log.created_at) : null);
+        const timeStr = ts ? ts.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--';
+        const dateStr = ts ? ts.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '--';
         const message = log.message || log.log_message || log.content || '';
+        const source = log.source || '';
+        
+        // Formatear mensaje de forma más legible
+        let formattedMessage = message;
+        
+        // Mejorar formato de mensajes comunes
+        if (message.includes('Usuario autenticado:')) {
+          const username = message.split('Usuario autenticado:')[1]?.trim() || '';
+          formattedMessage = `<i class="bi bi-person-check me-1"></i>Usuario <strong>${username}</strong> inició sesión`;
+        } else if (message.includes('Usuario cerró sesión:')) {
+          const username = message.split('Usuario cerró sesión:')[1]?.trim() || '';
+          formattedMessage = `<i class="bi bi-person-x me-1"></i>Usuario <strong>${username}</strong> cerró sesión`;
+        } else if (message.includes('WiFi conectado:')) {
+          const parts = message.match(/WiFi conectado: (.+?) \(usuario: (.+?)\)/);
+          if (parts) {
+            formattedMessage = `<i class="bi bi-wifi me-1"></i>WiFi conectado a <strong>${parts[1]}</strong> por usuario <strong>${parts[2]}</strong>`;
+          }
+        } else if (message.includes('Error conectando WiFi:')) {
+          const parts = message.match(/Error conectando WiFi: (.+?) \(usuario: (.+?)\)/);
+          if (parts) {
+            formattedMessage = `<i class="bi bi-wifi-off me-1"></i>Error conectando WiFi: <strong>${parts[1]}</strong> (usuario: <strong>${parts[2]}</strong>)`;
+          }
+        } else if (message.includes('Sistema apagado por:')) {
+          const username = message.split('Sistema apagado por:')[1]?.trim() || '';
+          formattedMessage = `<i class="bi bi-power me-1"></i>Sistema apagado por usuario <strong>${username}</strong>`;
+        } else if (message.includes('Sistema reiniciado por:')) {
+          const username = message.split('Sistema reiniciado por:')[1]?.trim() || '';
+          formattedMessage = `<i class="bi bi-arrow-clockwise me-1"></i>Sistema reiniciado por usuario <strong>${username}</strong>`;
+        } else if (message.includes('Usuario cambió contraseña')) {
+          formattedMessage = `<i class="bi bi-key me-1"></i>Usuario cambió su contraseña`;
+        } else if (message.includes('Usuario actualizó su perfil')) {
+          formattedMessage = `<i class="bi bi-person-gear me-1"></i>Usuario actualizó su perfil`;
+        }
+        
+        // Agregar icono según el source
+        let sourceIcon = '';
+        if (source === 'wifi') {
+          sourceIcon = '<i class="bi bi-wifi me-1"></i>';
+        } else if (source === 'auth') {
+          sourceIcon = '<i class="bi bi-shield-lock me-1"></i>';
+        } else if (source === 'system') {
+          sourceIcon = '<i class="bi bi-gear me-1"></i>';
+        } else if (source === 'network') {
+          sourceIcon = '<i class="bi bi-router me-1"></i>';
+        }
+        
         item.innerHTML = `
-          <span class="text-white-50 small">${ts}</span>
-          <span class="badge bg-${getLevelColor(levelLabel)} log-level">${levelLabel}</span>
-          <span class="text-white flex-grow-1">${message}</span>`;
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="text-white-50 small" style="min-width: 80px;">${timeStr}</span>
+            <span class="text-white-50 small" style="min-width: 90px;">${dateStr}</span>
+            <span class="badge bg-${getLevelColor(levelLabel)} log-level">${levelLabel}</span>
+            ${sourceIcon ? `<span class="text-white-50">${sourceIcon}</span>` : ''}
+            <span class="text-white flex-grow-1">${formattedMessage}</span>
+          </div>`;
         container.appendChild(item);
       });
     }catch(error){
