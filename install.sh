@@ -109,14 +109,44 @@ install_dependencies() {
     local wifi_packages=("hostapd" "dnsmasq" "iptables" "wpa_supplicant")
     
     for package in "${wifi_packages[@]}"; do
+        # Verificar si ya está instalado (múltiples métodos)
+        local is_installed=false
         if dpkg -l | grep -q "^ii.*${package} "; then
+            is_installed=true
+        elif command -v "${package}" &> /dev/null; then
+            is_installed=true
+        elif [ "${package}" = "wpa_supplicant" ] && (command -v wpa_supplicant &> /dev/null || [ -f "/usr/sbin/wpa_supplicant" ] || [ -f "/sbin/wpa_supplicant" ]); then
+            is_installed=true
+        elif [ "${package}" = "hostapd" ] && (command -v hostapd &> /dev/null || [ -f "/usr/sbin/hostapd" ] || [ -f "/sbin/hostapd" ]); then
+            is_installed=true
+        elif [ "${package}" = "dnsmasq" ] && (command -v dnsmasq &> /dev/null || [ -f "/usr/sbin/dnsmasq" ] || [ -f "/sbin/dnsmasq" ]); then
+            is_installed=true
+        fi
+        
+        if [ "$is_installed" = true ]; then
             print_info "  ✓ ${package} ya está instalado"
             installed_packages+=("${package}")
         else
             print_info "  Instalando ${package}..."
-            if apt-get install -y "${package}" > /dev/null 2>&1; then
+            
+            # Intentar instalar con salida visible para diagnóstico
+            local install_output
+            if install_output=$(apt-get install -y "${package}" 2>&1); then
                 # Verificar que realmente se instaló
-                if dpkg -l | grep -q "^ii.*${package} " || command -v "${package}" &> /dev/null; then
+                local verify_installed=false
+                if dpkg -l | grep -q "^ii.*${package} "; then
+                    verify_installed=true
+                elif command -v "${package}" &> /dev/null; then
+                    verify_installed=true
+                elif [ "${package}" = "wpa_supplicant" ] && (command -v wpa_supplicant &> /dev/null || [ -f "/usr/sbin/wpa_supplicant" ] || [ -f "/sbin/wpa_supplicant" ]); then
+                    verify_installed=true
+                elif [ "${package}" = "hostapd" ] && (command -v hostapd &> /dev/null || [ -f "/usr/sbin/hostapd" ] || [ -f "/sbin/hostapd" ]); then
+                    verify_installed=true
+                elif [ "${package}" = "dnsmasq" ] && (command -v dnsmasq &> /dev/null || [ -f "/usr/sbin/dnsmasq" ] || [ -f "/sbin/dnsmasq" ]); then
+                    verify_installed=true
+                fi
+                
+                if [ "$verify_installed" = true ]; then
                     print_success "  ✓ ${package} instalado correctamente"
                     installed_packages+=("${package}")
                 else
@@ -124,7 +154,22 @@ install_dependencies() {
                     failed_packages+=("${package}")
                 fi
             else
+                # Mostrar información del error
                 print_warning "  ✗ No se pudo instalar ${package}"
+                
+                # Verificar si el paquete está disponible en los repositorios
+                if ! apt-cache search "${package}" 2>/dev/null | grep -q "^${package} "; then
+                    print_warning "    El paquete ${package} no está disponible en los repositorios configurados"
+                    print_info "    Intenta ejecutar: sudo apt-get update && sudo apt-get install -y ${package}"
+                else
+                    # Mostrar el error específico
+                    echo "$install_output" | tail -5 | while read line; do
+                        if [ -n "$line" ]; then
+                            print_warning "    $line"
+                        fi
+                    done
+                fi
+                
                 failed_packages+=("${package}")
             fi
         fi
