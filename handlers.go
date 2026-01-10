@@ -273,7 +273,7 @@ func updateProfileAPIHandler(c *fiber.Ctx) error {
 	}
 
 	userID := user.ID
-	InsertLog("INFO", "Usuario actualizó su perfil", "auth", &userID)
+		InsertLog("INFO", fmt.Sprintf("Usuario %s actualizó su perfil", user.Username), "auth", &userID)
 	return c.JSON(fiber.Map{"message": "Perfil actualizado"})
 }
 
