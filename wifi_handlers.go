@@ -180,7 +180,6 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 // connectWiFi conecta a una red WiFi (reemplaza wifi_connect.lua)
 func connectWiFi(ssid, password, interfaceName, country, user string) map[string]interface{} {
 	result := make(map[string]interface{})
-	useSystemWpa := false
 
 	if ssid == "" {
 		result["success"] = false
