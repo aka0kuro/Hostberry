@@ -912,7 +912,7 @@ func adblockDisableHandler(c *fiber.Ctx) error {
 
 	result := disableAdBlock(user.Username)
 	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("AdBlock deshabilitado (usuario: %s)", user.Username), "adblock", &userID)
+		InsertLog("INFO", fmt.Sprintf("AdBlock deshabilitado por usuario %s", user.Username), "adblock", &userID)
 		return c.JSON(result)
 	}
 
