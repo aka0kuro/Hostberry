@@ -945,6 +945,21 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 		log.Printf("❌ ERROR: Error conectando WiFi: %s - Estado final: %s", ssid, statusOutput)
 	}
 
+	// Asegurar que siempre se retorne un resultado válido con success y error
+	if _, hasSuccess := result["success"]; !hasSuccess {
+		log.Printf("⚠️  WARNING: result no tiene 'success', estableciendo a false")
+		result["success"] = false
+	}
+	if _, hasError := result["error"]; !hasError {
+		if result["success"] == false {
+			log.Printf("⚠️  WARNING: result no tiene 'error' pero success es false, estableciendo mensaje genérico")
+			result["error"] = "Error desconocido al conectar a la red WiFi"
+		} else {
+			result["error"] = ""
+		}
+	}
+	
+	log.Printf("📤 Retornando resultado: success=%v, error=%v", result["success"], result["error"])
 	return result
 }
 
