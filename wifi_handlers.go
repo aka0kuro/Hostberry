@@ -444,9 +444,9 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 				if attempt < maxAttempts-1 {
 					log.Printf("Reintentando conexión... (estado: %s)", currentState)
 					// Deshabilitar y volver a habilitar la red
-					executeCommand(fmt.Sprintf("%s disable_network %s", wpaCliCmd, networkID))
+					executeCommand(fmt.Sprintf("%s disable_network %s", wpaCliCmd, "0"))
 					time.Sleep(1 * time.Second)
-					executeCommand(fmt.Sprintf("%s enable_network %s", wpaCliCmd, networkID))
+					executeCommand(fmt.Sprintf("%s enable_network %s", wpaCliCmd, "0"))
 					executeCommand(fmt.Sprintf("%s reconnect", wpaCliCmd))
 				}
 			}
