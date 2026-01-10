@@ -1272,6 +1272,18 @@ EOF
         print_info "Revisa manualmente: visudo -c -f /etc/sudoers.d/hostberry"
         chmod 440 "/etc/sudoers.d/hostberry"
     fi
+
+    # Crear directorio temporal persistente para la configuración de wpa_supplicant
+    FALLBACK_WPA_DIR="/tmp/hostberry/wpa_supplicant"
+    if [ ! -d "$FALLBACK_WPA_DIR" ]; then
+        mkdir -p "$FALLBACK_WPA_DIR"
+        chown root:netdev "$FALLBACK_WPA_DIR"
+        chmod 775 "$FALLBACK_WPA_DIR"
+        print_info "Directorio temporal persistente creado: $FALLBACK_WPA_DIR"
+    else
+        chown root:netdev "$FALLBACK_WPA_DIR"
+        chmod 775 "$FALLBACK_WPA_DIR"
+    fi
 }
 
 # Crear configuración por defecto de HostAPD
@@ -1398,25 +1410,30 @@ EOF
         print_success "Archivo de configuración de dnsmasq creado"
     fi
     
-    # Configurar wpa_supplicant para modo STA
-    print_info "Configurando wpa_supplicant para modo estación (STA)..."
-    WPA_CONFIG="/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
-    if [ ! -f "$WPA_CONFIG" ]; then
-        # Crear archivo de configuración de wpa_supplicant si no existe
-        print_info "Creando archivo de configuración de wpa_supplicant: $WPA_CONFIG"
-        mkdir -p /etc/wpa_supplicant
-        cat > "$WPA_CONFIG" <<EOF
+# Configurar wpa_supplicant para modo STA
+print_info "Configurando wpa_supplicant para modo estación (STA)..."
+WPA_CONFIG="/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
+if [ ! -f "$WPA_CONFIG" ]; then
+    # Crear archivo de configuración de wpa_supplicant si no existe
+    print_info "Creando archivo de configuración de wpa_supplicant: $WPA_CONFIG"
+    mkdir -p /etc/wpa_supplicant
+    chown root:netdev /etc/wpa_supplicant
+    chmod 755 /etc/wpa_supplicant
+    cat > "$WPA_CONFIG" <<EOF
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
 country=US
 
 # Redes guardadas se agregarán aquí automáticamente
 EOF
-        chmod 600 "$WPA_CONFIG"
-        print_success "Archivo de configuración de wpa_supplicant creado"
-    else
-        print_info "Archivo de configuración de wpa_supplicant ya existe"
-    fi
+    chmod 600 "$WPA_CONFIG"
+    chown root:netdev "$WPA_CONFIG"
+    print_success "Archivo de configuración de wpa_supplicant creado"
+else
+    print_info "Archivo de configuración de wpa_supplicant ya existe"
+    chown root:netdev /etc/wpa_supplicant
+    chmod 755 /etc/wpa_supplicant
+fi
     
     # Crear archivo de override de systemd para hostapd si no existe
     OVERRIDE_DIR="/etc/systemd/system/hostapd.service.d"
