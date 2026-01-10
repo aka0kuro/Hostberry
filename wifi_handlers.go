@@ -80,10 +80,10 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 	lines := strings.Split(string(scanOut), "\n")
 	currentNetwork := make(map[string]interface{})
 	seenNetworks := make(map[string]bool) // Para evitar duplicados
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		
+
 		// Detectar inicio de nuevo BSS (nueva red)
 		if strings.HasPrefix(line, "BSS ") {
 			// Guardar red anterior si existe y tiene SSID
@@ -312,7 +312,7 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 			result["error"] = "wpa_passphrase no está disponible. Instala el paquete wpa_supplicant"
 			return result
 		}
-		
+
 		// Usar exec.Command directamente para evitar problemas de escaping en shell
 		cmd := exec.Command("wpa_passphrase", ssid, password)
 		passphraseOutBytes, err := cmd.Output()
@@ -336,14 +336,14 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	// Escribir el archivo de configuración de manera robusta
 	// Usamos sudo sh -c "cat > ..." para escribir directamente como root
 	// Esto evita problemas de namespaces (mv), stdout (tee) y permisos de archivo existente
-	
+
 	// 1. Intentar limpiar archivo existente
 	exec.Command("sudo", "rm", "-f", wpaConfigPath).Run()
 
 	// 2. Escribir contenido
 	writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", wpaConfigPath))
 	writeCmd.Stdin = strings.NewReader(configContent)
-	
+
 	if out, err := writeCmd.CombinedOutput(); err != nil {
 		log.Printf("CRITICAL ERROR: Falló escritura con sudo cat: %v", err)
 		log.Printf("Output: %s", string(out))
@@ -436,10 +436,10 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	connected := false
 	statusOutput := ""
 	maxAttempts := 15 // Aumentado de 8 a 15
-// ...
+	// ...
 	lastState := ""
 	authFailures := 0
-	
+
 	// Asegurar que result siempre tenga success y error inicializados
 	if _, hasSuccess := result["success"]; !hasSuccess {
 		result["success"] = false
@@ -464,9 +464,9 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 		}
 
 		// Detectar errores de autenticación
-		if strings.Contains(statusOutput, "WRONG_KEY") || 
-		   strings.Contains(statusOutput, "AUTH_FAIL") ||
-		   strings.Contains(statusOutput, "4WAY_HANDSHAKE_TIMEOUT") {
+		if strings.Contains(statusOutput, "WRONG_KEY") ||
+			strings.Contains(statusOutput, "AUTH_FAIL") ||
+			strings.Contains(statusOutput, "4WAY_HANDSHAKE_TIMEOUT") {
 			authFailures++
 			log.Printf("ERROR: Fallo de autenticación detectado (intento %d)", authFailures)
 			if authFailures >= 3 {
@@ -490,7 +490,7 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 				ssidRe := regexp.MustCompile(`ssid=([^\r\n]+)`)
 				ssidMatches := ssidRe.FindStringSubmatch(statusOutput)
 				if len(ssidMatches) > 1 {
-					log.Printf("⚠️  wpa_state=COMPLETED pero SSID no coincide. Conectado a: %s, esperado: %s", 
+					log.Printf("⚠️  wpa_state=COMPLETED pero SSID no coincide. Conectado a: %s, esperado: %s",
 						strings.TrimSpace(ssidMatches[1]), ssid)
 				} else {
 					log.Printf("⚠️  wpa_state=COMPLETED pero no se pudo extraer SSID")
@@ -504,8 +504,8 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 			}
 
 			// Estados intermedios que indican progreso
-			if currentState == "ASSOCIATING" || currentState == "ASSOCIATED" || 
-			   currentState == "4WAY_HANDSHAKE" || currentState == "GROUP_HANDSHAKE" {
+			if currentState == "ASSOCIATING" || currentState == "ASSOCIATED" ||
+				currentState == "4WAY_HANDSHAKE" || currentState == "GROUP_HANDSHAKE" {
 				log.Printf("Progreso de conexión: %s", currentState)
 			}
 
@@ -575,7 +575,7 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	} else {
 		// Extraer información de error más detallada
 		errorMsg := fmt.Sprintf("No se pudo establecer la conexión después de %d intentos", maxAttempts)
-		
+
 		// Intentar obtener más información del estado
 		re := regexp.MustCompile(`wpa_state=([^\r\n]+)`)
 		matches := re.FindStringSubmatch(statusOutput)
@@ -621,7 +621,7 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 			result["error"] = ""
 		}
 	}
-	
+
 	log.Printf("📤 Retornando resultado: success=%v, error=%v", result["success"], result["error"])
 	return result
 }
