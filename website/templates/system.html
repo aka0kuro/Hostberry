@@ -553,32 +553,77 @@
         let formattedMessage = message;
         
         // Mejorar formato de mensajes comunes
-        if (message.includes('Usuario autenticado:')) {
-          const username = message.split('Usuario autenticado:')[1]?.trim() || '';
-          formattedMessage = `<i class="bi bi-person-check me-1"></i>Usuario <strong>${username}</strong> inició sesión`;
-        } else if (message.includes('Usuario cerró sesión:')) {
-          const username = message.split('Usuario cerró sesión:')[1]?.trim() || '';
-          formattedMessage = `<i class="bi bi-person-x me-1"></i>Usuario <strong>${username}</strong> cerró sesión`;
-        } else if (message.includes('WiFi conectado:')) {
-          const parts = message.match(/WiFi conectado: (.+?) \(usuario: (.+?)\)/);
+        if (message.includes('inició sesión')) {
+          const parts = message.match(/Usuario (.+?) inició sesión/);
+          if (parts) {
+            formattedMessage = `<i class="bi bi-person-check me-1"></i>Usuario <strong>${parts[1]}</strong> inició sesión`;
+          }
+        } else if (message.includes('cerró sesión')) {
+          const parts = message.match(/Usuario (.+?) cerró sesión/);
+          if (parts) {
+            formattedMessage = `<i class="bi bi-person-x me-1"></i>Usuario <strong>${parts[1]}</strong> cerró sesión`;
+          }
+        } else if (message.includes('WiFi conectado a')) {
+          const parts = message.match(/WiFi conectado a (.+?) por usuario (.+?)$/);
           if (parts) {
             formattedMessage = `<i class="bi bi-wifi me-1"></i>WiFi conectado a <strong>${parts[1]}</strong> por usuario <strong>${parts[2]}</strong>`;
           }
-        } else if (message.includes('Error conectando WiFi:')) {
-          const parts = message.match(/Error conectando WiFi: (.+?) \(usuario: (.+?)\)/);
+        } else if (message.includes('Error conectando WiFi')) {
+          const parts = message.match(/Error conectando WiFi (.+?): (.+?) \(usuario: (.+?)\)/);
           if (parts) {
-            formattedMessage = `<i class="bi bi-wifi-off me-1"></i>Error conectando WiFi: <strong>${parts[1]}</strong> (usuario: <strong>${parts[2]}</strong>)`;
+            formattedMessage = `<i class="bi bi-wifi-off me-1"></i>Error conectando WiFi <strong>${parts[1]}</strong>: ${parts[2]} (usuario: <strong>${parts[3]}</strong>)`;
+          } else {
+            // Formato alternativo sin SSID
+            const parts2 = message.match(/Error conectando WiFi: (.+?) \(usuario: (.+?)\)/);
+            if (parts2) {
+              formattedMessage = `<i class="bi bi-wifi-off me-1"></i>Error conectando WiFi: <strong>${parts2[1]}</strong> (usuario: <strong>${parts2[2]}</strong>)`;
+            }
           }
-        } else if (message.includes('Sistema apagado por:')) {
-          const username = message.split('Sistema apagado por:')[1]?.trim() || '';
-          formattedMessage = `<i class="bi bi-power me-1"></i>Sistema apagado por usuario <strong>${username}</strong>`;
-        } else if (message.includes('Sistema reiniciado por:')) {
-          const username = message.split('Sistema reiniciado por:')[1]?.trim() || '';
-          formattedMessage = `<i class="bi bi-arrow-clockwise me-1"></i>Sistema reiniciado por usuario <strong>${username}</strong>`;
-        } else if (message.includes('Usuario cambió contraseña')) {
-          formattedMessage = `<i class="bi bi-key me-1"></i>Usuario cambió su contraseña`;
-        } else if (message.includes('Usuario actualizó su perfil')) {
-          formattedMessage = `<i class="bi bi-person-gear me-1"></i>Usuario actualizó su perfil`;
+        } else if (message.includes('Sistema apagado por usuario')) {
+          const parts = message.match(/Sistema apagado por usuario (.+?)$/);
+          if (parts) {
+            formattedMessage = `<i class="bi bi-power me-1"></i>Sistema apagado por usuario <strong>${parts[1]}</strong>`;
+          }
+        } else if (message.includes('Sistema reiniciado por usuario')) {
+          const parts = message.match(/Sistema reiniciado por usuario (.+?)$/);
+          if (parts) {
+            formattedMessage = `<i class="bi bi-arrow-clockwise me-1"></i>Sistema reiniciado por usuario <strong>${parts[1]}</strong>`;
+          }
+        } else if (message.includes('cambió su contraseña')) {
+          const parts = message.match(/Usuario (.+?) cambió su contraseña/);
+          if (parts) {
+            formattedMessage = `<i class="bi bi-key me-1"></i>Usuario <strong>${parts[1]}</strong> cambió su contraseña`;
+          }
+        } else if (message.includes('actualizó su perfil')) {
+          const parts = message.match(/Usuario (.+?) actualizó su perfil/);
+          if (parts) {
+            formattedMessage = `<i class="bi bi-person-gear me-1"></i>Usuario <strong>${parts[1]}</strong> actualizó su perfil`;
+          }
+        } else if (message.includes('actualizó sus preferencias')) {
+          const parts = message.match(/Usuario (.+?) actualizó sus preferencias/);
+          if (parts) {
+            formattedMessage = `<i class="bi bi-sliders me-1"></i>Usuario <strong>${parts[1]}</strong> actualizó sus preferencias`;
+          }
+        } else if (message.includes('VPN') && message.includes('conectado')) {
+          const parts = message.match(/VPN (.+?) conectado por usuario (.+?)$/);
+          if (parts) {
+            formattedMessage = `<i class="bi bi-shield-lock me-1"></i>VPN <strong>${parts[1]}</strong> conectado por usuario <strong>${parts[2]}</strong>`;
+          }
+        } else if (message.includes('WireGuard configurado')) {
+          const parts = message.match(/WireGuard configurado por usuario (.+?)$/);
+          if (parts) {
+            formattedMessage = `<i class="bi bi-shield-check me-1"></i>WireGuard configurado por usuario <strong>${parts[1]}</strong>`;
+          }
+        } else if (message.includes('AdBlock habilitado')) {
+          const parts = message.match(/AdBlock habilitado por usuario (.+?)$/);
+          if (parts) {
+            formattedMessage = `<i class="bi bi-shield-fill-check me-1"></i>AdBlock habilitado por usuario <strong>${parts[1]}</strong>`;
+          }
+        } else if (message.includes('AdBlock deshabilitado')) {
+          const parts = message.match(/AdBlock deshabilitado por usuario (.+?)$/);
+          if (parts) {
+            formattedMessage = `<i class="bi bi-shield-fill-x me-1"></i>AdBlock deshabilitado por usuario <strong>${parts[1]}</strong>`;
+          }
         }
         
         // Agregar icono según el source
