@@ -287,18 +287,38 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	// Crear contenido completo del archivo de configuración
 	configContent := fmt.Sprintf("ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\nctrl_interface_group=netdev\nupdate_config=1\ncountry=%s\n\n%s\n", country, networkBlock)
 
-	// Escribir el archivo de configuración usando sudo tee para evitar problemas de permisos
-	// Esto es más robusto que mv o cp cuando hay restricciones de permisos
-	writeCmd := exec.Command("sudo", "tee", wpaConfigPath)
-	writeCmd.Stdin = strings.NewReader(configContent)
-	// Descartar stdout para no llenar los logs con el contenido del archivo
-	writeCmd.Stdout = nil
-	
-	if err := writeCmd.Run(); err != nil {
-		log.Printf("Error escribiendo archivo con sudo tee: %v", err)
+	// Escribir el archivo de configuración de manera robusta
+	// 1. Escribir en archivo temporal en /tmp (siempre escribible)
+	tempConfigPath := fmt.Sprintf("/tmp/wpa_config_%s_%d.conf", interfaceName, time.Now().Unix())
+	if err := os.WriteFile(tempConfigPath, []byte(configContent), 0644); err != nil {
+		log.Printf("Error escribiendo archivo temporal: %v", err)
 		result["success"] = false
-		result["error"] = fmt.Sprintf("Error de permisos al guardar configuración wifi (tee): %v", err)
+		result["error"] = "Error creando archivo temporal"
 		return result
+	}
+	defer os.Remove(tempConfigPath) // Limpiar temporal al salir
+
+	// 2. Intentar borrar el archivo destino explícitamente y loguear resultado
+	rmCmd := exec.Command("sudo", "rm", "-f", wpaConfigPath)
+	if out, err := rmCmd.CombinedOutput(); err != nil {
+		log.Printf("Advertencia: No se pudo borrar config anterior (puede no existir): %v, output: %s", err, string(out))
+	}
+
+	// 3. Copiar archivo temporal al destino usando sudo cp
+	cpCmd := exec.Command("sudo", "cp", "-f", tempConfigPath, wpaConfigPath)
+	if out, err := cpCmd.CombinedOutput(); err != nil {
+		log.Printf("CRITICAL ERROR: Falló sudo cp: %v", err)
+		log.Printf("Output de cp: %s", string(out))
+		
+		// Intento alternativo: mover
+		log.Printf("Intentando sudo mv como alternativa...")
+		mvCmd := exec.Command("sudo", "mv", "-f", tempConfigPath, wpaConfigPath)
+		if outMv, errMv := mvCmd.CombinedOutput(); errMv != nil {
+			log.Printf("CRITICAL ERROR: Falló también sudo mv: %v, output: %s", errMv, string(outMv))
+			result["success"] = false
+			result["error"] = fmt.Sprintf("Error crítico guardando configuración: %v", err)
+			return result
+		}
 	}
 	
 	// Asegurar permisos correctos (solo lectura/escritura para root)
