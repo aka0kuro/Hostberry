@@ -285,22 +285,12 @@
     
     if(!form) return;
     
-    form.addEventListener('submit', async function(e){
-      e.preventDefault();
-      const fd = new FormData(form);
-      const payload = Object.fromEntries(fd.entries());
-      
-      if(payload.new_password !== payload.confirm_password){
-        showError(t('auth.passwords_dont_match', 'Las contraseñas no coinciden'));
-        return;
-      }
-      
       // Usar fetch directamente para tener control total sobre la respuesta
       const headers = {
         'Content-Type': 'application/json',
         'Accept-Language': currentLang
       };
-      
+
       // Agregar token si existe (evitar Bearer null/undefined)
       if (token && token !== 'null' && token !== 'undefined') {
         headers['Authorization'] = `Bearer ${token}`;
@@ -312,7 +302,7 @@
         credentials: 'include',
         body: JSON.stringify(payload)
       });
-      
+
       let data = null;
       try {
         // Leer el texto de la respuesta primero
@@ -334,7 +324,7 @@
       if(resp && resp.ok){
         // Extraer solo el mensaje de la respuesta
         let successMessage = t('auth.credentials_updated', 'Credenciales actualizadas. Vuelve a iniciar sesión.');
-        
+
         if (data) {
           // Si data es un objeto con message, usar ese
           if (typeof data === 'object' && data !== null && data.message && typeof data.message === 'string') {
@@ -357,12 +347,12 @@
             }
           }
         }
-        
+
         // Asegurar que el mensaje es un string y no un objeto
         if (typeof successMessage !== 'string') {
           successMessage = t('auth.credentials_updated', 'Credenciales actualizadas. Vuelve a iniciar sesión.');
         }
-        
+
         showSuccess(successMessage);
         localStorage.removeItem('access_token');
         setTimeout(function(){ 
@@ -381,7 +371,36 @@
               data = null;
             }
           }
-    });
-  });
-})();
 
+          // Caso especial: endpoint de first-login solo válido en primer login
+          if (resp && resp.status === 403 && data && typeof data === 'object' && data !== null && typeof data.error === 'string') {
+            showError(data.error);
+            setTimeout(function(){
+              window.location.href = `/login?lang=${encodeURIComponent(currentLang)}`;
+            }, 1200);
+            return;
+          }
+
+          // Caso: 401 sin token/cookie
+          if (resp && resp.status === 401) {
+            showError(t('auth.session_expired', 'Session expired'));
+            setTimeout(function(){
+              window.location.href = `/login?lang=${encodeURIComponent(currentLang)}`;
+            }, 1200);
+            return;
+          }
+
+          // Fallback: status + mensaje genérico
+          const status = resp && typeof resp.status === 'number' ? resp.status : 0;
+          const baseMsg = t('errors.general_error_message', 'Ha ocurrido un error inesperado');
+          showError(status ? `${baseMsg} (HTTP ${status})` : baseMsg);
+        }
+      }
+    }
+    catch(_e){
+      console.error('Error en first-login:', _e);
+      const errorMsg = _e.message || t('errors.unknown_error', 'Error desconocido');
+      showError(t('errors.connection_error', 'Error de conexión') + ': ' + errorMsg);
+    }
+  });
+});
