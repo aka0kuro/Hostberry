@@ -241,13 +241,16 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	// Asegurar que la interfaz esté activa y no bloqueada
 	executeCommand("sudo rfkill unblock wifi 2>/dev/null || true")
 	executeCommand(fmt.Sprintf("sudo ip link set %s down 2>/dev/null", interfaceName))
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null", interfaceName))
 	time.Sleep(2 * time.Second)
 
+	// Asegurar que el directorio de configuración existe
+	executeCommand("sudo mkdir -p /var/wpa_supplicant")
+
 	// Crear archivo de configuración wpa_supplicant para la interfaz
-	// Usamos /home/hostberry para persistencia ya que /etc es read-only y /tmp se borra al reiniciar
-	wpaConfigPath := fmt.Sprintf("/home/hostberry/wpa_supplicant-%s.conf", interfaceName)
+	// Usamos /var/wpa_supplicant como solicitado
+	wpaConfigPath := fmt.Sprintf("/var/wpa_supplicant/wpa_supplicant-%s.conf", interfaceName)
 	log.Printf("Creando archivo de configuración en: %s", wpaConfigPath)
 
 	// Eliminar archivo existente para evitar problemas de permisos si fue creado por root anteriormente
