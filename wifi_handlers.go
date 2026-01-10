@@ -14,38 +14,82 @@ import (
 // Directorio estándar para configuración de wpa_supplicant
 const WpaSupplicantConfigDir = "/etc/wpa_supplicant"
 
-// Directorio para socket de control de wpa_supplicant
-const WpaSupplicantRunDir = "/var/run/wpa_supplicant"
+// Variables para directorios de socket (se determinan dinámicamente)
+var activeRunDir string
+
+// getRunDir retorna el directorio de socket activo
+func getRunDir() string {
+	if activeRunDir != "" {
+		return activeRunDir
+	}
+	// Intentar determinar el directorio de socket
+	candidates := []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"}
+	for _, dir := range candidates {
+		if _, err := os.Stat(dir); err == nil {
+			activeRunDir = dir
+			return activeRunDir
+		}
+	}
+	activeRunDir = "/run/wpa_supplicant"
+	return activeRunDir
+}
 
 // ensureWpaSupplicantDirs asegura que los directorios necesarios existan con permisos correctos
 func ensureWpaSupplicantDirs() error {
-	// Crear directorio de configuración
+	// Crear directorio de configuración (generalmente siempre funciona)
 	if _, err := os.Stat(WpaSupplicantConfigDir); os.IsNotExist(err) {
 		log.Printf("Creando directorio de configuración: %s", WpaSupplicantConfigDir)
-		if _, err := executeCommand(fmt.Sprintf("sudo mkdir -p %s", WpaSupplicantConfigDir)); err != nil {
-			return fmt.Errorf("no se pudo crear %s: %v", WpaSupplicantConfigDir, err)
+		cmd := exec.Command("sudo", "mkdir", "-p", WpaSupplicantConfigDir)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			log.Printf("Warning: no se pudo crear %s: %v (output: %s)", WpaSupplicantConfigDir, err, string(out))
+			// No es fatal, intentamos continuar
 		}
 	}
-	executeCommand(fmt.Sprintf("sudo chmod 755 %s", WpaSupplicantConfigDir))
-	executeCommand(fmt.Sprintf("sudo chown root:netdev %s 2>/dev/null || sudo chown root:root %s", WpaSupplicantConfigDir, WpaSupplicantConfigDir))
+	exec.Command("sudo", "chmod", "755", WpaSupplicantConfigDir).Run()
+	exec.Command("sudo", "chown", "root:netdev", WpaSupplicantConfigDir).Run()
 
-	// Crear directorio de socket de control
-	if _, err := os.Stat(WpaSupplicantRunDir); os.IsNotExist(err) {
-		log.Printf("Creando directorio de socket: %s", WpaSupplicantRunDir)
-		if _, err := executeCommand(fmt.Sprintf("sudo mkdir -p %s", WpaSupplicantRunDir)); err != nil {
-			return fmt.Errorf("no se pudo crear %s: %v", WpaSupplicantRunDir, err)
+	// Intentar crear directorio de socket en orden de preferencia
+	runDirCandidates := []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"}
+	var createdDir string
+
+	for _, dir := range runDirCandidates {
+		// Verificar si ya existe
+		if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
+			log.Printf("Directorio de socket ya existe: %s", dir)
+			createdDir = dir
+			break
+		}
+
+		// Intentar crear
+		log.Printf("Intentando crear directorio de socket: %s", dir)
+		cmd := exec.Command("sudo", "mkdir", "-p", dir)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			log.Printf("No se pudo crear %s: %v (output: %s)", dir, err, string(out))
+			continue
+		}
+
+		// Verificar que se creó
+		if _, err := os.Stat(dir); err == nil {
+			log.Printf("Directorio de socket creado: %s", dir)
+			createdDir = dir
+			break
 		}
 	}
-	executeCommand(fmt.Sprintf("sudo chmod 775 %s", WpaSupplicantRunDir))
-	executeCommand(fmt.Sprintf("sudo chown root:netdev %s 2>/dev/null || sudo chown root:root %s", WpaSupplicantRunDir, WpaSupplicantRunDir))
 
-	// También crear /run/wpa_supplicant como symlink o directorio alternativo
-	runDir := "/run/wpa_supplicant"
-	if _, err := os.Stat(runDir); os.IsNotExist(err) {
-		executeCommand(fmt.Sprintf("sudo mkdir -p %s", runDir))
-		executeCommand(fmt.Sprintf("sudo chmod 775 %s", runDir))
-		executeCommand(fmt.Sprintf("sudo chown root:netdev %s 2>/dev/null || true", runDir))
+	if createdDir == "" {
+		// Último recurso: usar /tmp
+		createdDir = "/tmp/wpa_supplicant"
+		os.MkdirAll(createdDir, 0775)
+		log.Printf("Usando directorio temporal: %s", createdDir)
 	}
+
+	// Configurar permisos
+	exec.Command("sudo", "chmod", "775", createdDir).Run()
+	exec.Command("sudo", "chown", "root:netdev", createdDir).Run()
+
+	// Guardar el directorio activo
+	activeRunDir = createdDir
+	log.Printf("Directorio de socket activo: %s", activeRunDir)
 
 	return nil
 }
