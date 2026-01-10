@@ -313,10 +313,6 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 			return result
 		}
 	}
-	
-	// Asegurar permisos correctos (solo lectura/escritura para root)
-	executeCommand(fmt.Sprintf("sudo chown root:root %s", wpaConfigPath))
-	executeCommand(fmt.Sprintf("sudo chmod 600 %s", wpaConfigPath))
 
 	log.Printf("Archivo de configuración creado exitosamente en %s", wpaConfigPath)
 
