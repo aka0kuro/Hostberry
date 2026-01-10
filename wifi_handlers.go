@@ -246,8 +246,8 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	time.Sleep(2 * time.Second)
 
 	// Crear archivo de configuración wpa_supplicant para la interfaz
-	// Usamos /tmp porque /etc puede ser de solo lectura (read-only filesystem)
-	wpaConfigPath := fmt.Sprintf("/tmp/wpa_supplicant-%s.conf", interfaceName)
+	// Usamos /home/hostberry para persistencia ya que /etc es read-only y /tmp se borra al reiniciar
+	wpaConfigPath := fmt.Sprintf("/home/hostberry/wpa_supplicant-%s.conf", interfaceName)
 	log.Printf("Creando archivo de configuración en: %s", wpaConfigPath)
 
 	// Eliminar archivo existente para evitar problemas de permisos si fue creado por root anteriormente
