@@ -180,6 +180,7 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 // connectWiFi conecta a una red WiFi (reemplaza wifi_connect.lua)
 func connectWiFi(ssid, password, interfaceName, country, user string) map[string]interface{} {
 	result := make(map[string]interface{})
+	useSystemWpa := false
 
 	if ssid == "" {
 		result["success"] = false
@@ -220,14 +221,9 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	systemWpaOut, _ := exec.Command("sh", "-c", "ps aux | grep -E '[w]pa_supplicant.* -u ' 2>/dev/null").Output()
 	if strings.TrimSpace(string(systemWpaOut)) != "" {
 		log.Printf("wpa_supplicant está siendo gestionado por el sistema (-u)")
-		if nmConnected {
-			result["success"] = false
-			result["error"] = "NetworkManager está activo y wpa_supplicant está gestionado por el sistema. Desactiva NetworkManager o usa nmcli para conectar."
-			return result
-		}
-		executeCommand("sudo systemctl stop wpa_supplicant 2>/dev/null || true")
-		executeCommand(fmt.Sprintf("sudo systemctl stop wpa_supplicant@%s 2>/dev/null || true", interfaceName))
-		time.Sleep(1 * time.Second)
+		// En sistemas tipo Arch (wpa_supplicant global con -O DIR=/run/wpa_supplicant),
+		// lo correcto es usar el socket global y agregar la interfaz, no parar el servicio.
+		useSystemWpa = true
 	}
 
 	// Si hostapd está corriendo, NO lo detenemos automáticamente porque puede cortar la sesión (AP).
@@ -259,17 +255,55 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null", interfaceName))
 	time.Sleep(2 * time.Second)
 
-	// Detener cualquier instancia de wpa_supplicant existente SOLO para esta interfaz
-	wpaPid, _ := exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'wpa_supplicant.*%s'", interfaceName)).Output()
-	if strings.TrimSpace(string(wpaPid)) != "" {
-		log.Printf("Deteniendo wpa_supplicant existente para reiniciar limpiamente")
-		executeCommand(fmt.Sprintf("sudo pkill -f 'wpa_supplicant.*%s' 2>/dev/null || true", interfaceName))
-		time.Sleep(2 * time.Second)
+	// Si NO estamos usando wpa_supplicant global del sistema, podemos controlar una instancia por interfaz.
+	if !useSystemWpa {
+		// Detener cualquier instancia de wpa_supplicant existente SOLO para esta interfaz
+		wpaPid, _ := exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'wpa_supplicant.*%s'", interfaceName)).Output()
+		if strings.TrimSpace(string(wpaPid)) != "" {
+			log.Printf("Deteniendo wpa_supplicant existente para reiniciar limpiamente")
+			executeCommand(fmt.Sprintf("sudo pkill -f 'wpa_supplicant.*%s' 2>/dev/null || true", interfaceName))
+			time.Sleep(2 * time.Second)
+		}
 	}
 
 	// Asegurar que wpa_supplicant esté corriendo
-	wpaPid, _ = exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'wpa_supplicant.*%s'", interfaceName)).Output()
-	if strings.TrimSpace(string(wpaPid)) == "" {
+	// - Si usamos wpa_supplicant global del sistema (-u), agregamos la interfaz vía socket global.
+	// - Si no, iniciamos una instancia por interfaz.
+	wpaPid, _ := exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'wpa_supplicant.*%s'", interfaceName)).Output()
+	if useSystemWpa {
+		ctrlDir := "/run/wpa_supplicant"
+		if _, err := os.Stat(ctrlDir); err != nil {
+			ctrlDir = "/var/run/wpa_supplicant"
+		}
+		globalSock := fmt.Sprintf("%s/global", ctrlDir)
+		log.Printf("Usando wpa_supplicant global: %s", globalSock)
+		// Verificar que el socket global exista y responda
+		pingGlobalCmd := fmt.Sprintf("sudo wpa_cli -g %s ping 2>&1", globalSock)
+		if pingOut, _ := executeCommand(pingGlobalCmd); !strings.Contains(pingOut, "PONG") {
+			result["success"] = false
+			result["error"] = "wpa_supplicant global no responde (socket global no disponible)."
+			return result
+		}
+		// Si el socket por interfaz no existe, agregar la interfaz
+		ifaceSock := fmt.Sprintf("%s/%s", ctrlDir, interfaceName)
+		ifaceCheck := exec.Command("sh", "-c", fmt.Sprintf("test -S %s && echo ok || echo missing", ifaceSock))
+		if out, _ := ifaceCheck.Output(); strings.Contains(string(out), "missing") {
+			log.Printf("Socket por interfaz no existe (%s). Agregando interfaz vía wpa_cli -g...", ifaceSock)
+			// interface_add <ifname> <config> <driver> <ctrl_interface>
+			addCmd := fmt.Sprintf("sudo wpa_cli -g %s interface_add %s '' nl80211 %s 2>&1", globalSock, interfaceName, ctrlDir)
+			addOut, _ := executeCommand(addCmd)
+			log.Printf("interface_add output: %s", strings.TrimSpace(addOut))
+			// Esperar a que aparezca el socket
+			time.Sleep(1 * time.Second)
+			ifaceCheck2 := exec.Command("sh", "-c", fmt.Sprintf("test -S %s && echo ok || echo missing", ifaceSock))
+			if out2, _ := ifaceCheck2.Output(); strings.Contains(string(out2), "missing") {
+				result["success"] = false
+				result["error"] = "No se pudo crear el socket de control de la interfaz en wpa_supplicant."
+				return result
+			}
+		}
+		log.Printf("Interfaz %s lista en wpa_supplicant global", interfaceName)
+	} else if strings.TrimSpace(string(wpaPid)) == "" {
 		log.Printf("Iniciando wpa_supplicant en interfaz %s", interfaceName)
 		
 		wpaConfig := fmt.Sprintf("/etc/wpa_supplicant/wpa_supplicant-%s.conf", interfaceName)
