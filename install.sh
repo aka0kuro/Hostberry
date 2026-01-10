@@ -1679,6 +1679,7 @@ main() {
     echo ""
     
     check_root
+    fix_hostname
     detect_os
     install_git
     download_project
