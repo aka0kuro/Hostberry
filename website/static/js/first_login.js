@@ -285,122 +285,102 @@
     
     if(!form) return;
     
-      // Usar fetch directamente para tener control total sobre la respuesta
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept-Language': currentLang
-      };
-
-      // Agregar token si existe (evitar Bearer null/undefined)
-      if (token && token !== 'null' && token !== 'undefined') {
-        headers['Authorization'] = `Bearer ${token}`;
+    form.addEventListener('submit', async function(e){
+      e.preventDefault();
+      const fd = new FormData(form);
+      const payload = Object.fromEntries(fd.entries());
+      
+      if(payload.new_password !== payload.confirm_password){
+        showError(t('auth.passwords_dont_match', 'Las contraseñas no coinciden'));
+        return;
       }
-
-      const resp = await fetch('/api/v1/auth/first-login/change', {
-        method: 'POST',
-        headers: headers,
-        credentials: 'include',
-        body: JSON.stringify(payload)
-      });
-
-      let data = null;
-      try {
-        // Leer el texto de la respuesta primero
-        const text = await resp.text();
-        if (text && text.trim()) {
-          try {
-            data = JSON.parse(text);
-          } catch (parseErr) {
-            // Si no es JSON válido, podría ser HTML o texto plano
-            console.warn('Response is not valid JSON:', text.substring(0, 100));
-            data = null;
-          }
-        }
-      } catch (_jsonErr) {
-        console.error('Error reading response:', _jsonErr);
-        data = null;
-      }
-
-      if(resp && resp.ok){
-        // Extraer solo el mensaje de la respuesta
-        let successMessage = t('auth.credentials_updated', 'Credenciales actualizadas. Vuelve a iniciar sesión.');
-
-        if (data) {
-          // Si data es un objeto con message, usar ese
-          if (typeof data === 'object' && data !== null && data.message && typeof data.message === 'string') {
-            successMessage = data.message;
-          } 
-          // Si data es un string, usarlo directamente
-          else if (typeof data === 'string') {
-            successMessage = data;
-          }
-          // Si data es un objeto pero no tiene message, verificar si es el objeto de traducciones
-          else if (typeof data === 'object' && data !== null) {
-            // Verificar si tiene las claves típicas de traducciones (adblock, auth, etc.)
-            const hasTranslationKeys = data.adblock || data.auth || data.common || data.dashboard;
-            if (hasTranslationKeys) {
-              // Es el objeto de traducciones, no mostrar
-              console.warn('Received translations object instead of success message, using default message');
-            } else if (!data.message) {
-              // No es traducciones pero tampoco tiene message, usar por defecto
-              console.log('Response data (not shown to user):', Object.keys(data));
-            }
-          }
+      
+      try{
+        const currentLang = document.documentElement.lang || document.querySelector('html').getAttribute('lang') || 'es';
+        const token = localStorage.getItem('access_token');
+        const headers = {
+          'Content-Type': 'application/json',
+          'Accept-Language': currentLang
+        };
+        if (token && token !== 'null' && token !== 'undefined') {
+          headers['Authorization'] = `Bearer ${token}`;
         }
 
-        // Asegurar que el mensaje es un string y no un objeto
-        if (typeof successMessage !== 'string') {
-          successMessage = t('auth.credentials_updated', 'Credenciales actualizadas. Vuelve a iniciar sesión.');
-        }
-
-        showSuccess(successMessage);
-        localStorage.removeItem('access_token');
-        setTimeout(function(){ 
-          window.location.href = `/login?lang=${encodeURIComponent(currentLang)}`;
-        }, 1200);
-      } else {
-        // Procesar errores de validación de Pydantic (si hay JSON)
-        const detail = data ? data.detail : null;
-        if (detail) {
-          showError(processValidationError(detail));
-        } else {
-          // Evitar mostrar por error un objeto de traducciones completo
-          if (data && typeof data === 'object' && data !== null) {
-            const hasTranslationKeys = data.adblock || data.auth || data.common || data.dashboard || data.errors;
-            if (hasTranslationKeys) {
+        const resp = await fetch('/api/v1/auth/first-login/change', {
+          method: 'POST',
+          headers: headers,
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+        
+        let data = null;
+        try {
+          const text = await resp.text();
+          if (text && text.trim()) {
+            try {
+              data = JSON.parse(text);
+            } catch (_parseErr) {
               data = null;
             }
           }
-
-          // Caso especial: endpoint de first-login solo válido en primer login
-          if (resp && resp.status === 403 && data && typeof data === 'object' && data !== null && typeof data.error === 'string') {
-            showError(data.error);
-            setTimeout(function(){
-              window.location.href = `/login?lang=${encodeURIComponent(currentLang)}`;
-            }, 1200);
-            return;
-          }
-
-          // Caso: 401 sin token/cookie
-          if (resp && resp.status === 401) {
-            showError(t('auth.session_expired', 'Session expired'));
-            setTimeout(function(){
-              window.location.href = `/login?lang=${encodeURIComponent(currentLang)}`;
-            }, 1200);
-            return;
-          }
-
-          // Fallback: status + mensaje genérico
-          const status = resp && typeof resp.status === 'number' ? resp.status : 0;
-          const baseMsg = t('errors.general_error_message', 'Ha ocurrido un error inesperado');
-          showError(status ? `${baseMsg} (HTTP ${status})` : baseMsg);
+        } catch (_jsonErr) {
+          data = null;
         }
+
+        if(resp && resp.ok){
+          let successMessage = t('auth.credentials_updated', 'Credenciales actualizadas. Vuelve a iniciar sesión.');
+          if (data && typeof data === 'object' && data !== null && typeof data.message === 'string') {
+            successMessage = data.message;
+          } else if (typeof data === 'string') {
+            successMessage = data;
+          }
+          if (typeof successMessage !== 'string') {
+            successMessage = t('auth.credentials_updated', 'Credenciales actualizadas. Vuelve a iniciar sesión.');
+          }
+          showSuccess(successMessage);
+          localStorage.removeItem('access_token');
+          setTimeout(function(){
+            window.location.href = `/login?lang=${encodeURIComponent(currentLang)}`;
+          }, 1200);
+          return;
+        }
+
+        const detail = data ? data.detail : null;
+        if (detail) {
+          showError(processValidationError(detail));
+          return;
+        }
+
+        if (data && typeof data === 'object' && data !== null) {
+          const hasTranslationKeys = data.adblock || data.auth || data.common || data.dashboard || data.errors;
+          if (hasTranslationKeys) {
+            data = null;
+          }
+        }
+
+        if (resp && resp.status === 403 && data && typeof data === 'object' && data !== null && typeof data.error === 'string') {
+          showError(data.error);
+          setTimeout(function(){
+            window.location.href = `/login?lang=${encodeURIComponent(currentLang)}`;
+          }, 1200);
+          return;
+        }
+
+        if (resp && resp.status === 401) {
+          showError(t('auth.session_expired', 'Session expired'));
+          setTimeout(function(){
+            window.location.href = `/login?lang=${encodeURIComponent(currentLang)}`;
+          }, 1200);
+          return;
+        }
+
+        const status = resp && typeof resp.status === 'number' ? resp.status : 0;
+        const baseMsg = t('errors.general_error_message', 'Ha ocurrido un error inesperado');
+        showError(status ? `${baseMsg} (HTTP ${status})` : baseMsg);
+      }catch(_e){
+        const errorMsg = _e.message || t('errors.unknown_error', 'Error desconocido');
+        showError(t('errors.connection_error', 'Error de conexión') + ': ' + errorMsg);
       }
-    }
-    catch(_e){
-      console.error('Error en first-login:', _e);
-      const errorMsg = _e.message || t('errors.unknown_error', 'Error desconocido');
-      showError(t('errors.connection_error', 'Error de conexión') + ': ' + errorMsg);
-    }
+    });
   });
 });
