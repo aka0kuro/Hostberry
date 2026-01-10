@@ -745,7 +745,7 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 				time.Sleep(1 * time.Second)
 				
 				// Verificar que wpa_cli responde ahora usando el directorio de control estándar
-				ctrlDir := "/run/wpa_supplicant"
+				ctrlDir = "/run/wpa_supplicant"
 				if _, err := os.Stat(ctrlDir); err != nil {
 					ctrlDir = "/var/run/wpa_supplicant"
 				}
