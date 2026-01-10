@@ -302,12 +302,32 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 		executeCommand("sudo chgrp netdev /var/run/wpa_supplicant 2>/dev/null || sudo chgrp hostberry /var/run/wpa_supplicant 2>/dev/null || true")
 		executeCommand("sudo chgrp netdev /run/wpa_supplicant 2>/dev/null || sudo chgrp hostberry /run/wpa_supplicant 2>/dev/null || true")
 		
-		// Limpiar el socket de control anterior
+		// Limpiar completamente wpa_supplicant y todos sus sockets antes de reiniciar
+		log.Printf("Limpiando procesos y sockets de wpa_supplicant...")
+		executeCommand(fmt.Sprintf("sudo pkill -9 -f 'wpa_supplicant.*%s' 2>/dev/null || true", interfaceName))
+		executeCommand("sudo pkill -9 wpa_supplicant 2>/dev/null || true")
+		time.Sleep(1 * time.Second) // Dar tiempo para que los procesos terminen
+		
+		// Limpiar todos los sockets posibles
 		executeCommand(fmt.Sprintf("sudo rm -rf /var/run/wpa_supplicant/%s 2>/dev/null || true", interfaceName))
 		executeCommand(fmt.Sprintf("sudo rm -rf /run/wpa_supplicant/%s 2>/dev/null || true", interfaceName))
+		executeCommand("sudo rm -rf /var/run/wpa_supplicant/* 2>/dev/null || true")
+		executeCommand("sudo rm -rf /run/wpa_supplicant/* 2>/dev/null || true")
+		
+		// Asegurar que los directorios existan con permisos correctos ANTES de iniciar wpa_supplicant
+		executeCommand("sudo mkdir -p /var/run/wpa_supplicant 2>/dev/null || true")
+		executeCommand("sudo mkdir -p /run/wpa_supplicant 2>/dev/null || true")
+		executeCommand("sudo chmod 775 /var/run/wpa_supplicant 2>/dev/null || true")
+		executeCommand("sudo chmod 775 /run/wpa_supplicant 2>/dev/null || true")
+		executeCommand("sudo chgrp netdev /var/run/wpa_supplicant 2>/dev/null || sudo chgrp hostberry /var/run/wpa_supplicant 2>/dev/null || true")
+		executeCommand("sudo chgrp netdev /run/wpa_supplicant 2>/dev/null || sudo chgrp hostberry /run/wpa_supplicant 2>/dev/null || true")
+		executeCommand("sudo chown root:netdev /var/run/wpa_supplicant 2>/dev/null || sudo chown root:hostberry /var/run/wpa_supplicant 2>/dev/null || true")
+		executeCommand("sudo chown root:netdev /run/wpa_supplicant 2>/dev/null || sudo chown root:hostberry /run/wpa_supplicant 2>/dev/null || true")
 
 		// Iniciar wpa_supplicant con el grupo correcto para que el socket tenga permisos adecuados
 		// Usar -g para especificar el grupo del socket (netdev o hostberry)
+		// También usar -u para especificar el usuario (root) y -g para el grupo (netdev)
+		log.Printf("Iniciando wpa_supplicant con configuración de permisos...")
 		startCmd := fmt.Sprintf("sudo wpa_supplicant -B -i %s -c %s -D nl80211,wext -g netdev", interfaceName, wpaConfig)
 		startOut, _ := executeCommand(startCmd)
 		log.Printf("wpa_supplicant start output: %s", strings.TrimSpace(startOut))
@@ -319,6 +339,9 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 			startOut, _ = executeCommand(startCmd)
 			log.Printf("wpa_supplicant start output (sin -g): %s", strings.TrimSpace(startOut))
 		}
+		
+		// Esperar un momento para que wpa_supplicant cree el socket
+		time.Sleep(500 * time.Millisecond)
 		
 		// Esperar más tiempo y verificar que el socket se haya creado
 		socketReady := false
