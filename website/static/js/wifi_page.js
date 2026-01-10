@@ -503,8 +503,43 @@
             </div>
           `;
         }
-        // Manejar error 401 (sesión expirada)
+        // Manejar error 401 (sesión expirada o usuario no encontrado)
         if (resp.status === 401) {
+          // Intentar leer el mensaje de error para determinar si es un error de usuario no encontrado
+          let errorData = null;
+          try {
+            const text = await resp.text();
+            if (text) {
+              errorData = JSON.parse(text);
+            }
+          } catch (e) {
+            // Ignorar errores de parsing
+          }
+          
+          // Si es "Usuario no encontrado", puede ser un problema temporal de la base de datos
+          if (errorData && errorData.error && (
+            errorData.error.includes('Usuario no encontrado') || 
+            errorData.error.includes('User not found') ||
+            errorData.code === 'USER_NOT_FOUND'
+          )) {
+            showAlert('warning', t('wifi.scan_error', 'Error scanning WiFi networks') + ': ' + (errorData.error || 'Usuario no encontrado. Por favor, recarga la página e intenta nuevamente.'));
+            if (loadingEl) loadingEl.style.display = 'none';
+            if (emptyEl) {
+              emptyEl.style.display = 'block';
+              emptyEl.innerHTML = `
+                <div class="text-center py-5">
+                  <i class="bi bi-exclamation-triangle text-warning" style="font-size: 4rem;"></i>
+                  <p class="mt-3">${t('wifi.scan_error', 'Error scanning WiFi networks')}</p>
+                  <p class="text-muted small">${errorData.error || 'Usuario no encontrado'}</p>
+                  <button class="btn btn-primary mt-3" onclick="location.reload()">
+                    <i class="bi bi-arrow-clockwise me-2"></i>Recargar página
+                  </button>
+                </div>`;
+            }
+            return;
+          }
+          
+          // Para otros errores 401, cerrar sesión normalmente
           showAlert('warning', t('auth.session_expired', 'Session expired. Please log in again.'));
           setTimeout(() => {
             localStorage.removeItem('access_token');
