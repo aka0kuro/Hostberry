@@ -338,20 +338,23 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 		executeCommand("sudo chown root:netdev /var/run/wpa_supplicant 2>/dev/null || sudo chown root:hostberry /var/run/wpa_supplicant 2>/dev/null || true")
 		executeCommand("sudo chown root:netdev /run/wpa_supplicant 2>/dev/null || sudo chown root:hostberry /run/wpa_supplicant 2>/dev/null || true")
 
-		// Iniciar wpa_supplicant con el grupo correcto para que el socket tenga permisos adecuados
-		// Usar -g para especificar el grupo del socket (netdev o hostberry)
-		// También usar -u para especificar el usuario (root) y -g para el grupo (netdev)
-		log.Printf("Iniciando wpa_supplicant con configuración de permisos...")
-		startCmd := fmt.Sprintf("sudo wpa_supplicant -B -i %s -c %s -D nl80211,wext -g netdev", interfaceName, wpaConfig)
+		// Iniciar wpa_supplicant especificando explícitamente el directorio de control (-C)
+		// Nota: -g NO es un grupo; es el socket global. Pasar "netdev" aquí rompe el control socket.
+		ctrlDir := "/run/wpa_supplicant"
+		if _, err := os.Stat(ctrlDir); err != nil {
+			ctrlDir = "/var/run/wpa_supplicant"
+		}
+		log.Printf("Iniciando wpa_supplicant con ctrlDir=%s...", ctrlDir)
+		startCmd := fmt.Sprintf("sudo wpa_supplicant -B -i %s -c %s -D nl80211,wext -C %s", interfaceName, wpaConfig, ctrlDir)
 		startOut, _ := executeCommand(startCmd)
 		log.Printf("wpa_supplicant start output: %s", strings.TrimSpace(startOut))
 		
-		// Si falla con -g netdev, intentar sin especificar grupo (usará el del archivo de configuración)
+		// Si falla, intentar sin -C (usará ctrl_interface desde config)
 		if strings.Contains(strings.ToLower(startOut), "error") || strings.Contains(strings.ToLower(startOut), "failed") {
-			log.Printf("Intento con -g netdev falló, intentando sin especificar grupo...")
+			log.Printf("Intento con -C falló, intentando sin -C...")
 			startCmd = fmt.Sprintf("sudo wpa_supplicant -B -i %s -c %s -D nl80211,wext", interfaceName, wpaConfig)
 			startOut, _ = executeCommand(startCmd)
-			log.Printf("wpa_supplicant start output (sin -g): %s", strings.TrimSpace(startOut))
+			log.Printf("wpa_supplicant start output (sin -C): %s", strings.TrimSpace(startOut))
 		}
 		
 		// Esperar un momento para que wpa_supplicant cree el socket
