@@ -457,7 +457,7 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 			log.Printf("Sin progreso después de %d intentos, forzando reconexión...", attempt+1)
 			executeCommand(fmt.Sprintf("%s disable_network all", wpaCliCmd))
 			time.Sleep(1 * time.Second)
-			executeCommand(fmt.Sprintf("%s enable_network %s", wpaCliCmd, networkID))
+			executeCommand(fmt.Sprintf("%s enable_network %s", wpaCliCmd, "0"))
 			executeCommand(fmt.Sprintf("%s reconnect", wpaCliCmd))
 		}
 	}
