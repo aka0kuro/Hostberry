@@ -262,10 +262,12 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 			return result
 		}
 		
-		passphraseCmd := fmt.Sprintf("wpa_passphrase '%s' '%s'", ssid, password)
-		passphraseOut, err := executeCommand(passphraseCmd)
+		// Usar exec.Command directamente para evitar problemas de escaping en shell
+		cmd := exec.Command("wpa_passphrase", ssid, password)
+		passphraseOutBytes, err := cmd.Output()
+		passphraseOut := string(passphraseOutBytes)
 		if err != nil || !strings.Contains(passphraseOut, "network=") {
-			log.Printf("ERROR: wpa_passphrase falló. Comando: %s", passphraseCmd)
+			log.Printf("ERROR: wpa_passphrase falló. SSID: %s, Password length: %d", ssid, len(password))
 			log.Printf("ERROR: Salida: %s", passphraseOut)
 			log.Printf("ERROR: Error: %v", err)
 			result["success"] = false
