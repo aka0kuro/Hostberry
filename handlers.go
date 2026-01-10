@@ -696,7 +696,7 @@ func vpnConnectHandler(c *fiber.Ctx) error {
 	}
 
 	if errorMsg, ok := result["error"].(string); ok {
-		InsertLog("ERROR", fmt.Sprintf("Error conectando VPN: %s (usuario: %s)", errorMsg, user.Username), "vpn", &userID)
+		InsertLog("ERROR", fmt.Sprintf("Error conectando VPN %s: %s (usuario: %s)", req.Type, errorMsg, user.Username), "vpn", &userID)
 		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
 	}
 
