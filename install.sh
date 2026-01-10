@@ -63,6 +63,30 @@ check_root() {
     fi
 }
 
+# Configurar hostname en /etc/hosts para evitar warnings de sudo
+fix_hostname() {
+    CURRENT_HOSTNAME=$(hostname)
+    if [ -n "$CURRENT_HOSTNAME" ]; then
+        # Verificar si el hostname ya está en /etc/hosts
+        if ! grep -q "127.0.0.1.*$CURRENT_HOSTNAME" /etc/hosts 2>/dev/null; then
+            print_info "Configurando hostname '$CURRENT_HOSTNAME' en /etc/hosts..."
+            # Agregar hostname a la línea de 127.0.0.1
+            if grep -q "^127.0.0.1" /etc/hosts; then
+                # La línea existe, agregar el hostname si no está
+                sed -i "s/^127.0.0.1.*/& $CURRENT_HOSTNAME/" /etc/hosts 2>/dev/null || true
+            else
+                # La línea no existe, crearla
+                echo "127.0.0.1 localhost $CURRENT_HOSTNAME" >> /etc/hosts
+            fi
+            # También agregar a 127.0.1.1 si no existe
+            if ! grep -q "^127.0.1.1" /etc/hosts; then
+                echo "127.0.1.1 $CURRENT_HOSTNAME" >> /etc/hosts
+            fi
+            print_success "Hostname configurado en /etc/hosts"
+        fi
+    fi
+}
+
 # Detectar sistema operativo
 detect_os() {
     if [ -f /etc/os-release ]; then
