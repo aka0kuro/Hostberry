@@ -300,7 +300,8 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	exec.Command("sudo", "rm", "-f", wpaConfigPath).Run()
 
 	// 2. Escribir contenido
-	writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", wpaConfigPath))
+	// Usamos mkdir -p dentro del mismo comando para asegurar que el directorio existe justo antes de escribir
+	writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("mkdir -p $(dirname %s) && cat > %s", wpaConfigPath, wpaConfigPath))
 	writeCmd.Stdin = strings.NewReader(configContent)
 	
 	if out, err := writeCmd.CombinedOutput(); err != nil {
