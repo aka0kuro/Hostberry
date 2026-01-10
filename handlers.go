@@ -138,7 +138,7 @@ func changePasswordAPIHandler(c *fiber.Ctx) error {
 	}
 
 	userID := user.ID
-	InsertLog("INFO", "Usuario cambió contraseña", "auth", &userID)
+		InsertLog("INFO", fmt.Sprintf("Usuario %s cambió su contraseña", user.Username), "auth", &userID)
 	return c.JSON(fiber.Map{"message": "Contraseña actualizada"})
 }
 
