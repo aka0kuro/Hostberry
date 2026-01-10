@@ -651,7 +651,7 @@ func wifiConnectHandler(c *fiber.Ctx) error {
 	}
 
 	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("WiFi conectado: %s (usuario: %s)", req.SSID, user.Username), "wifi", &userID)
+		InsertLog("INFO", fmt.Sprintf("WiFi conectado a %s por usuario %s", req.SSID, user.Username), "wifi", &userID)
 		return c.JSON(result)
 	}
 
