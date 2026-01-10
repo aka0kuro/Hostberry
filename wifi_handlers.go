@@ -288,14 +288,31 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	configContent := fmt.Sprintf("ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\nctrl_interface_group=netdev\nupdate_config=1\ncountry=%s\n\n%s\n", country, networkBlock)
 
 	// Escribir el archivo de configuración
-	err := os.WriteFile(wpaConfigPath, []byte(configContent), 0600)
+	// Usamos un archivo temporal y luego sudo mv para evitar problemas de permisos
+	tempConfigPath := fmt.Sprintf("/tmp/wpa_config_%s_%d.conf", interfaceName, time.Now().Unix())
+	err := os.WriteFile(tempConfigPath, []byte(configContent), 0644)
 	if err != nil {
-		log.Printf("Error escribiendo archivo de configuración: %v", err)
+		log.Printf("Error escribiendo archivo temporal: %v", err)
 		result["success"] = false
-		result["error"] = "Error al crear archivo de configuración wpa_supplicant"
+		result["error"] = "Error al crear archivo temporal de configuración"
 		return result
 	}
-	log.Printf("Archivo de configuración creado exitosamente")
+
+	// Mover a la ubicación final con sudo
+	moveCmd := fmt.Sprintf("sudo mv %s %s", tempConfigPath, wpaConfigPath)
+	if out, err := executeCommand(moveCmd); err != nil {
+		log.Printf("Error moviendo archivo de configuración con sudo: %v, output: %s", err, out)
+		os.Remove(tempConfigPath) // limpiar en caso de error
+		result["success"] = false
+		result["error"] = "Error de permisos al guardar configuración wifi"
+		return result
+	}
+	
+	// Asegurar permisos correctos
+	executeCommand(fmt.Sprintf("sudo chown root:root %s", wpaConfigPath))
+	executeCommand(fmt.Sprintf("sudo chmod 600 %s", wpaConfigPath))
+
+	log.Printf("Archivo de configuración creado exitosamente en %s", wpaConfigPath)
 
 	// Asegurar que el directorio del socket existe con permisos y grupo correctos
 	executeCommand("sudo mkdir -p /var/run/wpa_supplicant 2>/dev/null || true")
