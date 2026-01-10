@@ -255,298 +255,112 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null", interfaceName))
 	time.Sleep(2 * time.Second)
 
-	// Si NO estamos usando wpa_supplicant global del sistema, podemos controlar una instancia por interfaz.
-	if !useSystemWpa {
-		// Detener cualquier instancia de wpa_supplicant existente SOLO para esta interfaz
-		wpaPid, _ := exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'wpa_supplicant.*%s'", interfaceName)).Output()
-		if strings.TrimSpace(string(wpaPid)) != "" {
-			log.Printf("Deteniendo wpa_supplicant existente para reiniciar limpiamente")
-			executeCommand(fmt.Sprintf("sudo pkill -f 'wpa_supplicant.*%s' 2>/dev/null || true", interfaceName))
-			time.Sleep(2 * time.Second)
-		}
-	}
+	// Crear archivo de configuración wpa_supplicant para la interfaz
+	wpaConfigPath := fmt.Sprintf("/etc/wpa_supplicant/wpa_supplicant-%s.conf", interfaceName)
+	log.Printf("Creando archivo de configuración: %s", wpaConfigPath)
 
-	// Asegurar que wpa_supplicant esté corriendo
-	// - Si usamos wpa_supplicant global del sistema (-u), agregamos la interfaz vía socket global.
-	// - Si no, iniciamos una instancia por interfaz.
-	wpaPid, _ := exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'wpa_supplicant.*%s'", interfaceName)).Output()
-	if useSystemWpa {
-		ctrlDir := "/run/wpa_supplicant"
-		if _, err := os.Stat(ctrlDir); err != nil {
-			ctrlDir = "/var/run/wpa_supplicant"
-		}
-		globalSock := fmt.Sprintf("%s/global", ctrlDir)
-		log.Printf("Usando wpa_supplicant global: %s", globalSock)
-		// Verificar que el socket global exista y responda
-		pingGlobalCmd := fmt.Sprintf("sudo wpa_cli -g %s ping 2>&1", globalSock)
-		if pingOut, _ := executeCommand(pingGlobalCmd); !strings.Contains(pingOut, "PONG") {
+	// Generar bloque de red usando wpa_passphrase
+	var networkBlock string
+	if password != "" {
+		passphraseCmd := fmt.Sprintf("wpa_passphrase '%s' '%s'", ssid, password)
+		passphraseOut, err := executeCommand(passphraseCmd)
+		if err != nil || !strings.Contains(passphraseOut, "network=") {
+			log.Printf("Error generando PSK con wpa_passphrase: %s", passphraseOut)
 			result["success"] = false
-			result["error"] = "wpa_supplicant global no responde (socket global no disponible)."
+			result["error"] = "Error al generar la clave PSK"
 			return result
 		}
-		// Si el socket por interfaz no existe, agregar la interfaz
-		ifaceSock := fmt.Sprintf("%s/%s", ctrlDir, interfaceName)
-		ifaceCheck := exec.Command("sh", "-c", fmt.Sprintf("test -S %s && echo ok || echo missing", ifaceSock))
-		if out, _ := ifaceCheck.Output(); strings.Contains(string(out), "missing") {
-			log.Printf("Socket por interfaz no existe (%s). Agregando interfaz vía wpa_cli -g...", ifaceSock)
-			// interface_add <ifname> <config> <driver> <ctrl_interface>
-			addCmd := fmt.Sprintf("sudo wpa_cli -g %s interface_add %s '' nl80211 %s 2>&1", globalSock, interfaceName, ctrlDir)
-			addOut, _ := executeCommand(addCmd)
-			log.Printf("interface_add output: %s", strings.TrimSpace(addOut))
-			// Esperar a que aparezca el socket
-			time.Sleep(1 * time.Second)
-			ifaceCheck2 := exec.Command("sh", "-c", fmt.Sprintf("test -S %s && echo ok || echo missing", ifaceSock))
-			if out2, _ := ifaceCheck2.Output(); strings.Contains(string(out2), "missing") {
-				result["success"] = false
-				result["error"] = "No se pudo crear el socket de control de la interfaz en wpa_supplicant."
-				return result
-			}
-		}
-		log.Printf("Interfaz %s lista en wpa_supplicant global", interfaceName)
-	} else if strings.TrimSpace(string(wpaPid)) == "" {
-		log.Printf("Iniciando wpa_supplicant en interfaz %s", interfaceName)
-		
-		wpaConfig := fmt.Sprintf("/etc/wpa_supplicant/wpa_supplicant-%s.conf", interfaceName)
-		if _, err := os.Stat(wpaConfig); os.IsNotExist(err) {
-			wpaConfig = "/etc/wpa_supplicant/wpa_supplicant.conf"
-			if _, err := os.Stat(wpaConfig); os.IsNotExist(err) {
-				// Crear configuración con grupo netdev y permisos del socket
-				defaultConfig := fmt.Sprintf("ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\nctrl_interface_group=netdev\nupdate_config=1\ncountry=%s\n", country)
-				os.WriteFile(wpaConfig, []byte(defaultConfig), 0600)
-				log.Printf("Archivo de configuración wpa_supplicant creado con GROUP=netdev")
-			} else {
-				// Actualizar country y asegurar que GROUP=netdev esté presente
-				configContent, _ := os.ReadFile(wpaConfig)
-				configStr := string(configContent)
-				
-				// Asegurar que GROUP=netdev esté presente
-				if !strings.Contains(configStr, "GROUP=netdev") && !strings.Contains(configStr, "GROUP=hostberry") {
-					// Agregar GROUP=netdev si no está presente
-					if strings.Contains(configStr, "ctrl_interface=") {
-						// Reemplazar ctrl_interface existente para agregar GROUP
-						re := regexp.MustCompile(`ctrl_interface=DIR=([^\n]+)`)
-						configStr = re.ReplaceAllString(configStr, "ctrl_interface=DIR=$1 GROUP=netdev")
-					} else {
-						configStr = fmt.Sprintf("ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\nctrl_interface_group=netdev\n%s", configStr)
-					}
-				}
-				
-				// Actualizar country
-				if !strings.Contains(configStr, "country=") {
-					configStr += fmt.Sprintf("\ncountry=%s\n", country)
-				} else {
-					re := regexp.MustCompile(`country=[A-Z][A-Z]`)
-					configStr = re.ReplaceAllString(configStr, fmt.Sprintf("country=%s", country))
-				}
-				
-				os.WriteFile(wpaConfig, []byte(configStr), 0600)
-				log.Printf("Archivo de configuración wpa_supplicant actualizado con GROUP=netdev")
-			}
-		}
-
-		// Asegurar que el directorio del socket existe con permisos y grupo correctos
-		executeCommand("sudo mkdir -p /var/run/wpa_supplicant 2>/dev/null || true")
-		executeCommand("sudo mkdir -p /run/wpa_supplicant 2>/dev/null || true")
-		executeCommand("sudo chmod 775 /var/run/wpa_supplicant 2>/dev/null || true")
-		executeCommand("sudo chmod 775 /run/wpa_supplicant 2>/dev/null || true")
-		// Asegurar que el grupo sea netdev (necesario para wpa_cli)
-		executeCommand("sudo chgrp netdev /var/run/wpa_supplicant 2>/dev/null || sudo chgrp hostberry /var/run/wpa_supplicant 2>/dev/null || true")
-		executeCommand("sudo chgrp netdev /run/wpa_supplicant 2>/dev/null || sudo chgrp hostberry /run/wpa_supplicant 2>/dev/null || true")
-		
-		// Limpiar wpa_supplicant y sockets SOLO de esta interfaz antes de reiniciar
-		log.Printf("Limpiando procesos y sockets de wpa_supplicant...")
-		executeCommand(fmt.Sprintf("sudo pkill -9 -f 'wpa_supplicant.*%s' 2>/dev/null || true", interfaceName))
-		time.Sleep(1 * time.Second) // Dar tiempo para que los procesos terminen
-		
-		// Limpiar sockets solo de la interfaz
-		executeCommand(fmt.Sprintf("sudo rm -rf /var/run/wpa_supplicant/%s 2>/dev/null || true", interfaceName))
-		executeCommand(fmt.Sprintf("sudo rm -rf /run/wpa_supplicant/%s 2>/dev/null || true", interfaceName))
-		
-		// Asegurar que los directorios existan con permisos correctos ANTES de iniciar wpa_supplicant
-		executeCommand("sudo mkdir -p /var/run/wpa_supplicant 2>/dev/null || true")
-		executeCommand("sudo mkdir -p /run/wpa_supplicant 2>/dev/null || true")
-		executeCommand("sudo chmod 775 /var/run/wpa_supplicant 2>/dev/null || true")
-		executeCommand("sudo chmod 775 /run/wpa_supplicant 2>/dev/null || true")
-		executeCommand("sudo chgrp netdev /var/run/wpa_supplicant 2>/dev/null || sudo chgrp hostberry /var/run/wpa_supplicant 2>/dev/null || true")
-		executeCommand("sudo chgrp netdev /run/wpa_supplicant 2>/dev/null || sudo chgrp hostberry /run/wpa_supplicant 2>/dev/null || true")
-		executeCommand("sudo chown root:netdev /var/run/wpa_supplicant 2>/dev/null || sudo chown root:hostberry /var/run/wpa_supplicant 2>/dev/null || true")
-		executeCommand("sudo chown root:netdev /run/wpa_supplicant 2>/dev/null || sudo chown root:hostberry /run/wpa_supplicant 2>/dev/null || true")
-
-		// Iniciar wpa_supplicant especificando explícitamente el directorio de control (-C)
-		// Nota: -g NO es un grupo; es el socket global. Pasar "netdev" aquí rompe el control socket.
-		ctrlDir := "/run/wpa_supplicant"
-		if _, err := os.Stat(ctrlDir); err != nil {
-			ctrlDir = "/var/run/wpa_supplicant"
-		}
-		log.Printf("Iniciando wpa_supplicant con ctrlDir=%s...", ctrlDir)
-		startCmd := fmt.Sprintf("sudo wpa_supplicant -B -i %s -c %s -D nl80211,wext -C %s", interfaceName, wpaConfig, ctrlDir)
-		startOut, _ := executeCommand(startCmd)
-		log.Printf("wpa_supplicant start output: %s", strings.TrimSpace(startOut))
-		
-		// Si falla, intentar sin -C (usará ctrl_interface desde config)
-		if strings.Contains(strings.ToLower(startOut), "error") || strings.Contains(strings.ToLower(startOut), "failed") {
-			log.Printf("Intento con -C falló, intentando sin -C...")
-			startCmd = fmt.Sprintf("sudo wpa_supplicant -B -i %s -c %s -D nl80211,wext", interfaceName, wpaConfig)
-			startOut, _ = executeCommand(startCmd)
-			log.Printf("wpa_supplicant start output (sin -C): %s", strings.TrimSpace(startOut))
-		}
-		
-		// Esperar un momento para que wpa_supplicant cree el socket
-		time.Sleep(500 * time.Millisecond)
-		
-		// Esperar más tiempo y verificar que el socket se haya creado
-		socketReady := false
-		socketPath1 := fmt.Sprintf("/var/run/wpa_supplicant/%s", interfaceName)
-		socketPath2 := fmt.Sprintf("/run/wpa_supplicant/%s", interfaceName)
-		
-		for waitAttempt := 0; waitAttempt < 15; waitAttempt++ {
-			time.Sleep(500 * time.Millisecond)
-			// Verificar que wpa_supplicant esté corriendo
-			wpaPid, _ = exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'wpa_supplicant.*%s'", interfaceName)).Output()
-			if strings.TrimSpace(string(wpaPid)) != "" {
-				// Verificar que el socket esté disponible y ajustar permisos inmediatamente
-				socketCheck1 := exec.Command("sh", "-c", fmt.Sprintf("test -S %s && echo 'exists' || echo 'not'", socketPath1))
-				socketCheck2 := exec.Command("sh", "-c", fmt.Sprintf("test -S %s && echo 'exists' || echo 'not'", socketPath2))
-				
-				if socketOut1, _ := socketCheck1.Output(); strings.Contains(string(socketOut1), "exists") {
-					// Socket encontrado, ajustar permisos inmediatamente
-					log.Printf("Socket encontrado en: %s, ajustando permisos...", socketPath1)
-					executeCommand(fmt.Sprintf("sudo chmod 660 %s 2>/dev/null || true", socketPath1))
-					executeCommand(fmt.Sprintf("sudo chgrp netdev %s 2>/dev/null || sudo chgrp hostberry %s 2>/dev/null || true", socketPath1, socketPath1))
-					// Verificar que los permisos se aplicaron correctamente
-					time.Sleep(300 * time.Millisecond)
-					// Verificar con wpa_cli ping
-					pingTest := exec.Command("sh", "-c", fmt.Sprintf("sudo wpa_cli -i %s ping 2>&1 | grep -q PONG && echo 'ok' || echo 'fail'", interfaceName))
-					if pingOut, _ := pingTest.Output(); strings.Contains(string(pingOut), "ok") {
-						socketReady = true
-						log.Printf("✅ Socket configurado correctamente y wpa_cli responde")
-						break
-					} else {
-						log.Printf("⚠️  Socket existe pero wpa_cli no responde, reintentando ajuste de permisos...")
-						// Reintentar ajuste de permisos con chown también
-						executeCommand(fmt.Sprintf("sudo chmod 660 %s 2>/dev/null || true", socketPath1))
-						executeCommand(fmt.Sprintf("sudo chgrp netdev %s 2>/dev/null || sudo chgrp hostberry %s 2>/dev/null || true", socketPath1, socketPath1))
-						executeCommand(fmt.Sprintf("sudo chown root:netdev %s 2>/dev/null || sudo chown root:hostberry %s 2>/dev/null || true", socketPath1, socketPath1))
-						time.Sleep(200 * time.Millisecond)
-						// Verificar nuevamente
-						pingTest2 := exec.Command("sh", "-c", fmt.Sprintf("sudo wpa_cli -i %s ping 2>&1 | grep -q PONG && echo 'ok' || echo 'fail'", interfaceName))
-						if pingOut2, _ := pingTest2.Output(); strings.Contains(string(pingOut2), "ok") {
-							socketReady = true
-							log.Printf("✅ Socket configurado correctamente después del segundo intento")
-							break
-						}
-					}
-				} else if socketOut2, _ := socketCheck2.Output(); strings.Contains(string(socketOut2), "exists") {
-					// Socket encontrado, ajustar permisos inmediatamente
-					log.Printf("Socket encontrado en: %s, ajustando permisos...", socketPath2)
-					executeCommand(fmt.Sprintf("sudo chmod 660 %s 2>/dev/null || true", socketPath2))
-					executeCommand(fmt.Sprintf("sudo chgrp netdev %s 2>/dev/null || sudo chgrp hostberry %s 2>/dev/null || true", socketPath2, socketPath2))
-					// Verificar que los permisos se aplicaron correctamente
-					time.Sleep(300 * time.Millisecond)
-					// Verificar con wpa_cli ping
-					pingTest := exec.Command("sh", "-c", fmt.Sprintf("sudo wpa_cli -i %s ping 2>&1 | grep -q PONG && echo 'ok' || echo 'fail'", interfaceName))
-					if pingOut, _ := pingTest.Output(); strings.Contains(string(pingOut), "ok") {
-						socketReady = true
-						log.Printf("✅ Socket configurado correctamente y wpa_cli responde")
-						break
-					} else {
-						log.Printf("⚠️  Socket existe pero wpa_cli no responde, reintentando ajuste de permisos...")
-						// Reintentar ajuste de permisos con chown también
-						executeCommand(fmt.Sprintf("sudo chmod 660 %s 2>/dev/null || true", socketPath2))
-						executeCommand(fmt.Sprintf("sudo chgrp netdev %s 2>/dev/null || sudo chgrp hostberry %s 2>/dev/null || true", socketPath2, socketPath2))
-						executeCommand(fmt.Sprintf("sudo chown root:netdev %s 2>/dev/null || sudo chown root:hostberry %s 2>/dev/null || true", socketPath2, socketPath2))
-						time.Sleep(200 * time.Millisecond)
-						// Verificar nuevamente
-						pingTest2 := exec.Command("sh", "-c", fmt.Sprintf("sudo wpa_cli -i %s ping 2>&1 | grep -q PONG && echo 'ok' || echo 'fail'", interfaceName))
-						if pingOut2, _ := pingTest2.Output(); strings.Contains(string(pingOut2), "ok") {
-							socketReady = true
-							log.Printf("✅ Socket configurado correctamente después del segundo intento")
-							break
-						}
-					}
-				} else {
-					// Intentar verificar con wpa_cli ping (puede funcionar aunque el socket no sea visible)
-					pingTest := exec.Command("sh", "-c", fmt.Sprintf("sudo wpa_cli -i %s ping 2>&1 | grep -q PONG && echo 'ok' || echo 'fail'", interfaceName))
-					if pingOut, _ := pingTest.Output(); strings.Contains(string(pingOut), "ok") {
-						socketReady = true
-						log.Printf("wpa_cli responde correctamente (socket puede estar en otra ubicación)")
-						break
-					}
-				}
-			}
-		}
-		
-		// Intentar ajustar permisos de todos los sockets posibles como medida adicional
-		if !socketReady {
-			log.Printf("Intentando ajustar permisos de sockets como medida preventiva...")
-			executeCommand(fmt.Sprintf("sudo chmod 660 %s 2>/dev/null || true", socketPath1))
-			executeCommand(fmt.Sprintf("sudo chmod 660 %s 2>/dev/null || true", socketPath2))
-			executeCommand(fmt.Sprintf("sudo chgrp netdev %s 2>/dev/null || sudo chgrp hostberry %s 2>/dev/null || true", socketPath1, socketPath1))
-			executeCommand(fmt.Sprintf("sudo chgrp netdev %s 2>/dev/null || sudo chgrp hostberry %s 2>/dev/null || true", socketPath2, socketPath2))
-			// También ajustar permisos de todos los sockets en el directorio
-			executeCommand("sudo chmod 660 /var/run/wpa_supplicant/* 2>/dev/null || true")
-			executeCommand("sudo chmod 660 /run/wpa_supplicant/* 2>/dev/null || true")
-			executeCommand("sudo chgrp netdev /var/run/wpa_supplicant/* 2>/dev/null || sudo chgrp hostberry /var/run/wpa_supplicant/* 2>/dev/null || true")
-			executeCommand("sudo chgrp netdev /run/wpa_supplicant/* 2>/dev/null || sudo chgrp hostberry /run/wpa_supplicant/* 2>/dev/null || true")
-			executeCommand("sudo chown root:netdev /var/run/wpa_supplicant/* 2>/dev/null || sudo chown root:hostberry /var/run/wpa_supplicant/* 2>/dev/null || true")
-			executeCommand("sudo chown root:netdev /run/wpa_supplicant/* 2>/dev/null || sudo chown root:hostberry /run/wpa_supplicant/* 2>/dev/null || true")
-		}
-
-		// Verificar que wpa_supplicant se inició
-		wpaPid, _ = exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'wpa_supplicant.*%s'", interfaceName)).Output()
-		if strings.TrimSpace(string(wpaPid)) == "" {
-			log.Printf("ERROR: wpa_supplicant no se inició correctamente")
-			result["success"] = false
-			result["error"] = "No se pudo iniciar wpa_supplicant"
-			return result
-		} else {
-			log.Printf("wpa_supplicant iniciado correctamente con PID: %s", strings.TrimSpace(string(wpaPid)))
-			if !socketReady {
-				log.Printf("WARNING: Socket de control puede no estar listo, pero continuando...")
-			}
-		}
+		networkBlock = strings.TrimSpace(passphraseOut)
 	} else {
-		// wpa_supplicant ya está corriendo, verificar que el socket esté disponible
-		log.Printf("wpa_supplicant ya está corriendo con PID: %s", strings.TrimSpace(string(wpaPid)))
-		time.Sleep(1 * time.Second) // Dar tiempo para que el socket esté listo
-		
-		// Asegurar permisos del socket si existe (múltiples ubicaciones posibles)
-		socketPath1 := fmt.Sprintf("/var/run/wpa_supplicant/%s", interfaceName)
-		socketPath2 := fmt.Sprintf("/run/wpa_supplicant/%s", interfaceName)
-		
-		log.Printf("Ajustando permisos de sockets para %s...", interfaceName)
-		// Ajustar permisos de sockets específicos
-		executeCommand(fmt.Sprintf("sudo chmod 660 %s 2>/dev/null || true", socketPath1))
-		executeCommand(fmt.Sprintf("sudo chmod 660 %s 2>/dev/null || true", socketPath2))
-		executeCommand(fmt.Sprintf("sudo chgrp netdev %s 2>/dev/null || sudo chgrp hostberry %s 2>/dev/null || true", socketPath1, socketPath1))
-		executeCommand(fmt.Sprintf("sudo chgrp netdev %s 2>/dev/null || sudo chgrp hostberry %s 2>/dev/null || true", socketPath2, socketPath2))
-		
-		// Ajustar permisos de todos los sockets en el directorio (por si hay múltiples interfaces)
-		executeCommand("sudo chmod 660 /var/run/wpa_supplicant/* 2>/dev/null || true")
-		executeCommand("sudo chmod 660 /run/wpa_supplicant/* 2>/dev/null || true")
-		executeCommand("sudo chgrp netdev /var/run/wpa_supplicant/* 2>/dev/null || sudo chgrp hostberry /var/run/wpa_supplicant/* 2>/dev/null || true")
-		executeCommand("sudo chgrp netdev /run/wpa_supplicant/* 2>/dev/null || sudo chgrp hostberry /run/wpa_supplicant/* 2>/dev/null || true")
-		executeCommand("sudo chown root:netdev /var/run/wpa_supplicant/* 2>/dev/null || sudo chown root:hostberry /var/run/wpa_supplicant/* 2>/dev/null || true")
-		executeCommand("sudo chown root:netdev /run/wpa_supplicant/* 2>/dev/null || sudo chown root:hostberry /run/wpa_supplicant/* 2>/dev/null || true")
-		
-		// Asegurar que el directorio también tenga permisos correctos
-		executeCommand("sudo chmod 775 /var/run/wpa_supplicant 2>/dev/null || true")
-		executeCommand("sudo chmod 775 /run/wpa_supplicant 2>/dev/null || true")
-		executeCommand("sudo chgrp netdev /var/run/wpa_supplicant 2>/dev/null || sudo chgrp hostberry /var/run/wpa_supplicant 2>/dev/null || true")
-		executeCommand("sudo chgrp netdev /run/wpa_supplicant 2>/dev/null || sudo chgrp hostberry /run/wpa_supplicant 2>/dev/null || true")
-		
-		// Verificar que wpa_cli puede comunicarse después de ajustar permisos
-		pingTest := exec.Command("sh", "-c", fmt.Sprintf("sudo wpa_cli -i %s ping 2>&1 | grep -q PONG && echo 'ok' || echo 'fail'", interfaceName))
-		if pingOut, _ := pingTest.Output(); strings.Contains(string(pingOut), "ok") {
-			log.Printf("✅ wpa_cli puede comunicarse después de ajustar permisos")
-		} else {
-			log.Printf("⚠️  wpa_cli aún no puede comunicarse, puede requerir reiniciar wpa_supplicant")
-		}
+		// Red abierta
+		networkBlock = fmt.Sprintf("network={\n\tssid=\"%s\"\n\tkey_mgmt=NONE\n}", ssid)
 	}
+
+	// Crear contenido completo del archivo de configuración
+	configContent := fmt.Sprintf("ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\nctrl_interface_group=netdev\nupdate_config=1\ncountry=%s\n\n%s\n", country, networkBlock)
+
+	// Escribir el archivo de configuración
+	err := os.WriteFile(wpaConfigPath, []byte(configContent), 0600)
+	if err != nil {
+		log.Printf("Error escribiendo archivo de configuración: %v", err)
+		result["success"] = false
+		result["error"] = "Error al crear archivo de configuración wpa_supplicant"
+		return result
+	}
+	log.Printf("Archivo de configuración creado exitosamente")
+
+	// Asegurar que el directorio del socket existe con permisos y grupo correctos
+	executeCommand("sudo mkdir -p /var/run/wpa_supplicant 2>/dev/null || true")
+	executeCommand("sudo mkdir -p /run/wpa_supplicant 2>/dev/null || true")
+	executeCommand("sudo chmod 775 /var/run/wpa_supplicant 2>/dev/null || true")
+	executeCommand("sudo chmod 775 /run/wpa_supplicant 2>/dev/null || true")
+	executeCommand("sudo chgrp netdev /var/run/wpa_supplicant 2>/dev/null || sudo chgrp hostberry /var/run/wpa_supplicant 2>/dev/null || true")
+	executeCommand("sudo chgrp netdev /run/wpa_supplicant 2>/dev/null || sudo chgrp hostberry /run/wpa_supplicant 2>/dev/null || true")
+
+	// Verificar si wpa_supplicant está corriendo para esta interfaz y detenerlo si es necesario
+	wpaPid, _ := exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'wpa_supplicant.*%s'", interfaceName)).Output()
+	if strings.TrimSpace(string(wpaPid)) != "" {
+		log.Printf("Deteniendo wpa_supplicant existente para %s", interfaceName)
+		executeCommand(fmt.Sprintf("sudo pkill -f 'wpa_supplicant.*%s' 2>/dev/null || true", interfaceName))
+		time.Sleep(2 * time.Second)
+	}
+
+	// Limpiar sockets existentes
+	executeCommand(fmt.Sprintf("sudo rm -rf /var/run/wpa_supplicant/%s 2>/dev/null || true", interfaceName))
+	executeCommand(fmt.Sprintf("sudo rm -rf /run/wpa_supplicant/%s 2>/dev/null || true", interfaceName))
+
+	// Iniciar wpa_supplicant con el archivo de configuración
+	ctrlDir := "/run/wpa_supplicant"
+	if _, err := os.Stat(ctrlDir); err != nil {
+		ctrlDir = "/var/run/wpa_supplicant"
+	}
+	startCmd := fmt.Sprintf("sudo wpa_supplicant -B -i %s -c %s -D nl80211,wext -C %s", interfaceName, wpaConfigPath, ctrlDir)
+	startOut, _ := executeCommand(startCmd)
+	log.Printf("wpa_supplicant start output: %s", strings.TrimSpace(startOut))
+
+	// Verificar que se inició correctamente
+	wpaPid, _ = exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'wpa_supplicant.*%s'", interfaceName)).Output()
+	if strings.TrimSpace(string(wpaPid)) == "" {
+		log.Printf("ERROR: wpa_supplicant no se inició correctamente")
+		result["success"] = false
+		result["error"] = "No se pudo iniciar wpa_supplicant"
+		return result
+	}
+	log.Printf("wpa_supplicant iniciado correctamente")
+
+	// Esperar a que el socket esté listo
+	time.Sleep(2 * time.Second)
+
+	// Ajustar permisos del socket
+	socketPath := fmt.Sprintf("%s/%s", ctrlDir, interfaceName)
+	executeCommand(fmt.Sprintf("sudo chmod 660 %s 2>/dev/null || true", socketPath))
+	executeCommand(fmt.Sprintf("sudo chgrp netdev %s 2>/dev/null || sudo chgrp hostberry %s 2>/dev/null || true", socketPath, socketPath))
+
+	// Verificar que wpa_cli puede comunicarse
+	wpaCliCmd := fmt.Sprintf("sudo wpa_cli -i %s -p %s", interfaceName, ctrlDir)
+	pingCmd := fmt.Sprintf("%s ping", wpaCliCmd)
+	pingOut, _ := executeCommand(pingCmd)
+	if !strings.Contains(pingOut, "PONG") {
+		log.Printf("ERROR: wpa_cli no responde después de iniciar wpa_supplicant")
+		result["success"] = false
+		result["error"] = "wpa_cli no puede comunicarse con wpa_supplicant"
+		return result
+	}
+	log.Printf("wpa_cli responde correctamente")
+
+	// Conectar a la red (debería estar configurada en el archivo)
+	selectCmd := fmt.Sprintf("%s select_network 0", wpaCliCmd)
+	selectResult, _ := executeCommand(selectCmd)
+	log.Printf("select_network result: %s", strings.TrimSpace(selectResult))
+
+	// Habilitar la red
+	enableCmd := fmt.Sprintf("%s enable_network 0", wpaCliCmd)
+	enableResult, _ := executeCommand(enableCmd)
+	log.Printf("enable_network result: %s", strings.TrimSpace(enableResult))"sudo rfkill unblock wifi 2>/dev/null || true")
 
 	// Usar wpa_cli con el directorio de control (NO el path del socket).
 	// Esto es la forma estándar y evita fallos por rutas de socket mal interpretadas.
-	ctrlDir := "/run/wpa_supplicant"
+	ctrlDir = "/run/wpa_supplicant"
 	if _, err := os.Stat(ctrlDir); err != nil {
 		ctrlDir = "/var/run/wpa_supplicant"
 	}
