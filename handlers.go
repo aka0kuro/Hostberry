@@ -870,7 +870,7 @@ func wireguardConfigHandler(c *fiber.Ctx) error {
 
 	result := configureWireGuard(req.Config, user.Username)
 	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("WireGuard configurado (usuario: %s)", user.Username), "wireguard", &userID)
+		InsertLog("INFO", fmt.Sprintf("WireGuard configurado por usuario %s", user.Username), "wireguard", &userID)
 		return c.JSON(result)
 	}
 
