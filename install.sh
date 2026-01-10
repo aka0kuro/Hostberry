@@ -1412,27 +1412,49 @@ EOF
     
 # Configurar wpa_supplicant para modo STA
 print_info "Configurando wpa_supplicant para modo estación (STA)..."
+
+# Crear directorio de configuración de wpa_supplicant
+print_info "Creando directorio de configuración de wpa_supplicant..."
+mkdir -p /etc/wpa_supplicant
+chown root:netdev /etc/wpa_supplicant 2>/dev/null || chown root:root /etc/wpa_supplicant
+chmod 755 /etc/wpa_supplicant
+print_success "Directorio /etc/wpa_supplicant configurado"
+
+# Crear directorio de socket de control de wpa_supplicant
+print_info "Creando directorio de socket de control de wpa_supplicant..."
+mkdir -p /var/run/wpa_supplicant
+chown root:netdev /var/run/wpa_supplicant 2>/dev/null || chown root:root /var/run/wpa_supplicant
+chmod 775 /var/run/wpa_supplicant
+print_success "Directorio /var/run/wpa_supplicant configurado con permisos 775"
+
+# También crear /run/wpa_supplicant (algunos sistemas usan este)
+mkdir -p /run/wpa_supplicant
+chown root:netdev /run/wpa_supplicant 2>/dev/null || chown root:root /run/wpa_supplicant
+chmod 775 /run/wpa_supplicant
+print_success "Directorio /run/wpa_supplicant configurado con permisos 775"
+
+# Crear archivo de configuración base de wpa_supplicant
 WPA_CONFIG="/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
 if [ ! -f "$WPA_CONFIG" ]; then
-    # Crear archivo de configuración de wpa_supplicant si no existe
     print_info "Creando archivo de configuración de wpa_supplicant: $WPA_CONFIG"
-    mkdir -p /etc/wpa_supplicant
-    chown root:netdev /etc/wpa_supplicant
-    chmod 755 /etc/wpa_supplicant
     cat > "$WPA_CONFIG" <<EOF
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+ctrl_interface_group=netdev
 update_config=1
 country=US
 
 # Redes guardadas se agregarán aquí automáticamente
 EOF
     chmod 600 "$WPA_CONFIG"
-    chown root:netdev "$WPA_CONFIG"
+    chown root:root "$WPA_CONFIG"
     print_success "Archivo de configuración de wpa_supplicant creado"
 else
     print_info "Archivo de configuración de wpa_supplicant ya existe"
-    chown root:netdev /etc/wpa_supplicant
-    chmod 755 /etc/wpa_supplicant
+    # Verificar que tenga el grupo netdev en ctrl_interface
+    if ! grep -q "GROUP=netdev" "$WPA_CONFIG" 2>/dev/null; then
+        print_info "Actualizando archivo de configuración para incluir GROUP=netdev..."
+        sed -i 's|ctrl_interface=DIR=/var/run/wpa_supplicant|ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev|g' "$WPA_CONFIG" 2>/dev/null || true
+    fi
 fi
     
     # Crear archivo de override de systemd para hostapd si no existe
