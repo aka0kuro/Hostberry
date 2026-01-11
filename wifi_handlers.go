@@ -651,6 +651,7 @@ country=%s
 			result["error"] = fmt.Sprintf("Error al guardar configuración: %v", cpErr)
 			return result
 		}
+	}
 	
 	// Limpiar archivo temporal
 	os.Remove(tmpConfigFile)
