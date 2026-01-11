@@ -603,7 +603,15 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 					iface["state"] = "connected"
 					// Verificar si tiene conectividad real a Internet
 					hasInternet := false
-					if iface["gateway"] != nil && iface["gateway"] != "" && iface["gateway"] != "192.168.4.1" {
+					gatewayStr := ""
+					if iface["gateway"] != nil {
+						if gw, ok := iface["gateway"].(string); ok {
+							gatewayStr = gw
+						} else {
+							gatewayStr = fmt.Sprintf("%v", iface["gateway"])
+						}
+					}
+					if gatewayStr != "" && gatewayStr != "192.168.4.1" {
 						// Tiene gateway que no es el del AP, probablemente tiene Internet
 						hasInternet = true
 					} else {
