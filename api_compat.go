@@ -467,28 +467,107 @@ func networkConfigHandler(c *fiber.Ctx) error {
 	
 	// Validar y aplicar Gateway
 	if req.Gateway != "" {
-		cmd := exec.Command("sh", "-c", fmt.Sprintf("echo '%s' | grep -E '^([0-9]{1,3}\\.){3}[0-9]{1,3}$'", req.Gateway))
-		if err := cmd.Run(); err != nil {
+		// Validar formato IP
+		ipRegex := regexp.MustCompile(`^([0-9]{1,3}\.){3}[0-9]{1,3}$`)
+		if !ipRegex.MatchString(req.Gateway) {
 			errors = append(errors, "Invalid Gateway format")
 		} else {
-			// Aplicar gateway usando nmcli o ip route
-			// Intentar con nmcli primero
-			nmcliCmd := fmt.Sprintf("nmcli connection modify $(nmcli -t -f NAME connection show --active | head -1) ipv4.gateway %s 2>&1", req.Gateway)
-			if out, err := executeCommand(nmcliCmd); err != nil {
-				// Si nmcli falla, intentar con ip route
-				ipCmd := fmt.Sprintf("ip route replace default via %s 2>&1", req.Gateway)
-				if out2, err2 := executeCommand(ipCmd); err2 != nil {
-					errors = append(errors, fmt.Sprintf("Failed to set gateway: %v (nmcli: %s, ip: %s)", err2, out, out2))
+			gatewayApplied := false
+			
+			// Método 1: nmcli (NetworkManager)
+			if !gatewayApplied {
+				connCmd := exec.Command("sh", "-c", "nmcli -t -f NAME connection show --active 2>/dev/null | head -1")
+				if connOut, err := connCmd.Output(); err == nil {
+					connName := strings.TrimSpace(string(connOut))
+					if connName != "" {
+						// Obtener interfaz activa
+						ifaceCmd := exec.Command("sh", "-c", fmt.Sprintf("nmcli -t -f DEVICE connection show '%s' 2>/dev/null | head -1", connName))
+						iface := ""
+						if ifaceOut, err := ifaceCmd.Output(); err == nil {
+							iface = strings.TrimSpace(string(ifaceOut))
+						}
+						
+						// Configurar gateway
+						cmd := fmt.Sprintf("sudo nmcli connection modify '%s' ipv4.gateway %s 2>&1", connName, req.Gateway)
+						if out, err := executeCommand(cmd); err == nil {
+							// Aplicar cambios reactivando la conexión
+							applyCmd := fmt.Sprintf("sudo nmcli connection up '%s' 2>&1", connName)
+							if _, err := executeCommand(applyCmd); err == nil {
+								applied = append(applied, fmt.Sprintf("Gateway set to %s (via NetworkManager)", req.Gateway))
+								gatewayApplied = true
+								log.Printf("Gateway configured via nmcli: %s", req.Gateway)
+							} else {
+								log.Printf("Failed to apply gateway via nmcli: %v", err)
+							}
+						} else {
+							log.Printf("nmcli gateway configuration failed: %v, output: %s", err, out)
+						}
+					}
+				}
+			}
+			
+			// Método 2: ip route (directo, funciona en cualquier sistema)
+			if !gatewayApplied {
+				// Obtener interfaz activa para la ruta por defecto
+				ifaceCmd := exec.Command("sh", "-c", "ip route | grep default | awk '{print $5}' | head -1")
+				iface := ""
+				if ifaceOut, err := ifaceCmd.Output(); err == nil {
+					iface = strings.TrimSpace(string(ifaceOut))
+				}
+				
+				if iface != "" {
+					// Eliminar ruta por defecto existente
+					executeCommand("sudo ip route del default 2>/dev/null || true")
+					// Agregar nueva ruta por defecto
+					cmd := fmt.Sprintf("sudo ip route add default via %s dev %s 2>&1", req.Gateway, iface)
+					if out, err := executeCommand(cmd); err == nil {
+						applied = append(applied, fmt.Sprintf("Gateway set to %s (via ip route)", req.Gateway))
+						gatewayApplied = true
+						log.Printf("Gateway configured via ip route: %s on %s", req.Gateway, iface)
+					} else {
+						log.Printf("ip route gateway configuration failed: %v, output: %s", err, out)
+					}
 				} else {
-					applied = append(applied, fmt.Sprintf("Gateway set to %s", req.Gateway))
+					// Intentar sin especificar interfaz
+					executeCommand("sudo ip route del default 2>/dev/null || true")
+					cmd := fmt.Sprintf("sudo ip route add default via %s 2>&1", req.Gateway)
+					if out, err := executeCommand(cmd); err == nil {
+						applied = append(applied, fmt.Sprintf("Gateway set to %s (via ip route)", req.Gateway))
+						gatewayApplied = true
+						log.Printf("Gateway configured via ip route: %s", req.Gateway)
+					} else {
+						log.Printf("ip route gateway configuration failed: %v, output: %s", err, out)
+					}
 				}
-			} else {
-				// Aplicar cambios de gateway
-				applyCmd := "nmcli connection up $(nmcli -t -f NAME connection show --active | head -1) 2>&1"
-				if _, err := executeCommand(applyCmd); err != nil {
-					// No es crítico si falla el apply
+			}
+			
+			// Método 3: route (comando legacy, para sistemas antiguos)
+			if !gatewayApplied {
+				// Obtener interfaz activa
+				ifaceCmd := exec.Command("sh", "-c", "route -n | grep '^0.0.0.0' | awk '{print $8}' | head -1")
+				iface := ""
+				if ifaceOut, err := ifaceCmd.Output(); err == nil {
+					iface = strings.TrimSpace(string(ifaceOut))
 				}
-				applied = append(applied, fmt.Sprintf("Gateway set to %s", req.Gateway))
+				
+				if iface != "" {
+					// Eliminar ruta por defecto existente
+					executeCommand("sudo route del default 2>/dev/null || true")
+					// Agregar nueva ruta por defecto
+					cmd := fmt.Sprintf("sudo route add default gw %s %s 2>&1", req.Gateway, iface)
+					if out, err := executeCommand(cmd); err == nil {
+						applied = append(applied, fmt.Sprintf("Gateway set to %s (via route)", req.Gateway))
+						gatewayApplied = true
+						log.Printf("Gateway configured via route: %s on %s", req.Gateway, iface)
+					} else {
+						log.Printf("route gateway configuration failed: %v, output: %s", err, out)
+					}
+				}
+			}
+			
+			// Si ningún método funcionó, reportar error
+			if !gatewayApplied {
+				errors = append(errors, fmt.Sprintf("Failed to set gateway: tried NetworkManager, ip route, and route command"))
 			}
 		}
 	}
