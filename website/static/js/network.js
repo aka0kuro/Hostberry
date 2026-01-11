@@ -880,12 +880,15 @@
       return;
     }
     
-    // Contar interfaces activas
+    // Contar interfaces activas con conexión real a Internet (no modo AP)
     const activeCount = interfaces.filter(iface => {
       if (!iface) return false;
+      const isAPMode = iface.ap_mode === true || iface.ap_mode === 'true' || iface.state === 'ap_mode';
+      const hasInternet = iface.internet_connected === true || iface.internet_connected === 'true';
       const status = iface.status || iface.state || '';
       const hasIp = iface.ip && iface.ip !== 'N/A' && iface.ip !== '';
-      return status === 'up' || status === 'connected' || hasIp;
+      // Solo contar si está conectado, tiene IP, no está en modo AP, y tiene Internet
+      return (status === 'up' || status === 'connected') && hasIp && !isAPMode && hasInternet;
     }).length;
     
     if (activeCount > 0) {
