@@ -19,20 +19,44 @@ const WpaSupplicantAltConfigDir = "/var/lib/hostberry/wpa_supplicant"
 // Variables para directorios de socket (se determinan dinámicamente)
 var activeRunDir string
 
-// getRunDir retorna el directorio de socket activo
+// getRunDir retorna el directorio de socket activo (escribible)
 func getRunDir() string {
 	if activeRunDir != "" {
 		return activeRunDir
 	}
-	// Intentar determinar el directorio de socket
+	// Intentar determinar el directorio de socket escribible
 	candidates := []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"}
 	for _, dir := range candidates {
+		// Verificar que el directorio existe o puede crearse
 		if _, err := os.Stat(dir); err == nil {
-			activeRunDir = dir
-			return activeRunDir
+			// Verificar que es escribible intentando crear un archivo temporal
+			testFile := fmt.Sprintf("%s/.test_write", dir)
+			if err := os.WriteFile(testFile, []byte("test"), 0644); err == nil {
+				os.Remove(testFile)
+				activeRunDir = dir
+				log.Printf("Directorio de socket seleccionado (escribible): %s", activeRunDir)
+				return activeRunDir
+			} else {
+				log.Printf("Directorio %s no es escribible: %v", dir, err)
+			}
+		} else {
+			// Intentar crear el directorio
+			if err := os.MkdirAll(dir, 0755); err == nil {
+				// Verificar que es escribible
+				testFile := fmt.Sprintf("%s/.test_write", dir)
+				if err := os.WriteFile(testFile, []byte("test"), 0644); err == nil {
+					os.Remove(testFile)
+					activeRunDir = dir
+					log.Printf("Directorio de socket creado y seleccionado: %s", activeRunDir)
+					return activeRunDir
+				}
+			}
 		}
 	}
-	activeRunDir = "/run/wpa_supplicant"
+	// Fallback: usar /tmp que siempre debería ser escribible
+	activeRunDir = "/tmp/wpa_supplicant"
+	os.MkdirAll(activeRunDir, 0755)
+	log.Printf("Usando directorio de socket por defecto (fallback): %s", activeRunDir)
 	return activeRunDir
 }
 
