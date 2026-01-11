@@ -174,19 +174,61 @@ func startWpaSupplicant(interfaceName, configPath string) error {
 		return fmt.Errorf("error iniciando wpa_supplicant: %v, output: %s", startErr, string(startOut))
 	}
 
-	log.Printf("wpa_supplicant iniciado, output: %s", strings.TrimSpace(out))
+	log.Printf("Comando wpa_supplicant ejecutado, output: %s", strings.TrimSpace(string(startOut)))
 
 	// Esperar a que el proceso esté corriendo
 	time.Sleep(2 * time.Second)
 
-	// Verificar que está corriendo
+	// Verificar que está corriendo usando múltiples métodos
+	pidFound := false
+	var pid string
+	
+	// Método 1: pgrep por nombre de proceso
 	pidCmd := exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'wpa_supplicant.*%s'", interfaceName))
-	pidOut, _ := pidCmd.Output()
-	if strings.TrimSpace(string(pidOut)) == "" {
-		return fmt.Errorf("wpa_supplicant no se inició correctamente")
+	if pidOut, err := pidCmd.Output(); err == nil {
+		pid = strings.TrimSpace(string(pidOut))
+		if pid != "" {
+			pidFound = true
+			log.Printf("wpa_supplicant encontrado con pgrep, PID: %s", pid)
+		}
+	}
+	
+	// Método 2: pgrep por nombre de archivo
+	if !pidFound {
+		pidCmd2 := exec.Command("sh", "-c", fmt.Sprintf("pgrep -f '%s.*%s'", wpaSupplicantPath, interfaceName))
+		if pidOut2, err2 := pidCmd2.Output(); err2 == nil {
+			pid = strings.TrimSpace(string(pidOut2))
+			if pid != "" {
+				pidFound = true
+				log.Printf("wpa_supplicant encontrado con pgrep (método 2), PID: %s", pid)
+			}
+		}
+	}
+	
+	// Método 3: ps aux | grep
+	if !pidFound {
+		psCmd := exec.Command("sh", "-c", fmt.Sprintf("ps aux | grep '[w]pa_supplicant.*%s' | awk '{print $2}' | head -1", interfaceName))
+		if psOut, err := psCmd.Output(); err == nil {
+			pid = strings.TrimSpace(string(psOut))
+			if pid != "" {
+				pidFound = true
+				log.Printf("wpa_supplicant encontrado con ps, PID: %s", pid)
+			}
+		}
+	}
+	
+	if !pidFound {
+		log.Printf("Warning: wpa_supplicant no se encontró corriendo después de iniciarlo")
+		log.Printf("Verificando si hay errores en los logs del sistema...")
+		// Intentar ver los últimos logs de wpa_supplicant
+		dmesgCmd := exec.Command("sh", "-c", "dmesg | tail -20 | grep -i wpa || echo 'No hay mensajes de wpa en dmesg'")
+		if dmesgOut, err := dmesgCmd.Output(); err == nil {
+			log.Printf("Últimos mensajes de dmesg relacionados con wpa: %s", string(dmesgOut))
+		}
+		return fmt.Errorf("wpa_supplicant no se inició correctamente o se detuvo inmediatamente")
 	}
 
-	log.Printf("wpa_supplicant corriendo con PID: %s", strings.TrimSpace(string(pidOut)))
+	log.Printf("wpa_supplicant corriendo con PID: %s", pid)
 	return nil
 }
 
