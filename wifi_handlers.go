@@ -15,8 +15,6 @@ import (
 const WpaSupplicantConfigDir = "/etc/wpa_supplicant"
 // Directorio alternativo persistente si /etc es de solo lectura (no se borra al reiniciar)
 const WpaSupplicantAltConfigDir = "/var/lib/hostberry/wpa_supplicant"
-// Directorio alternativo persistente si /etc es de solo lectura
-const WpaSupplicantAltConfigDir = "/var/lib/hostberry/wpa_supplicant"
 
 // Variables para directorios de socket (se determinan dinámicamente)
 var activeRunDir string
