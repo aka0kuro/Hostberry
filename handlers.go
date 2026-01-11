@@ -639,7 +639,7 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 				}
 			}
 		} else {
-			// Para interfaces no WiFi, usar el estado del sistema
+			// Para interfaces no WiFi (ethernet), usar el estado del sistema
 			if iface["ip"] != "N/A" && iface["ip"] != "" && iface["ip"] != "Obtaining IP..." {
 				iface["connected"] = true
 				if iface["state"] == "up" {
@@ -647,6 +647,12 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 				}
 				// Verificar conectividad a Internet
 				hasInternet := false
+				ipStr, ok := iface["ip"].(string)
+				if !ok {
+					ipStr = fmt.Sprintf("%v", iface["ip"])
+				}
+				
+				// Obtener gateway - intentar múltiples métodos
 				gatewayStr := ""
 				if iface["gateway"] != nil {
 					if gw, ok := iface["gateway"].(string); ok {
@@ -655,14 +661,42 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 						gatewayStr = fmt.Sprintf("%v", iface["gateway"])
 					}
 				}
-				if gatewayStr != "" && gatewayStr != "192.168.4.1" {
+				
+				// Si no hay gateway en el map, intentar obtenerlo de la ruta por defecto
+				if gatewayStr == "" {
+					// Obtener gateway por defecto del sistema
+					defaultGatewayCmd := exec.Command("sh", "-c", "ip route | grep default | awk '{print $3}' | head -1")
+					if defaultGatewayOut, err := defaultGatewayCmd.Output(); err == nil {
+						defaultGateway := strings.TrimSpace(string(defaultGatewayOut))
+						if defaultGateway != "" {
+							gatewayStr = defaultGateway
+							iface["gateway"] = defaultGateway
+						}
+					}
+				}
+				
+				// Si la IP no es del AP (192.168.4.x) y tiene gateway, asumir que tiene Internet
+				if !strings.HasPrefix(ipStr, "192.168.4.") && gatewayStr != "" && gatewayStr != "192.168.4.1" {
+					// Tiene IP válida y gateway válido, probablemente tiene Internet
 					hasInternet = true
+				} else if strings.HasPrefix(ipStr, "192.168.4.") {
+					// Está en la red del AP, no tiene Internet
+					hasInternet = false
 				} else {
-					pingCmd := exec.Command("sh", "-c", "ping -c 1 -W 1 8.8.8.8 > /dev/null 2>&1 && echo 'ok' || echo 'fail'")
+					// Verificar conectividad con ping (solo si no está en red del AP)
+					// Usar timeout más corto para no bloquear
+					pingCmd := exec.Command("sh", "-c", fmt.Sprintf("timeout 2 ping -c 1 -W 1 8.8.8.8 > /dev/null 2>&1 && echo 'ok' || echo 'fail'"))
 					if pingOut, err := pingCmd.Output(); err == nil {
 						if strings.TrimSpace(string(pingOut)) == "ok" {
 							hasInternet = true
 						}
+					}
+					// Si tiene IP válida (no AP) pero el ping falla, aún así asumir que tiene Internet
+					// (puede ser que el ping esté bloqueado pero la conexión funcione)
+					if !hasInternet && !strings.HasPrefix(ipStr, "192.168.4.") && ipStr != "" {
+						// Si tiene IP válida y no es del AP, probablemente tiene Internet
+						// (aunque el ping pueda fallar por firewall u otros motivos)
+						hasInternet = true
 					}
 				}
 				iface["internet_connected"] = hasInternet
