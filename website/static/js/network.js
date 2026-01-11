@@ -930,6 +930,19 @@
     if (basicConfigForm) {
       basicConfigForm.addEventListener('submit', async function(e) {
         e.preventDefault();
+        
+        // Obtener el botón de submit
+        const submitButton = this.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton ? submitButton.innerHTML : '';
+        const originalButtonDisabled = submitButton ? submitButton.disabled : false;
+        
+        // Mostrar spinner y deshabilitar botón
+        if (submitButton) {
+          submitButton.disabled = true;
+          submitButton.innerHTML = '<span class="spinning me-2"><i class="bi bi-arrow-clockwise"></i></span>' + 
+                                   t('network.saving', 'Saving...');
+        }
+        
         const fd = new FormData(this);
         const data = {
           hostname: fd.get('hostname'),
@@ -959,6 +972,12 @@
         } catch (e) {
           console.error('Error saving network config:', e);
           HostBerry.showAlert('danger', t('errors.network_error', 'Network error'));
+        } finally {
+          // Restaurar botón original
+          if (submitButton) {
+            submitButton.disabled = originalButtonDisabled;
+            submitButton.innerHTML = originalButtonText;
+          }
         }
       });
     }
