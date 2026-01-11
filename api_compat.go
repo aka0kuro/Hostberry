@@ -247,12 +247,70 @@ func networkConfigHandler(c *fiber.Ctx) error {
 			if !hostnameRegex.MatchString(req.Hostname) {
 				errors = append(errors, "Hostname contains invalid characters. Use only letters, numbers, hyphens and dots. Cannot start or end with hyphen or dot.")
 			} else {
-				// Aplicar hostname usando hostnamectl con sudo
-				cmd := fmt.Sprintf("sudo hostnamectl set-hostname %s", req.Hostname)
-				if out, err := executeCommand(cmd); err != nil {
-					log.Printf("Error setting hostname: %v, output: %s", err, out)
-					errors = append(errors, fmt.Sprintf("Failed to set hostname: %v", err))
-				} else {
+				hostnameApplied := false
+				
+				// Método 1: hostnamectl (preferido, funciona en systemd)
+				if !hostnameApplied {
+					cmd := fmt.Sprintf("hostnamectl set-hostname %s", req.Hostname)
+					if out, err := executeCommand(cmd); err == nil {
+						// Verificar que realmente se cambió
+						verifyCmd := exec.Command("sh", "-c", "hostnamectl --static 2>/dev/null || hostname 2>/dev/null || echo ''")
+						if verifyOut, err := verifyCmd.Output(); err == nil {
+							currentHostname := strings.TrimSpace(string(verifyOut))
+							if currentHostname == req.Hostname {
+								hostnameApplied = true
+								log.Printf("Hostname successfully set to %s via hostnamectl", req.Hostname)
+								_ = out
+							} else {
+								log.Printf("Hostname verification failed: expected %s, got %s", req.Hostname, currentHostname)
+							}
+						}
+					} else {
+						log.Printf("hostnamectl failed: %v, output: %s", err, out)
+					}
+				}
+				
+				// Método 2: /etc/hostname (directo, funciona en sistemas sin systemd)
+				if !hostnameApplied {
+					hostnameFile := "/etc/hostname"
+					writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("echo '%s' > %s", req.Hostname, hostnameFile))
+					if err := writeCmd.Run(); err == nil {
+						// Verificar que se escribió correctamente
+						if content, err := os.ReadFile(hostnameFile); err == nil {
+							writtenHostname := strings.TrimSpace(string(content))
+							if writtenHostname == req.Hostname {
+								// Intentar aplicar el hostname inmediatamente
+								applyCmd := exec.Command("sh", "-c", fmt.Sprintf("hostname %s 2>/dev/null || true", req.Hostname))
+								applyCmd.Run()
+								hostnameApplied = true
+								log.Printf("Hostname successfully set to %s via /etc/hostname", req.Hostname)
+							}
+						}
+					} else {
+						log.Printf("Failed to write /etc/hostname: %v", err)
+					}
+				}
+				
+				// Método 3: hostname command (temporal, se pierde al reiniciar)
+				if !hostnameApplied {
+					cmd := fmt.Sprintf("hostname %s", req.Hostname)
+					if out, err := executeCommand(cmd); err == nil {
+						// Verificar que se cambió
+						verifyCmd := exec.Command("hostname")
+						if verifyOut, err := verifyCmd.Output(); err == nil {
+							currentHostname := strings.TrimSpace(string(verifyOut))
+							if currentHostname == req.Hostname {
+								hostnameApplied = true
+								log.Printf("Hostname temporarily set to %s via hostname command (will persist if /etc/hostname is also updated)", req.Hostname)
+								_ = out
+							}
+						}
+					} else {
+						log.Printf("hostname command failed: %v, output: %s", err, out)
+					}
+				}
+				
+				if hostnameApplied {
 					// Actualizar /etc/hosts para evitar el warning de sudo
 					// Obtener el hostname anterior para reemplazarlo
 					oldHostnameCmd := exec.Command("sh", "-c", "hostnamectl --static 2>/dev/null || hostname 2>/dev/null || echo ''")
