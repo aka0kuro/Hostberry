@@ -368,29 +368,33 @@ func networkConfigHandler(c *fiber.Ctx) error {
 					hostsFile := "/etc/hosts"
 					oldHostname := ""
 					
-					// Usar grep para buscar el hostname antiguo en /etc/hosts (excluyendo localhost y comentarios)
+					// Paso 1: Usar grep para buscar cualquier hostname en /etc/hosts (excluyendo localhost y comentarios)
 					grepCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -v '^#' %s | grep -v '^$' | awk '{for(i=2;i<=NF;i++) if($i != \"localhost\") print $i}' | head -1", hostsFile))
 					if grepOut, err := grepCmd.Output(); err == nil {
 						oldHostname = strings.TrimSpace(string(grepOut))
-						log.Printf("Hostname antiguo encontrado con grep: %s", oldHostname)
+						if oldHostname != "" {
+							log.Printf("Hostname antiguo encontrado en /etc/hosts con grep: %s", oldHostname)
+						}
 					}
 					
-					// Si grep no encontró nada, intentar obtener el hostname actual del sistema
+					// Paso 2: Si grep no encontró nada en /etc/hosts, obtener el hostname actual del sistema
 					if oldHostname == "" {
 						oldHostnameCmd := exec.Command("sh", "-c", "hostnamectl --static 2>/dev/null || hostname 2>/dev/null || echo ''")
 						if oldOut, err := oldHostnameCmd.Output(); err == nil {
 							oldHostname = strings.TrimSpace(string(oldOut))
-							log.Printf("Hostname antiguo obtenido del sistema: %s", oldHostname)
+							if oldHostname != "" {
+								log.Printf("Hostname antiguo obtenido del sistema: %s", oldHostname)
+							}
 						}
 					}
 					
-					// Usar grep para verificar si el hostname antiguo existe en el archivo
+					// Paso 3: Si encontramos un hostname antiguo y es diferente al nuevo, reemplazarlo con sed
 					if oldHostname != "" && oldHostname != req.Hostname {
-						// Verificar con grep si el hostname antiguo existe
+						// Verificar con grep si el hostname antiguo existe en el archivo
 						grepCheckCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -q '%s' %s && echo 'found' || echo 'notfound'", oldHostname, hostsFile))
 						if grepCheckOut, err := grepCheckCmd.Output(); err == nil {
 							if strings.TrimSpace(string(grepCheckOut)) == "found" {
-								// Escapar caracteres especiales para sed (/, ., [, ], etc.)
+								// Escapar caracteres especiales para sed
 								oldHostnameEscaped := strings.ReplaceAll(oldHostname, "/", "\\/")
 								oldHostnameEscaped = strings.ReplaceAll(oldHostnameEscaped, ".", "\\.")
 								oldHostnameEscaped = strings.ReplaceAll(oldHostnameEscaped, "[", "\\[")
@@ -398,6 +402,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 								oldHostnameEscaped = strings.ReplaceAll(oldHostnameEscaped, "*", "\\*")
 								oldHostnameEscaped = strings.ReplaceAll(oldHostnameEscaped, "^", "\\^")
 								oldHostnameEscaped = strings.ReplaceAll(oldHostnameEscaped, "$", "\\$")
+								oldHostnameEscaped = strings.ReplaceAll(oldHostnameEscaped, "&", "\\&")
 								
 								newHostnameEscaped := strings.ReplaceAll(req.Hostname, "/", "\\/")
 								newHostnameEscaped = strings.ReplaceAll(newHostnameEscaped, ".", "\\.")
@@ -406,44 +411,75 @@ func networkConfigHandler(c *fiber.Ctx) error {
 								newHostnameEscaped = strings.ReplaceAll(newHostnameEscaped, "*", "\\*")
 								newHostnameEscaped = strings.ReplaceAll(newHostnameEscaped, "^", "\\^")
 								newHostnameEscaped = strings.ReplaceAll(newHostnameEscaped, "$", "\\$")
+								newHostnameEscaped = strings.ReplaceAll(newHostnameEscaped, "&", "\\&")
 								
 								// Usar sed para reemplazar el hostname antiguo por el nuevo
-								sedCmd := fmt.Sprintf("sudo sed -i 's/%s/%s/g' %s", oldHostnameEscaped, newHostnameEscaped, hostsFile)
-								log.Printf("Ejecutando sed: %s", sedCmd)
+								sedCmd := fmt.Sprintf("sudo sed -i 's/\\b%s\\b/%s/g' %s", oldHostnameEscaped, newHostnameEscaped, hostsFile)
+								log.Printf("Ejecutando sed para reemplazar: %s", sedCmd)
 								if out, err := executeCommand(sedCmd); err != nil {
 									log.Printf("Error: sed failed to replace hostname: %v, output: %s", err, out)
+									// Fallback: intentar sin \b (límite de palabra)
+									sedCmd2 := fmt.Sprintf("sudo sed -i 's/%s/%s/g' %s", oldHostnameEscaped, newHostnameEscaped, hostsFile)
+									log.Printf("Intentando sed sin límite de palabra: %s", sedCmd2)
+									if out2, err2 := executeCommand(sedCmd2); err2 != nil {
+										log.Printf("Error: sed fallback también falló: %v, output: %s", err2, out2)
+									} else {
+										log.Printf("Successfully replaced hostname using sed fallback")
+									}
 								} else {
 									log.Printf("Successfully replaced hostname %s with %s in /etc/hosts using sed", oldHostname, req.Hostname)
 								}
 							} else {
 								log.Printf("Hostname antiguo %s not found in /etc/hosts, adding new hostname", oldHostname)
-								// El hostname antiguo no está en el archivo, agregar el nuevo a la línea 127.0.0.1
-								addCmd := fmt.Sprintf("grep -q '^127\\.0\\.0\\.1' %s && sudo sed -i 's/^127\\.0\\.0\\.1[[:space:]]/&%s /' %s || echo '127.0.0.1\tlocalhost\t%s' | sudo tee -a %s > /dev/null", hostsFile, req.Hostname, hostsFile, req.Hostname, hostsFile)
-								executeCommand(addCmd)
+								// El hostname antiguo no está en el archivo, agregar el nuevo
+								addCmd := fmt.Sprintf("grep -q '^127\\.0\\.0\\.1' %s && sudo sed -i 's/^127\\.0\\.0\\.1[[:space:]]*/& %s/' %s || echo '127.0.0.1\tlocalhost\t%s' | sudo tee -a %s > /dev/null", hostsFile, req.Hostname, hostsFile, req.Hostname, hostsFile)
+								if out, err := executeCommand(addCmd); err != nil {
+									log.Printf("Error adding hostname: %v, output: %s", err, out)
+								} else {
+									log.Printf("Added new hostname %s to /etc/hosts", req.Hostname)
+								}
 							}
 						}
-					} else if oldHostname == "" {
-						// No se encontró hostname antiguo, verificar si el nuevo ya existe
+					} else {
+						// No se encontró hostname antiguo o es el mismo, verificar si el nuevo ya existe
 						grepNewCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -q '%s' %s && echo 'exists' || echo 'notexists'", req.Hostname, hostsFile))
 						if grepNewOut, err := grepNewCmd.Output(); err == nil {
 							if strings.TrimSpace(string(grepNewOut)) == "notexists" {
 								// Agregar el nuevo hostname a la línea 127.0.0.1
-								addCmd := fmt.Sprintf("grep -q '^127\\.0\\.0\\.1' %s && sudo sed -i 's/^127\\.0\\.0\\.1[[:space:]]/&%s /' %s || echo '127.0.0.1\tlocalhost\t%s' | sudo tee -a %s > /dev/null", hostsFile, req.Hostname, hostsFile, req.Hostname, hostsFile)
-								executeCommand(addCmd)
-								log.Printf("Added new hostname %s to /etc/hosts", req.Hostname)
+								addCmd := fmt.Sprintf("grep -q '^127\\.0\\.0\\.1' %s && sudo sed -i 's/^127\\.0\\.0\\.1[[:space:]]*/& %s/' %s || echo '127.0.0.1\tlocalhost\t%s' | sudo tee -a %s > /dev/null", hostsFile, req.Hostname, hostsFile, req.Hostname, hostsFile)
+								if out, err := executeCommand(addCmd); err != nil {
+									log.Printf("Error adding hostname: %v, output: %s", err, out)
+									// Último recurso: usar echo directamente
+									echoCmd := fmt.Sprintf("echo '127.0.0.1\tlocalhost\t%s' | sudo tee -a %s > /dev/null", req.Hostname, hostsFile)
+									executeCommand(echoCmd)
+								} else {
+									log.Printf("Added new hostname %s to /etc/hosts", req.Hostname)
+								}
 							} else {
 								log.Printf("Hostname %s already exists in /etc/hosts", req.Hostname)
 							}
 						}
 					}
 					
-					// Verificar que el cambio se aplicó correctamente usando grep
+					// Paso 4: Verificar que el cambio se aplicó correctamente usando grep
 					verifyCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -q '%s' %s && echo 'ok' || echo 'fail'", req.Hostname, hostsFile))
 					if verifyOut, err := verifyCmd.Output(); err == nil {
 						if strings.TrimSpace(string(verifyOut)) == "ok" {
 							log.Printf("Verified: hostname %s successfully updated in /etc/hosts", req.Hostname)
 						} else {
-							log.Printf("Warning: Could not verify hostname update in /etc/hosts")
+							log.Printf("Warning: Could not verify hostname update in /etc/hosts, attempting direct update")
+							// Último intento: actualizar directamente la línea 127.0.0.1
+							updateCmd := fmt.Sprintf("sudo sed -i 's/^127\\.0\\.0\\.1[[:space:]]*localhost.*/127.0.0.1\tlocalhost\t%s/' %s", req.Hostname, hostsFile)
+							executeCommand(updateCmd)
+							// Verificar nuevamente
+							verifyCmd2 := exec.Command("sh", "-c", fmt.Sprintf("grep -q '%s' %s && echo 'ok' || echo 'fail'", req.Hostname, hostsFile))
+							if verifyOut2, err2 := verifyCmd2.Output(); err2 == nil {
+								if strings.TrimSpace(string(verifyOut2)) == "ok" {
+									log.Printf("Verified: hostname %s successfully updated after direct update", req.Hostname)
+								} else {
+									log.Printf("Error: hostname %s still not found in /etc/hosts after all attempts", req.Hostname)
+								}
+							}
 						}
 					}
 					
