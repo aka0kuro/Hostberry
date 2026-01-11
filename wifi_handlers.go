@@ -548,13 +548,16 @@ country=%s
 	cpOut, cpErr := cpCmd.CombinedOutput()
 	cpOutStr := string(cpOut)
 	
-	// Si falla por sistema de solo lectura, intentar remontar
-	if cpErr != nil && (strings.Contains(cpOutStr, "Read-only file system") || strings.Contains(cpOutStr, "Read-only")) {
-		log.Printf("ERROR detectado: %s", cpOutStr)
-		log.Printf("Sistema de archivos de solo lectura detectado, intentando remontar...")
-		remountCmd := exec.Command("sudo", "mount", "-o", "remount,rw", "/")
-		remountCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
-		if remountOut, remountErr := remountCmd.CombinedOutput(); remountErr != nil {
+	// Si falla por sistema de solo lectura, intentar remontar o usar directorio alternativo
+	if cpErr != nil {
+		cpOutLower := strings.ToLower(cpOutStr)
+		if strings.Contains(cpOutLower, "read-only") || strings.Contains(cpOutLower, "readonly") {
+			log.Printf("ERROR detectado (sistema de solo lectura): %s", cpOutStr)
+			log.Printf("Sistema de archivos de solo lectura detectado, intentando remontar...")
+			remountCmd := exec.Command("sudo", "mount", "-o", "remount,rw", "/")
+			remountCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+			remountOut, remountErr := remountCmd.CombinedOutput()
+			if remountErr != nil {
 			log.Printf("No se pudo remontar como lectura-escritura: %v, output: %s", remountErr, string(remountOut))
 			// Intentar usar directorio alternativo persistente (no se borra al reiniciar)
 			log.Printf("Usando directorio alternativo persistente: %s", WpaSupplicantAltConfigDir)
