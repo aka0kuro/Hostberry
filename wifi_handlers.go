@@ -400,20 +400,48 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	// Paso 2: Verificar conflictos con otros servicios
 	log.Printf("Paso 2: Verificando conflictos...")
 
-	// Verificar si hostapd está corriendo
+	// Verificar si hostapd está corriendo y desactivarlo automáticamente
 	hostapdRunning, _ := exec.Command("sh", "-c", "pgrep hostapd 2>/dev/null").Output()
 	if strings.TrimSpace(string(hostapdRunning)) != "" {
-		log.Printf("hostapd está corriendo; no se detendrá automáticamente")
-		result["error"] = "WiFi AP (hostapd) está activo. Desactiva el modo AP antes de conectar a una red WiFi."
-		return result
+		log.Printf("hostapd está corriendo; desactivándolo automáticamente...")
+		
+		// Detener hostapd y dnsmasq
+		executeCommand("sudo systemctl stop hostapd 2>/dev/null || true")
+		executeCommand("sudo systemctl stop dnsmasq 2>/dev/null || true")
+		
+		// Esperar un momento para que se detenga completamente
+		time.Sleep(2 * time.Second)
+		
+		// Verificar que se detuvo
+		hostapdCheck, _ := exec.Command("sh", "-c", "pgrep hostapd 2>/dev/null").Output()
+		if strings.TrimSpace(string(hostapdCheck)) != "" {
+			log.Printf("Warning: hostapd aún está corriendo después de intentar detenerlo")
+			// Intentar matar el proceso
+			executeCommand("sudo pkill -9 hostapd 2>/dev/null || true")
+			time.Sleep(1 * time.Second)
+		}
+		
+		log.Printf("hostapd desactivado")
+	}
+
+	// Verificar y eliminar interfaz ap0 si existe (modo AP+STA)
+	ap0Check := exec.Command("sh", "-c", "ip link show ap0 2>/dev/null")
+	if ap0Out, err := ap0Check.Output(); err == nil && strings.TrimSpace(string(ap0Out)) != "" {
+		log.Printf("Interfaz ap0 detectada; eliminándola...")
+		executeCommand("sudo iw dev ap0 del 2>/dev/null || true")
+		time.Sleep(1 * time.Second)
+		log.Printf("Interfaz ap0 eliminada")
 	}
 
 	// Verificar modo de la interfaz
 	iwInfoCmd := exec.Command("sh", "-c", fmt.Sprintf("iw dev %s info 2>/dev/null", interfaceName))
 	if iwInfoOut, err := iwInfoCmd.Output(); err == nil {
 		if strings.Contains(string(iwInfoOut), "type AP") {
-			result["error"] = "La interfaz WiFi está en modo AP. Desactiva el modo AP antes de conectar como cliente."
-			return result
+			log.Printf("La interfaz %s está en modo AP; cambiándola a modo managed...", interfaceName)
+			// Cambiar la interfaz de modo AP a modo managed
+			executeCommand(fmt.Sprintf("sudo iw dev %s set type managed 2>/dev/null || true", interfaceName))
+			time.Sleep(1 * time.Second)
+			log.Printf("Interfaz %s cambiada a modo managed", interfaceName)
 		}
 	}
 
