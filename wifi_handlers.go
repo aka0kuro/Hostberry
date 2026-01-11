@@ -556,6 +556,24 @@ country=%s
 			log.Printf("No se pudo remontar como lectura-escritura: %v, output: %s", remountErr, string(remountOut))
 			// Intentar usar directorio alternativo persistente (no se borra al reiniciar)
 			log.Printf("Usando directorio alternativo persistente: %s", WpaSupplicantAltConfigDir)
+			// Crear directorio padre primero si no existe
+			parentDir := "/var/lib/hostberry"
+			mkdirParentCmd := exec.Command("sudo", "mkdir", "-p", parentDir)
+			mkdirParentCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+			if mkdirParentOut, mkdirParentErr := mkdirParentCmd.CombinedOutput(); mkdirParentErr != nil {
+				log.Printf("Warning: No se pudo crear directorio padre %s: %v, output: %s", parentDir, mkdirParentErr, string(mkdirParentOut))
+				// Intentar remontar /var primero
+				remountVarCmd := exec.Command("sudo", "mount", "-o", "remount,rw", "/var")
+				remountVarCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+				remountVarCmd.Run() // Intentar remontar
+				// Intentar crear de nuevo
+				if mkdirParentOut2, mkdirParentErr2 := mkdirParentCmd.CombinedOutput(); mkdirParentErr2 != nil {
+					log.Printf("ERROR: No se pudo crear directorio padre incluso después de remontar: %v, output: %s", mkdirParentErr2, string(mkdirParentOut2))
+					os.Remove(tmpConfigFile)
+					result["error"] = fmt.Sprintf("Error al guardar configuración: no se pudo crear directorio alternativo")
+					return result
+				}
+			}
 			// Crear directorio alternativo con sudo
 			mkdirAltCmd := exec.Command("sudo", "mkdir", "-p", WpaSupplicantAltConfigDir)
 			mkdirAltCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
