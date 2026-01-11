@@ -122,12 +122,42 @@ func startWpaSupplicant(interfaceName, configPath string) error {
 		return fmt.Errorf("archivo de configuración no existe: %s", configPath)
 	}
 
+	// Buscar la ruta completa de wpa_supplicant
+	wpaSupplicantPath := ""
+	possiblePaths := []string{
+		"/usr/sbin/wpa_supplicant",
+		"/sbin/wpa_supplicant",
+		"/usr/bin/wpa_supplicant",
+		"/bin/wpa_supplicant",
+	}
+	
+	for _, path := range possiblePaths {
+		if _, err := os.Stat(path); err == nil {
+			wpaSupplicantPath = path
+			break
+		}
+	}
+	
+	// Si no se encontró en las rutas estándar, intentar con which
+	if wpaSupplicantPath == "" {
+		whichCmd := exec.Command("sh", "-c", "which wpa_supplicant 2>/dev/null")
+		if whichOut, err := whichCmd.Output(); err == nil {
+			wpaSupplicantPath = strings.TrimSpace(string(whichOut))
+		}
+	}
+	
+	if wpaSupplicantPath == "" {
+		return fmt.Errorf("wpa_supplicant no se encontró en el sistema. Instala el paquete wpa_supplicant")
+	}
+	
+	log.Printf("Usando wpa_supplicant en: %s", wpaSupplicantPath)
+	
 	// Iniciar wpa_supplicant
 	// -B: background
 	// -i: interfaz
 	// -c: archivo de configuración
 	// -D: driver (nl80211 primero, luego wext como fallback)
-	startCmd := fmt.Sprintf("sudo wpa_supplicant -B -i %s -c %s -D nl80211,wext", interfaceName, configPath)
+	startCmd := fmt.Sprintf("sudo %s -B -i %s -c %s -D nl80211,wext", wpaSupplicantPath, interfaceName, configPath)
 	out, err := executeCommand(startCmd)
 	if err != nil {
 		log.Printf("Error iniciando wpa_supplicant: %v, output: %s", err, out)
