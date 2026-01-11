@@ -556,27 +556,34 @@ country=%s
 		remountCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 		if remountOut, remountErr := remountCmd.CombinedOutput(); remountErr != nil {
 			log.Printf("No se pudo remontar como lectura-escritura: %v, output: %s", remountErr, string(remountOut))
-			// Intentar usar directorio alternativo en /tmp
-			altConfigDir := "/tmp/hostberry/wpa_supplicant"
-			if err := os.MkdirAll(altConfigDir, 0755); err == nil {
-				log.Printf("Usando directorio alternativo: %s", altConfigDir)
-				wpaConfigPath = fmt.Sprintf("%s/wpa_supplicant-%s.conf", altConfigDir, safeSSID)
-				// Intentar copiar de nuevo
-				cpCmd2 := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
-				cpCmd2.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
-				if cpOut2, cpErr2 := cpCmd2.CombinedOutput(); cpErr2 != nil {
-					log.Printf("ERROR: Falló escritura incluso en directorio alternativo: %v, output: %s", cpErr2, string(cpOut2))
-					os.Remove(tmpConfigFile)
-					result["error"] = fmt.Sprintf("Error al guardar configuración: sistema de archivos de solo lectura")
-					return result
-				}
-				log.Printf("Archivo guardado en directorio alternativo: %s", wpaConfigPath)
-			} else {
-				log.Printf("ERROR: No se pudo crear directorio alternativo: %v", err)
+			// Intentar usar directorio alternativo persistente (no se borra al reiniciar)
+			log.Printf("Usando directorio alternativo persistente: %s", WpaSupplicantAltConfigDir)
+			// Crear directorio alternativo con sudo
+			mkdirAltCmd := exec.Command("sudo", "mkdir", "-p", WpaSupplicantAltConfigDir)
+			mkdirAltCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+			if mkdirOut, mkdirErr := mkdirAltCmd.CombinedOutput(); mkdirErr != nil {
+				log.Printf("ERROR: No se pudo crear directorio alternativo: %v, output: %s", mkdirErr, string(mkdirOut))
+				os.Remove(tmpConfigFile)
+				result["error"] = fmt.Sprintf("Error al guardar configuración: no se pudo crear directorio alternativo")
+				return result
+			}
+			// Establecer permisos del directorio alternativo
+			exec.Command("sudo", "chmod", "755", WpaSupplicantAltConfigDir).Run()
+			exec.Command("sudo", "chown", "root:netdev", WpaSupplicantAltConfigDir).Run()
+			
+			// Actualizar ruta de configuración al directorio alternativo
+			wpaConfigPath = fmt.Sprintf("%s/wpa_supplicant-%s.conf", WpaSupplicantAltConfigDir, safeSSID)
+			
+			// Intentar copiar de nuevo
+			cpCmd2 := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
+			cpCmd2.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+			if cpOut2, cpErr2 := cpCmd2.CombinedOutput(); cpErr2 != nil {
+				log.Printf("ERROR: Falló escritura incluso en directorio alternativo: %v, output: %s", cpErr2, string(cpOut2))
 				os.Remove(tmpConfigFile)
 				result["error"] = fmt.Sprintf("Error al guardar configuración: sistema de archivos de solo lectura")
 				return result
 			}
+			log.Printf("Archivo guardado en directorio alternativo persistente: %s", wpaConfigPath)
 		} else {
 			log.Printf("Sistema remontado como lectura-escritura, intentando copiar de nuevo...")
 			// Intentar copiar de nuevo después del remontaje
