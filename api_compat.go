@@ -393,55 +393,111 @@ func networkConfigHandler(c *fiber.Ctx) error {
 						log.Printf("Created new hosts file in /tmp: %s", tmpFile)
 						log.Printf("File content:\n%s", newContent)
 						
-						// Obtener la ruta completa de cp
-						cpPath := "/bin/cp"
-						if _, err := os.Stat(cpPath); os.IsNotExist(err) {
-							cpPath = "/usr/bin/cp"
-						}
-						
-						// Copiar el archivo temporal a /etc/hosts usando sudo cp (sobrescribir)
-						// Usar ruta completa de cp para asegurar que funcione con sudoers
-						copyCmd := fmt.Sprintf("sudo %s -f %s %s", cpPath, tmpFile, hostsFile)
-						log.Printf("Copying temp file to /etc/hosts (overwrite): %s", copyCmd)
-						if out, err := executeCommand(copyCmd); err != nil {
-							log.Printf("Error: Could not copy temp file to /etc/hosts: %v, output: %s", err, out)
-							// Intentar método alternativo: usar cat con tee
-							log.Printf("Trying alternative method: cat with tee")
-							catCmd := fmt.Sprintf("sudo cat %s | sudo tee %s > /dev/null", tmpFile, hostsFile)
-							if out2, err2 := executeCommand(catCmd); err2 != nil {
-								log.Printf("Error: Alternative method also failed: %v, output: %s", err2, out2)
-							} else {
-								log.Printf("Successfully copied using cat/tee method")
+						// Verificar que el archivo temporal existe
+						if _, err := os.Stat(tmpFile); os.IsNotExist(err) {
+							log.Printf("Error: Temp file does not exist after creation")
+						} else {
+							log.Printf("Temp file verified: exists and readable")
+							
+							// Método 1: Intentar con cp usando ruta completa
+							cpPath := "/bin/cp"
+							if _, err := os.Stat(cpPath); os.IsNotExist(err) {
+								cpPath = "/usr/bin/cp"
 							}
-						} else {
-							log.Printf("Successfully copied temp file to /etc/hosts")
-						}
-						
-						// Establecer permisos correctos
-						chmodPath := "/bin/chmod"
-						if _, err := os.Stat(chmodPath); os.IsNotExist(err) {
-							chmodPath = "/usr/bin/chmod"
-						}
-						chmodCmd := fmt.Sprintf("sudo %s 644 %s", chmodPath, hostsFile)
-						if out, err := executeCommand(chmodCmd); err != nil {
-							log.Printf("Warning: Could not set permissions: %v, output: %s", err, out)
-						} else {
-							log.Printf("Permissions set correctly")
-						}
-						
-						// Verificar que el cambio se aplicó correctamente
-						verifyCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -q '%s' %s && echo 'ok' || echo 'fail'", req.Hostname, hostsFile))
-						if verifyOut, err := verifyCmd.Output(); err == nil {
-							if strings.TrimSpace(string(verifyOut)) == "ok" {
-								log.Printf("Verified: hostname %s successfully updated in /etc/hosts", req.Hostname)
+							
+							copySuccess := false
+							copyCmd := fmt.Sprintf("sudo %s -f %s %s", cpPath, tmpFile, hostsFile)
+							log.Printf("Attempting to copy with cp: %s", copyCmd)
+							if out, err := executeCommand(copyCmd); err != nil {
+								log.Printf("Error with cp: %v, output: %s", err, out)
 							} else {
-								log.Printf("Warning: Could not verify hostname update in /etc/hosts")
-								// Leer el archivo para debug
+								log.Printf("cp command executed, output: %s", out)
+								// Verificar que el archivo se copió
 								if content, err := os.ReadFile(hostsFile); err == nil {
-									log.Printf("Current /etc/hosts content:\n%s", string(content))
-								} else {
-									log.Printf("Could not read /etc/hosts for verification: %v", err)
+									if strings.Contains(string(content), req.Hostname) {
+										log.Printf("Successfully copied with cp - hostname found in /etc/hosts")
+										copySuccess = true
+									} else {
+										log.Printf("cp executed but hostname not found in /etc/hosts")
+										log.Printf("Current /etc/hosts content:\n%s", string(content))
+									}
 								}
+							}
+							
+							// Método 2: Si cp falló, usar cat con tee
+							if !copySuccess {
+								log.Printf("Trying alternative method: cat with tee")
+								catCmd := fmt.Sprintf("sudo cat %s | sudo tee %s > /dev/null", tmpFile, hostsFile)
+								if out, err := executeCommand(catCmd); err != nil {
+									log.Printf("Error with cat/tee: %v, output: %s", err, out)
+								} else {
+									log.Printf("cat/tee command executed, output: %s", out)
+									// Verificar que el archivo se copió
+									if content, err := os.ReadFile(hostsFile); err == nil {
+										if strings.Contains(string(content), req.Hostname) {
+											log.Printf("Successfully copied with cat/tee - hostname found in /etc/hosts")
+											copySuccess = true
+										} else {
+											log.Printf("cat/tee executed but hostname not found in /etc/hosts")
+											log.Printf("Current /etc/hosts content:\n%s", string(content))
+										}
+									}
+								}
+							}
+							
+							// Método 3: Si ambos fallaron, leer el archivo temporal y escribirlo directamente
+							if !copySuccess {
+								log.Printf("Trying direct write method")
+								if tmpContent, err := os.ReadFile(tmpFile); err == nil {
+									// Intentar escribir directamente (esto fallará sin permisos, pero lo intentamos)
+									if err := os.WriteFile(hostsFile, tmpContent, 0644); err != nil {
+										log.Printf("Direct write failed (expected): %v", err)
+										// Último recurso: usar sh -c con redirección
+										writeCmd := fmt.Sprintf("sudo sh -c 'cat %s > %s'", tmpFile, hostsFile)
+										log.Printf("Trying sh -c method: %s", writeCmd)
+										if out, err := executeCommand(writeCmd); err != nil {
+											log.Printf("Error with sh -c: %v, output: %s", err, out)
+										} else {
+											log.Printf("sh -c command executed, output: %s", out)
+											// Verificar
+											if content, err := os.ReadFile(hostsFile); err == nil {
+												if strings.Contains(string(content), req.Hostname) {
+													log.Printf("Successfully copied with sh -c - hostname found in /etc/hosts")
+													copySuccess = true
+												}
+											}
+										}
+									} else {
+										log.Printf("Direct write succeeded (unexpected but good)")
+										copySuccess = true
+									}
+								}
+							}
+							
+							// Establecer permisos correctos
+							if copySuccess {
+								chmodPath := "/bin/chmod"
+								if _, err := os.Stat(chmodPath); os.IsNotExist(err) {
+									chmodPath = "/usr/bin/chmod"
+								}
+								chmodCmd := fmt.Sprintf("sudo %s 644 %s", chmodPath, hostsFile)
+								if out, err := executeCommand(chmodCmd); err != nil {
+									log.Printf("Warning: Could not set permissions: %v, output: %s", err, out)
+								} else {
+									log.Printf("Permissions set correctly")
+								}
+								
+								// Verificar final
+								if content, err := os.ReadFile(hostsFile); err == nil {
+									if strings.Contains(string(content), req.Hostname) {
+										log.Printf("Final verification: hostname %s successfully updated in /etc/hosts", req.Hostname)
+									} else {
+										log.Printf("Final verification failed: hostname not found")
+										log.Printf("Final /etc/hosts content:\n%s", string(content))
+									}
+								}
+							} else {
+								log.Printf("Error: All copy methods failed. /etc/hosts was not updated.")
 							}
 						}
 						
