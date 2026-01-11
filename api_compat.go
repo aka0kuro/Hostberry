@@ -248,11 +248,16 @@ func networkConfigHandler(c *fiber.Ctx) error {
 				errors = append(errors, "Hostname contains invalid characters. Use only letters, numbers, hyphens and dots. Cannot start or end with hyphen or dot.")
 			} else {
 				hostnameApplied := false
+				var lastError error
+				var lastOutput string
 				
 				// Método 1: hostnamectl (preferido, funciona en systemd)
 				if !hostnameApplied {
-					cmd := fmt.Sprintf("hostnamectl set-hostname %s", req.Hostname)
+					// hostnamectl necesita sudo explícito
+					cmd := fmt.Sprintf("sudo hostnamectl set-hostname %s", req.Hostname)
 					if out, err := executeCommand(cmd); err == nil {
+						// Esperar un momento para que el cambio se propague
+						time.Sleep(500 * time.Millisecond)
 						// Verificar que realmente se cambió
 						verifyCmd := exec.Command("sh", "-c", "hostnamectl --static 2>/dev/null || hostname 2>/dev/null || echo ''")
 						if verifyOut, err := verifyCmd.Output(); err == nil {
@@ -263,38 +268,76 @@ func networkConfigHandler(c *fiber.Ctx) error {
 								_ = out
 							} else {
 								log.Printf("Hostname verification failed: expected %s, got %s", req.Hostname, currentHostname)
+								lastError = fmt.Errorf("verification failed: got %s", currentHostname)
+								lastOutput = out
 							}
+						} else {
+							log.Printf("Failed to verify hostname after change: %v", err)
+							lastError = err
+							lastOutput = out
 						}
 					} else {
 						log.Printf("hostnamectl failed: %v, output: %s", err, out)
+						lastError = err
+						lastOutput = out
 					}
 				}
 				
-				// Método 2: /etc/hostname (directo, funciona en sistemas sin systemd)
+				// Método 2: /etc/hostname + hostname command (directo, funciona en sistemas sin systemd)
 				if !hostnameApplied {
 					hostnameFile := "/etc/hostname"
-					writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("echo '%s' > %s", req.Hostname, hostnameFile))
-					if err := writeCmd.Run(); err == nil {
+					// Escribir /etc/hostname con sudo usando execCommand para manejar permisos
+					writeCmdStr := fmt.Sprintf("echo '%s' > %s", req.Hostname, hostnameFile)
+					if out, err := executeCommand("sudo " + writeCmdStr); err == nil {
 						// Verificar que se escribió correctamente
 						if content, err := os.ReadFile(hostnameFile); err == nil {
 							writtenHostname := strings.TrimSpace(string(content))
 							if writtenHostname == req.Hostname {
-								// Intentar aplicar el hostname inmediatamente
-								applyCmd := exec.Command("sh", "-c", fmt.Sprintf("hostname %s 2>/dev/null || true", req.Hostname))
-								applyCmd.Run()
-								hostnameApplied = true
-								log.Printf("Hostname successfully set to %s via /etc/hostname", req.Hostname)
+								// Aplicar el hostname inmediatamente con sudo
+								applyCmdStr := fmt.Sprintf("sudo hostname %s", req.Hostname)
+								if applyOut, err := executeCommand(applyCmdStr); err == nil {
+									// Verificar que se aplicó
+									verifyCmd := exec.Command("hostname")
+									if verifyOut, err := verifyCmd.Output(); err == nil {
+										currentHostname := strings.TrimSpace(string(verifyOut))
+										if currentHostname == req.Hostname {
+											hostnameApplied = true
+											log.Printf("Hostname successfully set to %s via /etc/hostname + hostname command", req.Hostname)
+											_ = applyOut
+										} else {
+											log.Printf("Hostname verification after /etc/hostname failed: expected %s, got %s", req.Hostname, currentHostname)
+											lastError = fmt.Errorf("verification failed: got %s", currentHostname)
+											lastOutput = applyOut
+										}
+									}
+								} else {
+									log.Printf("Failed to apply hostname via hostname command: %v, output: %s", err, applyOut)
+									lastError = err
+									lastOutput = applyOut
+								}
+							} else {
+								log.Printf("Written hostname doesn't match: expected %s, got %s", req.Hostname, writtenHostname)
+								lastError = fmt.Errorf("written hostname mismatch")
+								lastOutput = out
 							}
+						} else {
+							log.Printf("Failed to read /etc/hostname after write: %v", err)
+							lastError = err
+							lastOutput = out
 						}
 					} else {
-						log.Printf("Failed to write /etc/hostname: %v", err)
+						log.Printf("Failed to write /etc/hostname: %v, output: %s", err, out)
+						lastError = err
+						lastOutput = out
 					}
 				}
 				
-				// Método 3: hostname command (temporal, se pierde al reiniciar)
+				// Método 3: hostname command directo con sudo (temporal, se pierde al reiniciar)
 				if !hostnameApplied {
-					cmd := fmt.Sprintf("hostname %s", req.Hostname)
+					cmd := fmt.Sprintf("sudo hostname %s", req.Hostname)
 					if out, err := executeCommand(cmd); err == nil {
+						// Esperar un momento
+						time.Sleep(200 * time.Millisecond)
 						// Verificar que se cambió
 						verifyCmd := exec.Command("hostname")
 						if verifyOut, err := verifyCmd.Output(); err == nil {
@@ -303,10 +346,20 @@ func networkConfigHandler(c *fiber.Ctx) error {
 								hostnameApplied = true
 								log.Printf("Hostname temporarily set to %s via hostname command (will persist if /etc/hostname is also updated)", req.Hostname)
 								_ = out
+							} else {
+								log.Printf("Hostname verification after hostname command failed: expected %s, got %s", req.Hostname, currentHostname)
+								lastError = fmt.Errorf("verification failed: got %s", currentHostname)
+								lastOutput = out
 							}
+						} else {
+							log.Printf("Failed to verify hostname: %v", err)
+							lastError = err
+							lastOutput = out
 						}
 					} else {
 						log.Printf("hostname command failed: %v, output: %s", err, out)
+						lastError = err
+						lastOutput = out
 					}
 				}
 				
