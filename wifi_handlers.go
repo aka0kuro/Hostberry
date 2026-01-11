@@ -558,7 +558,7 @@ country=%s
 			remountCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 			remountOut, remountErr := remountCmd.CombinedOutput()
 			if remountErr != nil {
-			log.Printf("No se pudo remontar como lectura-escritura: %v, output: %s", remountErr, string(remountOut))
+				log.Printf("No se pudo remontar como lectura-escritura: %v, output: %s", remountErr, string(remountOut))
 			// Intentar usar directorio alternativo persistente (no se borra al reiniciar)
 			log.Printf("Usando directorio alternativo persistente: %s", WpaSupplicantAltConfigDir)
 			// Crear directorio padre primero si no existe
