@@ -764,6 +764,83 @@ EOF
 }
 
 # Compilar el proyecto
+#
+# Descarga de dependencias Go: reintentos y fallbacks para redes lentas o bloqueo de proxy.golang.org
+try_go_mod_download() {
+    local env_kv="$1"
+    local attempt="$2"
+    local max="$3"
+    local tmp_log
+
+    tmp_log="$(mktemp)"
+
+    if [ -n "$env_kv" ]; then
+        print_info "go mod download ($env_kv) intento ${attempt}/${max}..."
+        if env $env_kv go mod download >"$tmp_log" 2>&1; then
+            rm -f "$tmp_log"
+            return 0
+        fi
+    else
+        print_info "go mod download (env por defecto) intento ${attempt}/${max}..."
+        if go mod download >"$tmp_log" 2>&1; then
+            rm -f "$tmp_log"
+            return 0
+        fi
+    fi
+
+    print_warning "Falló la descarga de dependencias Go (intento ${attempt}/${max}). Últimas líneas del error:"
+    tail -n 10 "$tmp_log" 2>/dev/null | while read -r line; do
+        [ -n "$line" ] && print_warning "  $line"
+    done
+    rm -f "$tmp_log"
+    return 1
+}
+
+download_go_deps() {
+    local retries="${HOSTBERRY_GO_MOD_RETRIES:-5}"
+    local sleep_secs="${HOSTBERRY_GO_MOD_RETRY_SLEEP:-4}"
+
+    print_info "Go env: GOPROXY=$(go env GOPROXY 2>/dev/null || echo 'desconocido'), GOSUMDB=$(go env GOSUMDB 2>/dev/null || echo 'desconocido')"
+
+    # 1) Intentar con el entorno actual
+    for ((i=1; i<=retries; i++)); do
+        if try_go_mod_download "" "$i" "$retries"; then
+            export HOSTBERRY_GO_MOD_ENV=""
+            return 0
+        fi
+        sleep "$sleep_secs"
+    done
+
+    # 2) Fallback a modo directo (sin proxy)
+    print_warning "No se pudo descargar usando GOPROXY actual. Probando fallback: GOPROXY=direct"
+    for ((i=1; i<=retries; i++)); do
+        if try_go_mod_download "GOPROXY=direct" "$i" "$retries"; then
+            export HOSTBERRY_GO_MOD_ENV="GOPROXY=direct"
+            return 0
+        fi
+        sleep "$sleep_secs"
+    done
+
+    # 3) (Opcional) último recurso: desactivar sumdb (menos seguro)
+    if [ "${HOSTBERRY_ALLOW_GOSUMDB_OFF:-0}" = "1" ]; then
+        print_warning "Último recurso habilitado: GOPROXY=direct GOSUMDB=off (menos seguro)."
+        for ((i=1; i<=retries; i++)); do
+            if try_go_mod_download "GOPROXY=direct GOSUMDB=off" "$i" "$retries"; then
+                export HOSTBERRY_GO_MOD_ENV="GOPROXY=direct GOSUMDB=off"
+                return 0
+            fi
+            sleep "$sleep_secs"
+        done
+    fi
+
+    print_error "Error al descargar dependencias de Go."
+    print_info "Posibles causas: conexión lenta, DNS, bloqueo a proxy.golang.org, reloj del sistema o CA certificates."
+    print_info "Puedes probar manualmente:"
+    print_info "  - GOPROXY=direct go mod download"
+    print_info "  - (último recurso) HOSTBERRY_ALLOW_GOSUMDB_OFF=1 GOPROXY=direct GOSUMDB=off go mod download"
+    return 1
+}
+
 build_project() {
     print_info "Compilando HostBerry en ${INSTALL_DIR}..."
     
@@ -825,12 +902,11 @@ build_project() {
     
     # Descargar dependencias
     print_info "Descargando dependencias de Go..."
-    if ! go mod download; then
-        print_error "Error al descargar dependencias"
+    if ! download_go_deps; then
         exit 1
     fi
     
-    if ! go mod tidy; then
+    if ! env $HOSTBERRY_GO_MOD_ENV go mod tidy; then
         print_warning "Advertencia: go mod tidy tuvo problemas, continuando..."
     fi
     
