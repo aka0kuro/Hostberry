@@ -399,20 +399,22 @@ func networkConfigHandler(c *fiber.Ctx) error {
 						} else {
 							log.Printf("Temp file verified: exists and readable")
 							
-							// Método 1: Intentar con cp usando ruta completa
+							// Método 1: Usar cp directamente con exec.Command y sudo
+							copySuccess := false
 							cpPath := "/bin/cp"
 							if _, err := os.Stat(cpPath); os.IsNotExist(err) {
 								cpPath = "/usr/bin/cp"
 							}
 							
-							copySuccess := false
-							copyCmd := fmt.Sprintf("sudo %s -f %s %s", cpPath, tmpFile, hostsFile)
-							log.Printf("Attempting to copy with cp: %s", copyCmd)
-							if out, err := executeCommand(copyCmd); err != nil {
-								log.Printf("Error with cp: %v, output: %s", err, out)
+							log.Printf("Attempting to copy with cp: %s -f %s %s", cpPath, tmpFile, hostsFile)
+							cpCmd := exec.Command("sudo", cpPath, "-f", tmpFile, hostsFile)
+							cpCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+							if cpOut, cpErr := cpCmd.CombinedOutput(); cpErr != nil {
+								log.Printf("Error with cp: %v, output: %s", cpErr, string(cpOut))
 							} else {
-								log.Printf("cp command executed, output: %s", out)
+								log.Printf("cp command executed successfully, output: %s", string(cpOut))
 								// Verificar que el archivo se copió
+								time.Sleep(100 * time.Millisecond) // Pequeña pausa para asegurar que el archivo se escribió
 								if content, err := os.ReadFile(hostsFile); err == nil {
 									if strings.Contains(string(content), req.Hostname) {
 										log.Printf("Successfully copied with cp - hostname found in /etc/hosts")
@@ -421,18 +423,22 @@ func networkConfigHandler(c *fiber.Ctx) error {
 										log.Printf("cp executed but hostname not found in /etc/hosts")
 										log.Printf("Current /etc/hosts content:\n%s", string(content))
 									}
+								} else {
+									log.Printf("Could not read /etc/hosts after cp: %v", err)
 								}
 							}
 							
-							// Método 2: Si cp falló, usar cat con tee
+							// Método 2: Si cp falló, usar cat con tee directamente
 							if !copySuccess {
 								log.Printf("Trying alternative method: cat with tee")
-								catCmd := fmt.Sprintf("sudo cat %s | sudo tee %s > /dev/null", tmpFile, hostsFile)
-								if out, err := executeCommand(catCmd); err != nil {
-									log.Printf("Error with cat/tee: %v, output: %s", err, out)
+								catCmd := exec.Command("sh", "-c", fmt.Sprintf("sudo cat %s | sudo tee %s > /dev/null", tmpFile, hostsFile))
+								catCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+								if catOut, catErr := catCmd.CombinedOutput(); catErr != nil {
+									log.Printf("Error with cat/tee: %v, output: %s", catErr, string(catOut))
 								} else {
-									log.Printf("cat/tee command executed, output: %s", out)
+									log.Printf("cat/tee command executed, output: %s", string(catOut))
 									// Verificar que el archivo se copió
+									time.Sleep(100 * time.Millisecond)
 									if content, err := os.ReadFile(hostsFile); err == nil {
 										if strings.Contains(string(content), req.Hostname) {
 											log.Printf("Successfully copied with cat/tee - hostname found in /etc/hosts")
@@ -445,31 +451,25 @@ func networkConfigHandler(c *fiber.Ctx) error {
 								}
 							}
 							
-							// Método 3: Si ambos fallaron, leer el archivo temporal y escribirlo directamente
+							// Método 3: Si ambos fallaron, usar sh -c con redirección directa
 							if !copySuccess {
-								log.Printf("Trying direct write method")
-								if tmpContent, err := os.ReadFile(tmpFile); err == nil {
-									// Intentar escribir directamente (esto fallará sin permisos, pero lo intentamos)
-									if err := os.WriteFile(hostsFile, tmpContent, 0644); err != nil {
-										log.Printf("Direct write failed (expected): %v", err)
-										// Último recurso: usar sh -c con redirección
-										writeCmd := fmt.Sprintf("sudo sh -c 'cat %s > %s'", tmpFile, hostsFile)
-										log.Printf("Trying sh -c method: %s", writeCmd)
-										if out, err := executeCommand(writeCmd); err != nil {
-											log.Printf("Error with sh -c: %v, output: %s", err, out)
+								log.Printf("Trying sh -c method with direct redirection")
+								writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat %s > %s", tmpFile, hostsFile))
+								writeCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+								if writeOut, writeErr := writeCmd.CombinedOutput(); writeErr != nil {
+									log.Printf("Error with sh -c: %v, output: %s", writeErr, string(writeOut))
+								} else {
+									log.Printf("sh -c command executed, output: %s", string(writeOut))
+									// Verificar
+									time.Sleep(100 * time.Millisecond)
+									if content, err := os.ReadFile(hostsFile); err == nil {
+										if strings.Contains(string(content), req.Hostname) {
+											log.Printf("Successfully copied with sh -c - hostname found in /etc/hosts")
+											copySuccess = true
 										} else {
-											log.Printf("sh -c command executed, output: %s", out)
-											// Verificar
-											if content, err := os.ReadFile(hostsFile); err == nil {
-												if strings.Contains(string(content), req.Hostname) {
-													log.Printf("Successfully copied with sh -c - hostname found in /etc/hosts")
-													copySuccess = true
-												}
-											}
+											log.Printf("sh -c executed but hostname not found in /etc/hosts")
+											log.Printf("Current /etc/hosts content:\n%s", string(content))
 										}
-									} else {
-										log.Printf("Direct write succeeded (unexpected but good)")
-										copySuccess = true
 									}
 								}
 							}
