@@ -575,13 +575,41 @@ country=%s
 			// Intentar copiar de nuevo
 			cpCmd2 := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
 			cpCmd2.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
-			if cpOut2, cpErr2 := cpCmd2.CombinedOutput(); cpErr2 != nil {
-				log.Printf("ERROR: Falló escritura incluso en directorio alternativo: %v, output: %s", cpErr2, string(cpOut2))
-				os.Remove(tmpConfigFile)
-				result["error"] = fmt.Sprintf("Error al guardar configuración: sistema de archivos de solo lectura")
-				return result
+			cpOut2, cpErr2 := cpCmd2.CombinedOutput()
+			if cpErr2 != nil {
+				// Si también falla en /var/lib, puede que también esté en solo lectura
+				// Intentar remontar /var también
+				if strings.Contains(string(cpOut2), "Read-only file system") {
+					log.Printf("ERROR: /var/lib también está en solo lectura, intentando remontar /var...")
+					remountVarCmd := exec.Command("sudo", "mount", "-o", "remount,rw", "/var")
+					remountVarCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+					if remountVarOut, remountVarErr := remountVarCmd.CombinedOutput(); remountVarErr == nil {
+						log.Printf("Remontado /var como lectura-escritura, intentando copiar de nuevo...")
+						cpCmd3 := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
+						cpCmd3.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+						if cpOut3, cpErr3 := cpCmd3.CombinedOutput(); cpErr3 != nil {
+							log.Printf("ERROR: Falló escritura incluso después de remontar /var: %v, output: %s", cpErr3, string(cpOut3))
+							os.Remove(tmpConfigFile)
+							result["error"] = fmt.Sprintf("Error al guardar configuración: sistema de archivos de solo lectura (incluso /var)")
+							return result
+						}
+						log.Printf("Archivo guardado exitosamente después de remontar /var: %s", wpaConfigPath)
+					} else {
+						log.Printf("ERROR: No se pudo remontar /var: %v, output: %s", remountVarErr, string(remountVarOut))
+						log.Printf("ERROR: Falló escritura en directorio alternativo: %v, output: %s", cpErr2, string(cpOut2))
+						os.Remove(tmpConfigFile)
+						result["error"] = fmt.Sprintf("Error al guardar configuración: sistema de archivos de solo lectura")
+						return result
+					}
+				} else {
+					log.Printf("ERROR: Falló escritura en directorio alternativo: %v, output: %s", cpErr2, string(cpOut2))
+					os.Remove(tmpConfigFile)
+					result["error"] = fmt.Sprintf("Error al guardar configuración: %v", cpErr2)
+					return result
+				}
+			} else {
+				log.Printf("Archivo guardado en directorio alternativo persistente: %s", wpaConfigPath)
 			}
-			log.Printf("Archivo guardado en directorio alternativo persistente: %s", wpaConfigPath)
 		} else {
 			log.Printf("Sistema remontado como lectura-escritura, intentando copiar de nuevo...")
 			// Intentar copiar de nuevo después del remontaje
