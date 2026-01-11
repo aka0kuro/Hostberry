@@ -409,22 +409,53 @@ func networkConfigHandler(c *fiber.Ctx) error {
 							log.Printf("Attempting to copy with cp: %s -f %s %s", cpPath, tmpFile, hostsFile)
 							cpCmd := exec.Command("sudo", cpPath, "-f", tmpFile, hostsFile)
 							cpCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
-							if cpOut, cpErr := cpCmd.CombinedOutput(); cpErr != nil {
-								log.Printf("Error with cp: %v, output: %s", cpErr, string(cpOut))
-							} else {
-								log.Printf("cp command executed successfully, output: %s", string(cpOut))
-								// Verificar que el archivo se copió
-								time.Sleep(100 * time.Millisecond) // Pequeña pausa para asegurar que el archivo se escribió
-								if content, err := os.ReadFile(hostsFile); err == nil {
-									if strings.Contains(string(content), req.Hostname) {
-										log.Printf("Successfully copied with cp - hostname found in /etc/hosts")
-										copySuccess = true
-									} else {
-										log.Printf("cp executed but hostname not found in /etc/hosts")
-										log.Printf("Current /etc/hosts content:\n%s", string(content))
-									}
+							cpOut, cpErr := cpCmd.CombinedOutput()
+							
+							// Verificar si el archivo se copió (incluso si hubo error en el comando)
+							time.Sleep(200 * time.Millisecond) // Pausa para asegurar que el archivo se escribió
+							if content, err := os.ReadFile(hostsFile); err == nil {
+								if strings.Contains(string(content), req.Hostname) {
+									log.Printf("Successfully copied with cp - hostname found in /etc/hosts")
+									copySuccess = true
 								} else {
-									log.Printf("Could not read /etc/hosts after cp: %v", err)
+									if cpErr != nil {
+										log.Printf("Error with cp: %v, output: %s", cpErr, string(cpOut))
+									} else {
+										log.Printf("cp command executed but hostname not found in /etc/hosts")
+									}
+									log.Printf("Current /etc/hosts content:\n%s", string(content))
+									
+									// Verificar si el sistema es de solo lectura
+									if strings.Contains(string(cpOut), "Read-only file system") || strings.Contains(string(cpOut), "Read-only") {
+										log.Printf("Warning: /etc/hosts appears to be on a read-only file system")
+										log.Printf("Attempting to remount /etc as read-write...")
+										// Intentar remontar /etc como lectura-escritura
+										remountCmd := exec.Command("sudo", "mount", "-o", "remount,rw", "/")
+										remountCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+										if remountOut, remountErr := remountCmd.CombinedOutput(); remountErr != nil {
+											log.Printf("Could not remount / as read-write: %v, output: %s", remountErr, string(remountOut))
+										} else {
+											log.Printf("Successfully remounted / as read-write")
+											// Intentar copiar de nuevo
+											cpCmd2 := exec.Command("sudo", cpPath, "-f", tmpFile, hostsFile)
+											cpCmd2.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+											if cpOut2, cpErr2 := cpCmd2.CombinedOutput(); cpErr2 == nil {
+												time.Sleep(200 * time.Millisecond)
+												if content2, err2 := os.ReadFile(hostsFile); err2 == nil {
+													if strings.Contains(string(content2), req.Hostname) {
+														log.Printf("Successfully copied after remount - hostname found in /etc/hosts")
+														copySuccess = true
+													}
+												}
+											}
+										}
+									}
+								}
+							} else {
+								if cpErr != nil {
+									log.Printf("Error with cp: %v, output: %s", cpErr, string(cpOut))
+								} else {
+									log.Printf("cp command executed but could not read /etc/hosts: %v", err)
 								}
 							}
 							
