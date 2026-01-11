@@ -633,6 +633,7 @@ country=%s
 				} else {
 					log.Printf("Archivo guardado en directorio alternativo persistente: %s", wpaConfigPath)
 				}
+			} else {
 				log.Printf("Sistema remontado como lectura-escritura, intentando copiar de nuevo...")
 				// Intentar copiar de nuevo después del remontaje
 				cpCmd2 := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
