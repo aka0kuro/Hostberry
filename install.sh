@@ -1174,6 +1174,14 @@ EOF
         print_info "Permisos agregados para wpa_supplicant: $WPA_SUPPLICANT_PATH"
     fi
     
+    # Agregar permisos para rutas estándar de wpa_supplicant (por si no está en PATH)
+    for wpa_path in "/usr/sbin/wpa_supplicant" "/sbin/wpa_supplicant" "/usr/bin/wpa_supplicant" "/bin/wpa_supplicant"; do
+        if [ -f "$wpa_path" ]; then
+            echo "$USER_NAME ALL=(ALL) NOPASSWD: $wpa_path" >> "/etc/sudoers.d/hostberry"
+            print_info "Permisos agregados para wpa_supplicant: $wpa_path"
+        fi
+    done
+    
     if command -v wpa_cli &> /dev/null; then
         WPA_CLI_PATH=$(command -v wpa_cli)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $WPA_CLI_PATH" >> "/etc/sudoers.d/hostberry"
