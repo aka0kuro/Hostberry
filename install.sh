@@ -1391,6 +1391,19 @@ EOF
         print_info "Permisos agregados para sed: /usr/bin/sed"
     fi
     
+    # mount (para remontar sistemas de archivos de solo lectura como lectura-escritura)
+    if command -v mount &> /dev/null; then
+        MOUNT_PATH=$(command -v mount)
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: $MOUNT_PATH" >> "/etc/sudoers.d/hostberry"
+        print_info "Permisos agregados para mount: $MOUNT_PATH"
+    elif [ -f "/bin/mount" ]; then
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/mount" >> "/etc/sudoers.d/hostberry"
+        print_info "Permisos agregados para mount: /bin/mount"
+    elif [ -f "/usr/bin/mount" ]; then
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/mount" >> "/etc/sudoers.d/hostberry"
+        print_info "Permisos agregados para mount: /usr/bin/mount"
+    fi
+    
     # Crear directorio /etc/hostapd con permisos correctos
     print_info "Creando directorio /etc/hostapd..."
     if [ ! -d "/etc/hostapd" ]; then
