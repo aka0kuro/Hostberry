@@ -535,42 +535,6 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 			}
 		}
 		
-		// Para interfaces WiFi, verificar el estado real de conexión
-		if strings.HasPrefix(ifaceName, "wlan") {
-			// Si wpa_supplicant dice COMPLETED pero no hay IP, aún no está completamente conectado
-			if wpaState, hasWpaState := iface["wpa_state"]; hasWpaState && wpaState == "COMPLETED" {
-				if iface["ip"] == "N/A" || iface["ip"] == "" || iface["ip"] == "Obtaining IP..." {
-					// wpa_supplicant conectado pero sin IP aún
-					iface["connected"] = false
-					iface["state"] = "connecting"
-				} else {
-					// Realmente conectado con IP
-					iface["connected"] = true
-					iface["state"] = "connected"
-				}
-			} else if wpaState, hasWpaState := iface["wpa_state"]; hasWpaState && (wpaState == "ASSOCIATING" || wpaState == "ASSOCIATED" || wpaState == "4WAY_HANDSHAKE" || wpaState == "GROUP_HANDSHAKE") {
-				// En proceso de conexión
-				iface["connected"] = false
-				iface["state"] = "connecting"
-			} else {
-				// No conectado
-				iface["connected"] = false
-				if iface["state"] != "down" {
-					iface["state"] = "down"
-				}
-			}
-		} else {
-			// Para interfaces no WiFi, usar el estado del sistema
-			if iface["ip"] != "N/A" && iface["ip"] != "" && iface["ip"] != "Obtaining IP..." {
-				iface["connected"] = true
-				if iface["state"] == "up" {
-					iface["state"] = "connected"
-				}
-			} else {
-				iface["connected"] = false
-			}
-		}
-
 		// Obtener gateway para esta interfaz
 		gatewayCmd := exec.Command("sh", "-c", fmt.Sprintf("ip route | grep %s | grep default | awk '{print $3}' | head -1", ifaceName))
 		if gatewayOut, err := gatewayCmd.Output(); err == nil {
@@ -588,6 +552,95 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 				if defaultGateway != "" {
 					iface["gateway"] = defaultGateway
 				}
+			}
+		}
+
+		// Detectar si está en modo AP (IP 192.168.4.1 es típica del AP)
+		isAPMode := false
+		if iface["ip"] != "N/A" && iface["ip"] != "" && iface["ip"] != "Obtaining IP..." {
+			ipStr := iface["ip"].(string)
+			// Verificar si la IP es 192.168.4.1 (modo AP) o está en la red 192.168.4.0/24 sin gateway externo
+			if ipStr == "192.168.4.1" || (strings.HasPrefix(ipStr, "192.168.4.") && (iface["gateway"] == nil || iface["gateway"] == "" || iface["gateway"] == "192.168.4.1")) {
+				// Verificar si realmente está en modo AP verificando si hostapd está corriendo
+				hostapdCheck := exec.Command("sh", "-c", "systemctl is-active hostapd 2>/dev/null || pgrep hostapd > /dev/null && echo active || echo inactive")
+				if hostapdOut, err := hostapdCheck.Output(); err == nil {
+					if strings.TrimSpace(string(hostapdOut)) == "active" {
+						isAPMode = true
+						iface["ap_mode"] = true
+					}
+				}
+			}
+		}
+
+		// Para interfaces WiFi, verificar el estado real de conexión
+		if strings.HasPrefix(ifaceName, "wlan") {
+			// Si está en modo AP, no está conectado a Internet
+			if isAPMode {
+				iface["connected"] = false
+				iface["state"] = "ap_mode"
+				iface["internet_connected"] = false
+			} else if wpaState, hasWpaState := iface["wpa_state"]; hasWpaState && wpaState == "COMPLETED" {
+				if iface["ip"] == "N/A" || iface["ip"] == "" || iface["ip"] == "Obtaining IP..." {
+					// wpa_supplicant conectado pero sin IP aún
+					iface["connected"] = false
+					iface["state"] = "connecting"
+					iface["internet_connected"] = false
+				} else {
+					// Realmente conectado con IP - verificar conectividad a Internet
+					iface["connected"] = true
+					iface["state"] = "connected"
+					// Verificar si tiene conectividad real a Internet
+					hasInternet := false
+					if iface["gateway"] != nil && iface["gateway"] != "" && iface["gateway"] != "192.168.4.1" {
+						// Tiene gateway que no es el del AP, probablemente tiene Internet
+						hasInternet = true
+					} else {
+						// Verificar conectividad con ping rápido
+						pingCmd := exec.Command("sh", "-c", "ping -c 1 -W 1 8.8.8.8 > /dev/null 2>&1 && echo 'ok' || echo 'fail'")
+						if pingOut, err := pingCmd.Output(); err == nil {
+							if strings.TrimSpace(string(pingOut)) == "ok" {
+								hasInternet = true
+							}
+						}
+					}
+					iface["internet_connected"] = hasInternet
+				}
+			} else if wpaState, hasWpaState := iface["wpa_state"]; hasWpaState && (wpaState == "ASSOCIATING" || wpaState == "ASSOCIATED" || wpaState == "4WAY_HANDSHAKE" || wpaState == "GROUP_HANDSHAKE") {
+				// En proceso de conexión
+				iface["connected"] = false
+				iface["state"] = "connecting"
+				iface["internet_connected"] = false
+			} else {
+				// No conectado
+				iface["connected"] = false
+				iface["internet_connected"] = false
+				if iface["state"] != "down" {
+					iface["state"] = "down"
+				}
+			}
+		} else {
+			// Para interfaces no WiFi, usar el estado del sistema
+			if iface["ip"] != "N/A" && iface["ip"] != "" && iface["ip"] != "Obtaining IP..." {
+				iface["connected"] = true
+				if iface["state"] == "up" {
+					iface["state"] = "connected"
+				}
+				// Verificar conectividad a Internet
+				hasInternet := false
+				if iface["gateway"] != nil && iface["gateway"] != "" && iface["gateway"] != "192.168.4.1" {
+					hasInternet = true
+				} else {
+					pingCmd := exec.Command("sh", "-c", "ping -c 1 -W 1 8.8.8.8 > /dev/null 2>&1 && echo 'ok' || echo 'fail'")
+					if pingOut, err := pingCmd.Output(); err == nil {
+						if strings.TrimSpace(string(pingOut)) == "ok" {
+							hasInternet = true
+						}
+					}
+				}
+				iface["internet_connected"] = hasInternet
+			} else {
+				iface["connected"] = false
+				iface["internet_connected"] = false
 			}
 		}
 
