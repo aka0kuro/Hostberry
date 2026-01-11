@@ -439,7 +439,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 											// Intentar copiar de nuevo
 											cpCmd2 := exec.Command("sudo", cpPath, "-f", tmpFile, hostsFile)
 											cpCmd2.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
-											if cpOut2, cpErr2 := cpCmd2.CombinedOutput(); cpErr2 == nil {
+											if _, cpErr2 := cpCmd2.CombinedOutput(); cpErr2 == nil {
 												time.Sleep(200 * time.Millisecond)
 												if content2, err2 := os.ReadFile(hostsFile); err2 == nil {
 													if strings.Contains(string(content2), req.Hostname) {
