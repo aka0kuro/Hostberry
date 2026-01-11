@@ -633,7 +633,6 @@ country=%s
 				} else {
 					log.Printf("Archivo guardado en directorio alternativo persistente: %s", wpaConfigPath)
 				}
-			} else {
 				log.Printf("Sistema remontado como lectura-escritura, intentando copiar de nuevo...")
 				// Intentar copiar de nuevo después del remontaje
 				cpCmd2 := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
@@ -647,11 +646,11 @@ country=%s
 				log.Printf("Archivo guardado exitosamente después del remontaje")
 			}
 		} else {
-		log.Printf("ERROR: Falló escritura del archivo de configuración: %v, output: %s", cpErr, string(cpOut))
-		os.Remove(tmpConfigFile)
-		result["error"] = fmt.Sprintf("Error al guardar configuración: %v", cpErr)
-		return result
-	}
+			log.Printf("ERROR: Falló escritura del archivo de configuración: %v, output: %s", cpErr, string(cpOut))
+			os.Remove(tmpConfigFile)
+			result["error"] = fmt.Sprintf("Error al guardar configuración: %v", cpErr)
+			return result
+		}
 	
 	// Limpiar archivo temporal
 	os.Remove(tmpConfigFile)
