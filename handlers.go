@@ -704,29 +704,34 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 					}
 				}
 				
-				// Si la IP no es del AP (192.168.4.x) y tiene gateway, asumir que tiene Internet
-				if !strings.HasPrefix(ipStr, "192.168.4.") && gatewayStr != "" && gatewayStr != "192.168.4.1" {
-					// Tiene IP válida y gateway válido, probablemente tiene Internet
-					hasInternet = true
-				} else if strings.HasPrefix(ipStr, "192.168.4.") {
+				// Para interfaces ethernet (eth0, enp*, etc.), si tienen IP válida y no es del AP, asumir que tienen Internet
+				// Esto es más confiable que depender del ping que puede estar bloqueado
+				if strings.HasPrefix(ipStr, "192.168.4.") {
 					// Está en la red del AP, no tiene Internet
 					hasInternet = false
-				} else {
-					// Verificar conectividad con ping (solo si no está en red del AP)
-					// Usar timeout más corto para no bloquear
-					pingCmd := exec.Command("sh", "-c", fmt.Sprintf("timeout 2 ping -c 1 -W 1 8.8.8.8 > /dev/null 2>&1 && echo 'ok' || echo 'fail'"))
-					if pingOut, err := pingCmd.Output(); err == nil {
-						if strings.TrimSpace(string(pingOut)) == "ok" {
-							hasInternet = true
+				} else if !strings.HasPrefix(ipStr, "192.168.4.") && ipStr != "" {
+					// Tiene IP válida y no es del AP, probablemente tiene Internet
+					// Para ethernet, si tiene IP válida, asumir que tiene Internet
+					hasInternet = true
+					
+					// Opcionalmente verificar con ping si hay gateway (pero no fallar si el ping falla)
+					if gatewayStr != "" && gatewayStr != "192.168.4.1" {
+						// Intentar ping para confirmar, pero no depender de él
+						pingCmd := exec.Command("sh", "-c", fmt.Sprintf("timeout 2 ping -c 1 -W 1 8.8.8.8 > /dev/null 2>&1 && echo 'ok' || echo 'fail'"))
+						if pingOut, err := pingCmd.Output(); err == nil {
+							if strings.TrimSpace(string(pingOut)) == "ok" {
+								// Ping exitoso, confirmado
+								hasInternet = true
+							} else {
+								// Ping falló, pero para ethernet con IP válida, aún asumir que tiene Internet
+								// (el ping puede estar bloqueado por firewall pero la conexión funciona)
+								hasInternet = true
+							}
 						}
 					}
-					// Si tiene IP válida (no AP) pero el ping falla, aún así asumir que tiene Internet
-					// (puede ser que el ping esté bloqueado pero la conexión funcione)
-					if !hasInternet && !strings.HasPrefix(ipStr, "192.168.4.") && ipStr != "" {
-						// Si tiene IP válida y no es del AP, probablemente tiene Internet
-						// (aunque el ping pueda fallar por firewall u otros motivos)
-						hasInternet = true
-					}
+				} else {
+					// No tiene IP válida
+					hasInternet = false
 				}
 				iface["internet_connected"] = hasInternet
 			} else {
