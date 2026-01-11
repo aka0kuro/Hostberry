@@ -1217,6 +1217,25 @@ EOF
         print_info "Permisos agregados para systemctl hostapd y dnsmasq"
     fi
     
+    # Agregar permisos para hostnamectl y hostname (cambio de hostname)
+    if command -v hostnamectl &> /dev/null; then
+        HOSTNAMECTL_PATH=$(command -v hostnamectl)
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: $HOSTNAMECTL_PATH" >> "/etc/sudoers.d/hostberry"
+        print_info "Permisos agregados para hostnamectl: $HOSTNAMECTL_PATH"
+    elif [ -f "/usr/bin/hostnamectl" ]; then
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/hostnamectl" >> "/etc/sudoers.d/hostberry"
+        print_info "Permisos agregados para hostnamectl: /usr/bin/hostnamectl"
+    fi
+    
+    if command -v hostname &> /dev/null; then
+        HOSTNAME_PATH=$(command -v hostname)
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: $HOSTNAME_PATH" >> "/etc/sudoers.d/hostberry"
+        print_info "Permisos agregados para hostname: $HOSTNAME_PATH"
+    elif [ -f "/bin/hostname" ]; then
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/hostname" >> "/etc/sudoers.d/hostberry"
+        print_info "Permisos agregados para hostname: /bin/hostname"
+    fi
+    
     # Agregar permisos para ip (configuración de interfaces de red)
     if command -v ip &> /dev/null; then
         IP_PATH=$(command -v ip)
