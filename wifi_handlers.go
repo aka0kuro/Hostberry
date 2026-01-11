@@ -152,16 +152,26 @@ func startWpaSupplicant(interfaceName, configPath string) error {
 	
 	log.Printf("Usando wpa_supplicant en: %s", wpaSupplicantPath)
 	
-	// Iniciar wpa_supplicant
+	// Verificar que el ejecutable existe y es ejecutable
+	if fi, err := os.Stat(wpaSupplicantPath); err != nil || fi.Mode()&0111 == 0 {
+		return fmt.Errorf("wpa_supplicant no es ejecutable en %s", wpaSupplicantPath)
+	}
+	
+	// Iniciar wpa_supplicant usando exec.Command directamente para mejor control
 	// -B: background
 	// -i: interfaz
 	// -c: archivo de configuración
 	// -D: driver (nl80211 primero, luego wext como fallback)
-	startCmd := fmt.Sprintf("sudo %s -B -i %s -c %s -D nl80211,wext", wpaSupplicantPath, interfaceName, configPath)
-	out, err := executeCommand(startCmd)
-	if err != nil {
-		log.Printf("Error iniciando wpa_supplicant: %v, output: %s", err, out)
-		return fmt.Errorf("error iniciando wpa_supplicant: %v", err)
+	startCmd := exec.Command("sudo", wpaSupplicantPath, "-B", "-i", interfaceName, "-c", configPath, "-D", "nl80211,wext")
+	startCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+	startOut, startErr := startCmd.CombinedOutput()
+	if startErr != nil {
+		log.Printf("Error iniciando wpa_supplicant: %v, output: %s", startErr, string(startOut))
+		// Verificar si el error es por permisos o por el ejecutable
+		if strings.Contains(string(startOut), "not found") || strings.Contains(string(startOut), "No such file") {
+			return fmt.Errorf("wpa_supplicant no se encontró en %s. Verifica la instalación", wpaSupplicantPath)
+		}
+		return fmt.Errorf("error iniciando wpa_supplicant: %v, output: %s", startErr, string(startOut))
 	}
 
 	log.Printf("wpa_supplicant iniciado, output: %s", strings.TrimSpace(out))
