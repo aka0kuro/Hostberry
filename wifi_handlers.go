@@ -633,20 +633,20 @@ country=%s
 			} else {
 				log.Printf("Archivo guardado en directorio alternativo persistente: %s", wpaConfigPath)
 			}
-		} else {
-			log.Printf("Sistema remontado como lectura-escritura, intentando copiar de nuevo...")
-			// Intentar copiar de nuevo después del remontaje
-			cpCmd2 := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
-			cpCmd2.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
-			if cpOut2, cpErr2 := cpCmd2.CombinedOutput(); cpErr2 != nil {
-				log.Printf("ERROR: Falló escritura después del remontaje: %v, output: %s", cpErr2, string(cpOut2))
-				os.Remove(tmpConfigFile)
-				result["error"] = fmt.Sprintf("Error al guardar configuración: %v", cpErr2)
-				return result
+			} else {
+				log.Printf("Sistema remontado como lectura-escritura, intentando copiar de nuevo...")
+				// Intentar copiar de nuevo después del remontaje
+				cpCmd2 := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
+				cpCmd2.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+				if cpOut2, cpErr2 := cpCmd2.CombinedOutput(); cpErr2 != nil {
+					log.Printf("ERROR: Falló escritura después del remontaje: %v, output: %s", cpErr2, string(cpOut2))
+					os.Remove(tmpConfigFile)
+					result["error"] = fmt.Sprintf("Error al guardar configuración: %v", cpErr2)
+					return result
+				}
+				log.Printf("Archivo guardado exitosamente después del remontaje")
 			}
-			log.Printf("Archivo guardado exitosamente después del remontaje")
-		}
-	} else if cpErr != nil {
+		} else {
 		log.Printf("ERROR: Falló escritura del archivo de configuración: %v, output: %s", cpErr, string(cpOut))
 		os.Remove(tmpConfigFile)
 		result["error"] = fmt.Sprintf("Error al guardar configuración: %v", cpErr)
