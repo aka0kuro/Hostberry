@@ -433,9 +433,17 @@ func networkConfigHandler(c *fiber.Ctx) error {
 					
 					applied = append(applied, fmt.Sprintf("Hostname set to %s and /etc/hosts updated", req.Hostname))
 				} else {
-					// Si ningún método funcionó, reportar error
-					errors = append(errors, fmt.Sprintf("Failed to set hostname: tried hostnamectl, /etc/hostname, and hostname command"))
-					log.Printf("All hostname setting methods failed for hostname: %s", req.Hostname)
+					// Si ningún método funcionó, reportar error con detalles
+					errorMsg := fmt.Sprintf("Failed to set hostname: tried hostnamectl, /etc/hostname, and hostname command")
+					if lastError != nil {
+						errorMsg += fmt.Sprintf(" (last error: %v", lastError)
+						if lastOutput != "" {
+							errorMsg += fmt.Sprintf(", output: %s", strings.TrimSpace(lastOutput))
+						}
+						errorMsg += ")"
+					}
+					errors = append(errors, errorMsg)
+					log.Printf("All hostname setting methods failed for hostname: %s. Last error: %v, Last output: %s", req.Hostname, lastError, lastOutput)
 				}
 			}
 		}
