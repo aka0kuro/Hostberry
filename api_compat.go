@@ -238,27 +238,91 @@ func networkConfigHandler(c *fiber.Ctx) error {
 	
 	// Validar y aplicar hostname
 	if req.Hostname != "" {
+		// Validar longitud
 		if len(req.Hostname) > 64 || len(req.Hostname) < 1 {
 			errors = append(errors, "Hostname must be between 1 and 64 characters")
-		} else if !strings.ContainsAny(req.Hostname, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-") {
-			errors = append(errors, "Hostname contains invalid characters")
 		} else {
-			// Aplicar hostname usando hostnamectl
-			cmd := fmt.Sprintf("hostnamectl set-hostname %s", req.Hostname)
-			if out, err := executeCommand(cmd); err != nil {
-				errors = append(errors, fmt.Sprintf("Failed to set hostname: %v", err))
+			// Validar formato: letras, números, guiones y puntos, pero no puede empezar o terminar con guión o punto
+			hostnameRegex := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$`)
+			if !hostnameRegex.MatchString(req.Hostname) {
+				errors = append(errors, "Hostname contains invalid characters. Use only letters, numbers, hyphens and dots. Cannot start or end with hyphen or dot.")
 			} else {
-				// Actualizar /etc/hosts para evitar el warning de sudo
-				// Primero intentar actualizar la línea existente de 127.0.0.1
-				hostsUpdateCmd1 := fmt.Sprintf("sed -i 's/^127\\.0\\.0\\.1[[:space:]]*localhost.*/127.0.0.1\\tlocalhost %s/' /etc/hosts 2>/dev/null", req.Hostname)
-				executeCommand(hostsUpdateCmd1) // Ignorar errores
-				
-				// Si no existe la línea, agregarla
-				hostsUpdateCmd2 := fmt.Sprintf("grep -q '^127\\.0\\.0\\.1' /etc/hosts || echo '127.0.0.1\\tlocalhost %s' >> /etc/hosts 2>/dev/null", req.Hostname)
-				executeCommand(hostsUpdateCmd2) // Ignorar errores
-				
-				applied = append(applied, fmt.Sprintf("Hostname set to %s", req.Hostname))
-				_ = out // Ignorar salida
+				// Aplicar hostname usando hostnamectl con sudo
+				cmd := fmt.Sprintf("sudo hostnamectl set-hostname %s", req.Hostname)
+				if out, err := executeCommand(cmd); err != nil {
+					log.Printf("Error setting hostname: %v, output: %s", err, out)
+					errors = append(errors, fmt.Sprintf("Failed to set hostname: %v", err))
+				} else {
+					// Actualizar /etc/hosts para evitar el warning de sudo
+					// Obtener el hostname anterior para reemplazarlo
+					oldHostnameCmd := exec.Command("sh", "-c", "hostnamectl --static 2>/dev/null || hostname 2>/dev/null || echo ''")
+					oldHostname := ""
+					if oldOut, err := oldHostnameCmd.Output(); err == nil {
+						oldHostname = strings.TrimSpace(string(oldOut))
+					}
+					
+					// Leer /etc/hosts
+					hostsFile := "/etc/hosts"
+					hostsContent, err := os.ReadFile(hostsFile)
+					if err != nil {
+						log.Printf("Warning: Could not read /etc/hosts: %v", err)
+					} else {
+						lines := strings.Split(string(hostsContent), "\n")
+						updated := false
+						newLines := []string{}
+						
+						for _, line := range lines {
+							trimmed := strings.TrimSpace(line)
+							// Buscar línea que empiece con 127.0.0.1
+							if strings.HasPrefix(trimmed, "127.0.0.1") || strings.HasPrefix(trimmed, "127.0.0.1") {
+								// Reemplazar hostname antiguo con el nuevo, o agregar si no está
+								parts := strings.Fields(trimmed)
+								if len(parts) > 0 && parts[0] == "127.0.0.1" {
+									// Construir nueva línea con localhost y el nuevo hostname
+									newLine := "127.0.0.1\tlocalhost"
+									if req.Hostname != "" {
+										newLine += " " + req.Hostname
+									}
+									// Mantener otros hostnames que no sean el antiguo
+									for i := 1; i < len(parts); i++ {
+										if parts[i] != "localhost" && parts[i] != oldHostname && parts[i] != req.Hostname {
+											newLine += " " + parts[i]
+										}
+									}
+									newLines = append(newLines, newLine)
+									updated = true
+									continue
+								}
+							}
+							// Si la línea contiene el hostname antiguo pero no es 127.0.0.1, reemplazarlo
+							if oldHostname != "" && strings.Contains(trimmed, oldHostname) && !strings.HasPrefix(trimmed, "127.0.0.1") {
+								line = strings.ReplaceAll(line, oldHostname, req.Hostname)
+							}
+							newLines = append(newLines, line)
+						}
+						
+						// Si no se encontró línea 127.0.0.1, agregarla
+						if !updated {
+							newLines = append([]string{"127.0.0.1\tlocalhost " + req.Hostname}, newLines...)
+						}
+						
+						// Escribir /etc/hosts con sudo
+						newContent := strings.Join(newLines, "\n")
+						writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", hostsFile))
+						writeCmd.Stdin = strings.NewReader(newContent)
+						if err := writeCmd.Run(); err != nil {
+							log.Printf("Warning: Could not update /etc/hosts: %v", err)
+							// Intentar método alternativo con echo
+							altCmd := fmt.Sprintf("echo '127.0.0.1 localhost %s' | sudo tee -a /etc/hosts > /dev/null 2>&1 || true", req.Hostname)
+							executeCommand(altCmd)
+						} else {
+							log.Printf("Successfully updated /etc/hosts with hostname %s", req.Hostname)
+						}
+					}
+					
+					applied = append(applied, fmt.Sprintf("Hostname set to %s and /etc/hosts updated", req.Hostname))
+					_ = out // Ignorar salida
+				}
 			}
 		}
 	}
