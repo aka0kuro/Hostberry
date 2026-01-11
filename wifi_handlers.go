@@ -621,8 +621,20 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	}
 
 	// Crear contenido del archivo de configuración
-	// ctrl_interface apunta al directorio de socket
+	// ctrl_interface apunta al directorio de socket (debe ser escribible)
+	// Obtener directorio de socket escribible ANTES de crear la configuración
 	runDir := getRunDir()
+	log.Printf("Usando directorio de socket escribible: %s", runDir)
+	
+	// Asegurar que el directorio de socket existe y es escribible
+	if err := os.MkdirAll(runDir, 0755); err != nil {
+		log.Printf("Warning: No se pudo crear directorio de socket %s: %v", runDir, err)
+		// Intentar usar /tmp como último recurso
+		runDir = "/tmp/wpa_supplicant"
+		os.MkdirAll(runDir, 0755)
+		log.Printf("Usando directorio de socket alternativo: %s", runDir)
+	}
+	
 	configContent := fmt.Sprintf(`ctrl_interface=DIR=%s GROUP=netdev
 ctrl_interface_group=netdev
 update_config=1
