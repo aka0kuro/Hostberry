@@ -1365,6 +1365,32 @@ EOF
         print_info "Permisos agregados para cat: /bin/cat"
     fi
     
+    # grep (para buscar en archivos como /etc/hosts)
+    if command -v grep &> /dev/null; then
+        GREP_PATH=$(command -v grep)
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: $GREP_PATH" >> "/etc/sudoers.d/hostberry"
+        print_info "Permisos agregados para grep: $GREP_PATH"
+    elif [ -f "/bin/grep" ]; then
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/grep" >> "/etc/sudoers.d/hostberry"
+        print_info "Permisos agregados para grep: /bin/grep"
+    elif [ -f "/usr/bin/grep" ]; then
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/grep" >> "/etc/sudoers.d/hostberry"
+        print_info "Permisos agregados para grep: /usr/bin/grep"
+    fi
+    
+    # sed (para reemplazar texto en archivos como /etc/hosts)
+    if command -v sed &> /dev/null; then
+        SED_PATH=$(command -v sed)
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: $SED_PATH" >> "/etc/sudoers.d/hostberry"
+        print_info "Permisos agregados para sed: $SED_PATH"
+    elif [ -f "/bin/sed" ]; then
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/sed" >> "/etc/sudoers.d/hostberry"
+        print_info "Permisos agregados para sed: /bin/sed"
+    elif [ -f "/usr/bin/sed" ]; then
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/sed" >> "/etc/sudoers.d/hostberry"
+        print_info "Permisos agregados para sed: /usr/bin/sed"
+    fi
+    
     # Crear directorio /etc/hostapd con permisos correctos
     print_info "Creando directorio /etc/hostapd..."
     if [ ! -d "/etc/hostapd" ]; then
