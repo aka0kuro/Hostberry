@@ -524,6 +524,18 @@ country=%s
 		return result
 	}
 	
+	// Asegurar que el directorio existe
+	if _, err := os.Stat(WpaSupplicantConfigDir); os.IsNotExist(err) {
+		log.Printf("Creando directorio de configuración: %s", WpaSupplicantConfigDir)
+		mkdirCmd := exec.Command("sudo", "mkdir", "-p", WpaSupplicantConfigDir)
+		mkdirCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+		if out, err := mkdirCmd.CombinedOutput(); err != nil {
+			log.Printf("Warning: no se pudo crear %s: %v (output: %s)", WpaSupplicantConfigDir, err, string(out))
+		}
+		exec.Command("sudo", "chmod", "755", WpaSupplicantConfigDir).Run()
+		exec.Command("sudo", "chown", "root:netdev", WpaSupplicantConfigDir).Run()
+	}
+	
 	// Copiar archivo temporal a la ubicación final usando cp (tiene permisos en sudoers)
 	cpPath := "/bin/cp"
 	if _, err := os.Stat(cpPath); os.IsNotExist(err) {
@@ -531,11 +543,53 @@ country=%s
 	}
 	cpCmd := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
 	cpCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
-	if out, err := cpCmd.CombinedOutput(); err != nil {
-		log.Printf("ERROR: Falló escritura del archivo de configuración: %v, output: %s", err, string(out))
-		// Limpiar archivo temporal
+	cpOut, cpErr := cpCmd.CombinedOutput()
+	
+	// Si falla por sistema de solo lectura, intentar remontar
+	if cpErr != nil && strings.Contains(string(cpOut), "Read-only file system") {
+		log.Printf("Sistema de archivos de solo lectura detectado, intentando remontar...")
+		remountCmd := exec.Command("sudo", "mount", "-o", "remount,rw", "/")
+		remountCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+		if remountOut, remountErr := remountCmd.CombinedOutput(); remountErr != nil {
+			log.Printf("No se pudo remontar como lectura-escritura: %v, output: %s", remountErr, string(remountOut))
+			// Intentar usar directorio alternativo en /tmp
+			altConfigDir := "/tmp/hostberry/wpa_supplicant"
+			if err := os.MkdirAll(altConfigDir, 0755); err == nil {
+				log.Printf("Usando directorio alternativo: %s", altConfigDir)
+				wpaConfigPath = fmt.Sprintf("%s/wpa_supplicant-%s.conf", altConfigDir, safeSSID)
+				// Intentar copiar de nuevo
+				cpCmd2 := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
+				cpCmd2.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+				if cpOut2, cpErr2 := cpCmd2.CombinedOutput(); cpErr2 != nil {
+					log.Printf("ERROR: Falló escritura incluso en directorio alternativo: %v, output: %s", cpErr2, string(cpOut2))
+					os.Remove(tmpConfigFile)
+					result["error"] = fmt.Sprintf("Error al guardar configuración: sistema de archivos de solo lectura")
+					return result
+				}
+				log.Printf("Archivo guardado en directorio alternativo: %s", wpaConfigPath)
+			} else {
+				log.Printf("ERROR: No se pudo crear directorio alternativo: %v", err)
+				os.Remove(tmpConfigFile)
+				result["error"] = fmt.Sprintf("Error al guardar configuración: sistema de archivos de solo lectura")
+				return result
+			}
+		} else {
+			log.Printf("Sistema remontado como lectura-escritura, intentando copiar de nuevo...")
+			// Intentar copiar de nuevo después del remontaje
+			cpCmd2 := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
+			cpCmd2.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+			if cpOut2, cpErr2 := cpCmd2.CombinedOutput(); cpErr2 != nil {
+				log.Printf("ERROR: Falló escritura después del remontaje: %v, output: %s", cpErr2, string(cpOut2))
+				os.Remove(tmpConfigFile)
+				result["error"] = fmt.Sprintf("Error al guardar configuración: %v", cpErr2)
+				return result
+			}
+			log.Printf("Archivo guardado exitosamente después del remontaje")
+		}
+	} else if cpErr != nil {
+		log.Printf("ERROR: Falló escritura del archivo de configuración: %v, output: %s", cpErr, string(cpOut))
 		os.Remove(tmpConfigFile)
-		result["error"] = fmt.Sprintf("Error al guardar configuración: %v", err)
+		result["error"] = fmt.Sprintf("Error al guardar configuración: %v", cpErr)
 		return result
 	}
 	
