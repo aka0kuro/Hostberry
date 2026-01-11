@@ -546,9 +546,11 @@ country=%s
 	cpCmd := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
 	cpCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 	cpOut, cpErr := cpCmd.CombinedOutput()
+	cpOutStr := string(cpOut)
 	
 	// Si falla por sistema de solo lectura, intentar remontar
-	if cpErr != nil && strings.Contains(string(cpOut), "Read-only file system") {
+	if cpErr != nil && (strings.Contains(cpOutStr, "Read-only file system") || strings.Contains(cpOutStr, "Read-only")) {
+		log.Printf("ERROR detectado: %s", cpOutStr)
 		log.Printf("Sistema de archivos de solo lectura detectado, intentando remontar...")
 		remountCmd := exec.Command("sudo", "mount", "-o", "remount,rw", "/")
 		remountCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
