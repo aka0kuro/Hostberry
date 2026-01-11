@@ -153,14 +153,46 @@
       if (!iface) return;
       // Verificar estado de la interfaz - puede venir como status, state, o connected
       const statusValue = iface.status || iface.state || '';
-      const isUp = (statusValue === 'up' || statusValue === 'connected' || 
-                   iface.connected === true || 
-                   (statusValue && statusValue.toLowerCase() === 'up') ||
-                   (iface.ip && iface.ip !== 'N/A' && iface.ip !== ''));
-      if (isUp) activeCount++;
-      const statusClass = isUp ? 'success' : 'danger';
-      const statusIcon = isUp ? 'bi-check-circle' : 'bi-x-circle';
-      const statusText = isUp ? t('network.connected', 'Connected') : t('network.disconnected', 'Disconnected');
+      const isAPMode = iface.ap_mode === true || iface.ap_mode === 'true';
+      const hasInternet = iface.internet_connected === true || iface.internet_connected === 'true';
+      
+      // Determinar estado real
+      let isUp = false;
+      let statusClass = 'danger';
+      let statusIcon = 'bi-x-circle';
+      let statusText = t('network.disconnected', 'Disconnected');
+      
+      if (isAPMode) {
+        // Modo AP - no tiene conexión a Internet
+        isUp = true; // La interfaz está activa pero en modo AP
+        statusClass = 'warning';
+        statusIcon = 'bi-broadcast';
+        statusText = t('network.ap_mode', 'AP Mode (No Internet)');
+      } else if (statusValue === 'ap_mode') {
+        // También detectar cuando el estado es explícitamente 'ap_mode'
+        isUp = true;
+        statusClass = 'warning';
+        statusIcon = 'bi-broadcast';
+        statusText = t('network.ap_mode', 'AP Mode (No Internet)');
+      } else if (statusValue === 'up' || statusValue === 'connected' || 
+                 iface.connected === true || 
+                 (statusValue && statusValue.toLowerCase() === 'up') ||
+                 (iface.ip && iface.ip !== 'N/A' && iface.ip !== '')) {
+        isUp = true;
+        if (hasInternet) {
+          // Conectado y tiene Internet
+          statusClass = 'success';
+          statusIcon = 'bi-check-circle';
+          statusText = t('network.connected', 'Connected');
+        } else {
+          // Conectado pero sin Internet
+          statusClass = 'warning';
+          statusIcon = 'bi-exclamation-triangle';
+          statusText = t('network.no_internet', 'No Internet');
+        }
+      }
+      
+      if (isUp && !isAPMode && hasInternet) activeCount++;
       const ifaceName = iface.name || iface.interface || 'Unknown';
       const ifaceIp = iface.ip || iface.ip_address || 'N/A';
       const ifaceMac = iface.mac || iface.mac_address || 'N/A';
