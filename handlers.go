@@ -558,9 +558,21 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 		// Detectar si está en modo AP (IP 192.168.4.1 es típica del AP)
 		isAPMode := false
 		if iface["ip"] != "N/A" && iface["ip"] != "" && iface["ip"] != "Obtaining IP..." {
-			ipStr := iface["ip"].(string)
+			ipStr, ok := iface["ip"].(string)
+			if !ok {
+				// Si no es string, convertir a string
+				ipStr = fmt.Sprintf("%v", iface["ip"])
+			}
 			// Verificar si la IP es 192.168.4.1 (modo AP) o está en la red 192.168.4.0/24 sin gateway externo
-			if ipStr == "192.168.4.1" || (strings.HasPrefix(ipStr, "192.168.4.") && (iface["gateway"] == nil || iface["gateway"] == "" || iface["gateway"] == "192.168.4.1")) {
+			gatewayStr := ""
+			if iface["gateway"] != nil {
+				if gw, ok := iface["gateway"].(string); ok {
+					gatewayStr = gw
+				} else {
+					gatewayStr = fmt.Sprintf("%v", iface["gateway"])
+				}
+			}
+			if ipStr == "192.168.4.1" || (strings.HasPrefix(ipStr, "192.168.4.") && (gatewayStr == "" || gatewayStr == "192.168.4.1")) {
 				// Verificar si realmente está en modo AP verificando si hostapd está corriendo
 				hostapdCheck := exec.Command("sh", "-c", "systemctl is-active hostapd 2>/dev/null || pgrep hostapd > /dev/null && echo active || echo inactive")
 				if hostapdOut, err := hostapdCheck.Output(); err == nil {
