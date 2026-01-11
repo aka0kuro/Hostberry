@@ -331,8 +331,8 @@ func networkConfigHandler(c *fiber.Ctx) error {
 	dnsServers := []string{}
 	if req.DNS1 != "" {
 		// Validar formato IP
-		cmd := exec.Command("sh", "-c", fmt.Sprintf("echo '%s' | grep -E '^([0-9]{1,3}\\.){3}[0-9]{1,3}$'", req.DNS1))
-		if err := cmd.Run(); err != nil {
+		ipRegex := regexp.MustCompile(`^([0-9]{1,3}\.){3}[0-9]{1,3}$`)
+		if !ipRegex.MatchString(req.DNS1) {
 			errors = append(errors, "Invalid DNS1 format")
 		} else {
 			dnsServers = append(dnsServers, req.DNS1)
@@ -340,31 +340,128 @@ func networkConfigHandler(c *fiber.Ctx) error {
 	}
 	
 	if req.DNS2 != "" {
-		cmd := exec.Command("sh", "-c", fmt.Sprintf("echo '%s' | grep -E '^([0-9]{1,3}\\.){3}[0-9]{1,3}$'", req.DNS2))
-		if err := cmd.Run(); err != nil {
+		ipRegex := regexp.MustCompile(`^([0-9]{1,3}\.){3}[0-9]{1,3}$`)
+		if !ipRegex.MatchString(req.DNS2) {
 			errors = append(errors, "Invalid DNS2 format")
 		} else {
 			dnsServers = append(dnsServers, req.DNS2)
 		}
 	}
 	
-	// Aplicar DNS usando nmcli o systemd-resolved
+	// Aplicar DNS usando múltiples métodos
 	if len(dnsServers) > 0 {
-		// Intentar con nmcli primero (más común en sistemas con NetworkManager)
+		dnsApplied := false
 		dnsStr := strings.Join(dnsServers, " ")
-		cmd := fmt.Sprintf("nmcli connection modify $(nmcli -t -f NAME connection show --active | head -1) ipv4.dns '%s' 2>&1", dnsStr)
-		if out, err := executeCommand(cmd); err != nil {
-			// Si nmcli falla, intentar con systemd-resolved
-			// systemd-resolved requiere editar /etc/systemd/resolved.conf
-			// Por ahora, solo reportamos el error de nmcli
-			errors = append(errors, fmt.Sprintf("Failed to set DNS: %v (output: %s)", err, out))
-		} else {
-			// Aplicar cambios de DNS
-			applyCmd := "nmcli connection up $(nmcli -t -f NAME connection show --active | head -1) 2>&1"
-			if _, err := executeCommand(applyCmd); err != nil {
-				// No es crítico si falla el apply, el DNS puede aplicarse en el próximo reinicio
+		
+		// Método 1: nmcli (NetworkManager) - más común en sistemas modernos
+		if !dnsApplied {
+			connCmd := exec.Command("sh", "-c", "nmcli -t -f NAME connection show --active 2>/dev/null | head -1")
+			if connOut, err := connCmd.Output(); err == nil {
+				connName := strings.TrimSpace(string(connOut))
+				if connName != "" {
+					cmd := fmt.Sprintf("sudo nmcli connection modify '%s' ipv4.dns '%s' 2>&1", connName, dnsStr)
+					if out, err := executeCommand(cmd); err == nil {
+						// Aplicar cambios reactivando la conexión
+						applyCmd := fmt.Sprintf("sudo nmcli connection up '%s' 2>&1", connName)
+						executeCommand(applyCmd) // Ignorar errores de apply
+						applied = append(applied, fmt.Sprintf("DNS set to %s (via NetworkManager)", strings.Join(dnsServers, ", ")))
+						dnsApplied = true
+						log.Printf("DNS configured via nmcli: %s", dnsStr)
+					} else {
+						log.Printf("nmcli DNS configuration failed: %v, output: %s", err, out)
+					}
+				}
 			}
-			applied = append(applied, fmt.Sprintf("DNS set to %s", strings.Join(dnsServers, ", ")))
+		}
+		
+		// Método 2: systemd-resolved (systemd)
+		if !dnsApplied {
+			resolvedConf := "/etc/systemd/resolved.conf"
+			if _, err := os.Stat(resolvedConf); err == nil {
+				// Leer configuración actual
+				content, err := os.ReadFile(resolvedConf)
+				if err == nil {
+					lines := strings.Split(string(content), "\n")
+					updated := false
+					newLines := []string{}
+					
+					for _, line := range lines {
+						trimmed := strings.TrimSpace(line)
+						// Buscar línea DNS=
+						if strings.HasPrefix(trimmed, "DNS=") {
+							newLines = append(newLines, "DNS="+strings.Join(dnsServers, " "))
+							updated = true
+						} else if strings.HasPrefix(trimmed, "#DNS=") && !updated {
+							// Si está comentado, descomentarlo y actualizar
+							newLines = append(newLines, "DNS="+strings.Join(dnsServers, " "))
+							updated = true
+						} else {
+							newLines = append(newLines, line)
+						}
+					}
+					
+					// Si no se encontró línea DNS, agregarla
+					if !updated {
+						newLines = append(newLines, "DNS="+strings.Join(dnsServers, " "))
+					}
+					
+					// Escribir archivo
+					newContent := strings.Join(newLines, "\n")
+					writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", resolvedConf))
+					writeCmd.Stdin = strings.NewReader(newContent)
+					if err := writeCmd.Run(); err == nil {
+						// Reiniciar systemd-resolved
+						executeCommand("sudo systemctl restart systemd-resolved 2>&1")
+						applied = append(applied, fmt.Sprintf("DNS set to %s (via systemd-resolved)", strings.Join(dnsServers, ", ")))
+						dnsApplied = true
+						log.Printf("DNS configured via systemd-resolved: %s", dnsStr)
+					}
+				}
+			}
+		}
+		
+		// Método 3: /etc/resolv.conf (fallback para sistemas sin NetworkManager ni systemd-resolved)
+		if !dnsApplied {
+			resolvConf := "/etc/resolv.conf"
+			// Crear backup
+			executeCommand(fmt.Sprintf("sudo cp %s %s.backup 2>/dev/null || true", resolvConf, resolvConf))
+			
+			// Leer contenido actual
+			content, err := os.ReadFile(resolvConf)
+			if err == nil {
+				lines := strings.Split(string(content), "\n")
+				newLines := []string{}
+				
+				// Eliminar líneas nameserver existentes
+				for _, line := range lines {
+					trimmed := strings.TrimSpace(line)
+					if !strings.HasPrefix(trimmed, "nameserver") {
+						newLines = append(newLines, line)
+					}
+				}
+				
+				// Agregar nuevos nameservers
+				for _, dns := range dnsServers {
+					newLines = append(newLines, "nameserver "+dns)
+				}
+				
+				// Escribir archivo
+				newContent := strings.Join(newLines, "\n")
+				writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", resolvConf))
+				writeCmd.Stdin = strings.NewReader(newContent)
+				if err := writeCmd.Run(); err == nil {
+					applied = append(applied, fmt.Sprintf("DNS set to %s (via /etc/resolv.conf)", strings.Join(dnsServers, ", ")))
+					dnsApplied = true
+					log.Printf("DNS configured via /etc/resolv.conf: %s", dnsStr)
+				} else {
+					log.Printf("Failed to write /etc/resolv.conf: %v", err)
+				}
+			}
+		}
+		
+		// Si ningún método funcionó, reportar error
+		if !dnsApplied {
+			errors = append(errors, fmt.Sprintf("Failed to set DNS: tried NetworkManager, systemd-resolved, and /etc/resolv.conf"))
 		}
 	}
 	
