@@ -364,98 +364,38 @@ func networkConfigHandler(c *fiber.Ctx) error {
 				}
 				
 				if hostnameApplied {
-					// Actualizar /etc/hosts creando un archivo nuevo en /tmp y copiándolo a /etc/hosts
+					// Crear un archivo /etc/hosts completamente nuevo y sobrescribirlo
 					hostsFile := "/etc/hosts"
 					tmpFile := "/tmp/hosts_hostberry_" + fmt.Sprintf("%d", time.Now().Unix())
 					
-					// Paso 1: Leer el archivo /etc/hosts actual
-					hostsContent, err := os.ReadFile(hostsFile)
-					if err != nil {
-						log.Printf("Warning: Could not read /etc/hosts: %v, creating new file", err)
-						hostsContent = []byte("# See `man hosts` for details.\n#\n# By default, systemd-resolved or libnss-myhostname will resolve\n# localhost and the system hostname if they're not specified here.\n127.0.0.1\tlocalhost\n::1\t\tlocalhost\n")
+					log.Printf("Creating new /etc/hosts file with hostname: %s", req.Hostname)
+					
+					// Crear contenido del archivo completamente nuevo
+					newContent := "# See `man hosts` for details.\n"
+					newContent += "#\n"
+					newContent += "# By default, systemd-resolved or libnss-myhostname will resolve\n"
+					newContent += "# localhost and the system hostname if they're not specified here.\n"
+					
+					// Línea IPv4 con localhost y el nuevo hostname
+					if req.Hostname != "" {
+						newContent += fmt.Sprintf("127.0.0.1\tlocalhost\t%s\n", req.Hostname)
+					} else {
+						newContent += "127.0.0.1\tlocalhost\n"
 					}
 					
-					// Paso 2: Obtener el hostname antiguo del sistema (para reemplazarlo si existe en el archivo)
-					oldHostname := ""
-					oldHostnameCmd := exec.Command("sh", "-c", "hostnamectl --static 2>/dev/null || hostname 2>/dev/null || echo ''")
-					if oldOut, err := oldHostnameCmd.Output(); err == nil {
-						oldHostname = strings.TrimSpace(string(oldOut))
-						if oldHostname != "" {
-							log.Printf("Hostname antiguo obtenido del sistema: %s", oldHostname)
-						}
-					}
+					// Línea IPv6
+					newContent += "::1\t\tlocalhost\n"
 					
-					// Paso 3: Procesar el archivo línea por línea
-					lines := strings.Split(string(hostsContent), "\n")
-					newLines := []string{}
-					line127Updated := false
-					
-					for _, line := range lines {
-						trimmed := strings.TrimSpace(line)
-						
-						// Si es una línea que empieza con 127.0.0.1, actualizarla
-						if strings.HasPrefix(trimmed, "127.0.0.1") && !strings.HasPrefix(trimmed, "#") {
-							parts := strings.Fields(trimmed)
-							if len(parts) > 0 && parts[0] == "127.0.0.1" {
-								// Construir nueva línea con localhost y el nuevo hostname
-								newLine := "127.0.0.1\tlocalhost"
-								if req.Hostname != "" {
-									newLine += "\t" + req.Hostname
-								}
-								// Mantener otros hostnames que no sean el antiguo ni el nuevo
-								for i := 1; i < len(parts); i++ {
-									if parts[i] != "localhost" && parts[i] != oldHostname && parts[i] != req.Hostname {
-										newLine += "\t" + parts[i]
-									}
-								}
-								newLines = append(newLines, newLine)
-								line127Updated = true
-								continue
-							}
-						}
-						
-						// Si la línea contiene el hostname antiguo (pero no es 127.0.0.1), reemplazarlo
-						if oldHostname != "" && oldHostname != req.Hostname && strings.Contains(trimmed, oldHostname) && !strings.HasPrefix(trimmed, "#") {
-							line = strings.ReplaceAll(line, oldHostname, req.Hostname)
-						}
-						
-						newLines = append(newLines, line)
-					}
-					
-					// Paso 4: Si no se encontró línea 127.0.0.1, agregarla al principio
-					if !line127Updated {
-						newLine := "127.0.0.1\tlocalhost"
-						if req.Hostname != "" {
-							newLine += "\t" + req.Hostname
-						}
-						// Insertar después de los comentarios iniciales
-						insertPos := 0
-						for i, line := range newLines {
-							if strings.HasPrefix(strings.TrimSpace(line), "#") {
-								insertPos = i + 1
-							} else if strings.TrimSpace(line) != "" {
-								break
-							}
-						}
-						// Insertar la línea
-						newLines = append(newLines[:insertPos], append([]string{newLine}, newLines[insertPos:]...)...)
-					}
-					
-					// Paso 5: Construir el contenido completo del nuevo archivo
-					newContent := strings.Join(newLines, "\n")
-					if !strings.HasSuffix(newContent, "\n") {
-						newContent += "\n"
-					}
-					
-					// Paso 6: Escribir el archivo nuevo en /tmp
+					// Escribir el archivo nuevo en /tmp
 					if err := os.WriteFile(tmpFile, []byte(newContent), 0644); err != nil {
 						log.Printf("Error: Could not create temp hosts file: %v", err)
 					} else {
 						log.Printf("Created new hosts file in /tmp: %s", tmpFile)
+						log.Printf("File content:\n%s", newContent)
 						
-						// Paso 7: Copiar el archivo temporal a /etc/hosts usando sudo cp
-						copyCmd := fmt.Sprintf("sudo cp %s %s", tmpFile, hostsFile)
-						log.Printf("Copying temp file to /etc/hosts: %s", copyCmd)
+						// Copiar el archivo temporal a /etc/hosts usando sudo cp (sobrescribir)
+						copyCmd := fmt.Sprintf("sudo cp -f %s %s", tmpFile, hostsFile)
+						log.Printf("Copying temp file to /etc/hosts (overwrite): %s", copyCmd)
 						if out, err := executeCommand(copyCmd); err != nil {
 							log.Printf("Error: Could not copy temp file to /etc/hosts: %v, output: %s", err, out)
 						} else {
@@ -463,7 +403,9 @@ func networkConfigHandler(c *fiber.Ctx) error {
 							
 							// Establecer permisos correctos
 							chmodCmd := fmt.Sprintf("sudo chmod 644 %s", hostsFile)
-							executeCommand(chmodCmd)
+							if out, err := executeCommand(chmodCmd); err != nil {
+								log.Printf("Warning: Could not set permissions: %v, output: %s", err, out)
+							}
 							
 							// Verificar que el cambio se aplicó correctamente
 							verifyCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -q '%s' %s && echo 'ok' || echo 'fail'", req.Hostname, hostsFile))
@@ -472,6 +414,10 @@ func networkConfigHandler(c *fiber.Ctx) error {
 									log.Printf("Verified: hostname %s successfully updated in /etc/hosts", req.Hostname)
 								} else {
 									log.Printf("Warning: Could not verify hostname update in /etc/hosts")
+									// Leer el archivo para debug
+									if content, err := os.ReadFile(hostsFile); err == nil {
+										log.Printf("Current /etc/hosts content:\n%s", string(content))
+									}
 								}
 							}
 						}
