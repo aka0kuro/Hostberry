@@ -480,13 +480,6 @@ func networkConfigHandler(c *fiber.Ctx) error {
 				if connOut, err := connCmd.Output(); err == nil {
 					connName := strings.TrimSpace(string(connOut))
 					if connName != "" {
-						// Obtener interfaz activa
-						ifaceCmd := exec.Command("sh", "-c", fmt.Sprintf("nmcli -t -f DEVICE connection show '%s' 2>/dev/null | head -1", connName))
-						iface := ""
-						if ifaceOut, err := ifaceCmd.Output(); err == nil {
-							iface = strings.TrimSpace(string(ifaceOut))
-						}
-						
 						// Configurar gateway
 						cmd := fmt.Sprintf("sudo nmcli connection modify '%s' ipv4.gateway %s 2>&1", connName, req.Gateway)
 						if out, err := executeCommand(cmd); err == nil {
