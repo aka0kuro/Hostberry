@@ -393,31 +393,54 @@ func networkConfigHandler(c *fiber.Ctx) error {
 						log.Printf("Created new hosts file in /tmp: %s", tmpFile)
 						log.Printf("File content:\n%s", newContent)
 						
+						// Obtener la ruta completa de cp
+						cpPath := "/bin/cp"
+						if _, err := os.Stat(cpPath); os.IsNotExist(err) {
+							cpPath = "/usr/bin/cp"
+						}
+						
 						// Copiar el archivo temporal a /etc/hosts usando sudo cp (sobrescribir)
-						copyCmd := fmt.Sprintf("sudo cp -f %s %s", tmpFile, hostsFile)
+						// Usar ruta completa de cp para asegurar que funcione con sudoers
+						copyCmd := fmt.Sprintf("sudo %s -f %s %s", cpPath, tmpFile, hostsFile)
 						log.Printf("Copying temp file to /etc/hosts (overwrite): %s", copyCmd)
 						if out, err := executeCommand(copyCmd); err != nil {
 							log.Printf("Error: Could not copy temp file to /etc/hosts: %v, output: %s", err, out)
+							// Intentar método alternativo: usar cat con tee
+							log.Printf("Trying alternative method: cat with tee")
+							catCmd := fmt.Sprintf("sudo cat %s | sudo tee %s > /dev/null", tmpFile, hostsFile)
+							if out2, err2 := executeCommand(catCmd); err2 != nil {
+								log.Printf("Error: Alternative method also failed: %v, output: %s", err2, out2)
+							} else {
+								log.Printf("Successfully copied using cat/tee method")
+							}
 						} else {
 							log.Printf("Successfully copied temp file to /etc/hosts")
-							
-							// Establecer permisos correctos
-							chmodCmd := fmt.Sprintf("sudo chmod 644 %s", hostsFile)
-							if out, err := executeCommand(chmodCmd); err != nil {
-								log.Printf("Warning: Could not set permissions: %v, output: %s", err, out)
-							}
-							
-							// Verificar que el cambio se aplicó correctamente
-							verifyCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -q '%s' %s && echo 'ok' || echo 'fail'", req.Hostname, hostsFile))
-							if verifyOut, err := verifyCmd.Output(); err == nil {
-								if strings.TrimSpace(string(verifyOut)) == "ok" {
-									log.Printf("Verified: hostname %s successfully updated in /etc/hosts", req.Hostname)
+						}
+						
+						// Establecer permisos correctos
+						chmodPath := "/bin/chmod"
+						if _, err := os.Stat(chmodPath); os.IsNotExist(err) {
+							chmodPath = "/usr/bin/chmod"
+						}
+						chmodCmd := fmt.Sprintf("sudo %s 644 %s", chmodPath, hostsFile)
+						if out, err := executeCommand(chmodCmd); err != nil {
+							log.Printf("Warning: Could not set permissions: %v, output: %s", err, out)
+						} else {
+							log.Printf("Permissions set correctly")
+						}
+						
+						// Verificar que el cambio se aplicó correctamente
+						verifyCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -q '%s' %s && echo 'ok' || echo 'fail'", req.Hostname, hostsFile))
+						if verifyOut, err := verifyCmd.Output(); err == nil {
+							if strings.TrimSpace(string(verifyOut)) == "ok" {
+								log.Printf("Verified: hostname %s successfully updated in /etc/hosts", req.Hostname)
+							} else {
+								log.Printf("Warning: Could not verify hostname update in /etc/hosts")
+								// Leer el archivo para debug
+								if content, err := os.ReadFile(hostsFile); err == nil {
+									log.Printf("Current /etc/hosts content:\n%s", string(content))
 								} else {
-									log.Printf("Warning: Could not verify hostname update in /etc/hosts")
-									// Leer el archivo para debug
-									if content, err := os.ReadFile(hostsFile); err == nil {
-										log.Printf("Current /etc/hosts content:\n%s", string(content))
-									}
+									log.Printf("Could not read /etc/hosts for verification: %v", err)
 								}
 							}
 						}
