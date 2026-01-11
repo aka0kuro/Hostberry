@@ -584,9 +584,12 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 			log.Printf("Limpiando socket antiguo: %s", socketFile)
 			executeCommand(fmt.Sprintf("sudo rm -f %s 2>/dev/null || true", socketFile))
 		}
-		// También limpiar cualquier archivo en el directorio
-		executeCommand(fmt.Sprintf("sudo rm -rf %s/* 2>/dev/null || true", socketDir))
+		// También limpiar cualquier archivo en el directorio (si es escribible)
+		executeCommand(fmt.Sprintf("sudo rm -f %s/* 2>/dev/null || true", socketDir))
 	}
+	
+	// Resetear el directorio activo para forzar una nueva verificación
+	activeRunDir = ""
 
 	// Paso 5: Crear archivo de configuración
 	log.Printf("Paso 5: Creando archivo de configuración...")
