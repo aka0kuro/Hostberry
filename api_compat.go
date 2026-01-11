@@ -364,15 +364,15 @@ func networkConfigHandler(c *fiber.Ctx) error {
 				}
 				
 				if hostnameApplied {
-					// Actualizar /etc/hosts para evitar el warning de sudo
-					// Usar grep para buscar el hostname antiguo en /etc/hosts
+					// Actualizar /etc/hosts usando grep para buscar el hostname antiguo y sed para reemplazarlo
 					hostsFile := "/etc/hosts"
 					oldHostname := ""
 					
-					// Buscar hostname antiguo usando grep (excluyendo localhost y comentarios)
-					grepCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -v '^#' %s | grep -v '^$' | grep -v 'localhost' | awk '{for(i=2;i<=NF;i++) if($i != \"localhost\") print $i}' | head -1", hostsFile))
+					// Usar grep para buscar el hostname antiguo en /etc/hosts (excluyendo localhost y comentarios)
+					grepCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -v '^#' %s | grep -v '^$' | awk '{for(i=2;i<=NF;i++) if($i != \"localhost\") print $i}' | head -1", hostsFile))
 					if grepOut, err := grepCmd.Output(); err == nil {
 						oldHostname = strings.TrimSpace(string(grepOut))
+						log.Printf("Hostname antiguo encontrado con grep: %s", oldHostname)
 					}
 					
 					// Si grep no encontró nada, intentar obtener el hostname actual del sistema
@@ -380,91 +380,56 @@ func networkConfigHandler(c *fiber.Ctx) error {
 						oldHostnameCmd := exec.Command("sh", "-c", "hostnamectl --static 2>/dev/null || hostname 2>/dev/null || echo ''")
 						if oldOut, err := oldHostnameCmd.Output(); err == nil {
 							oldHostname = strings.TrimSpace(string(oldOut))
+							log.Printf("Hostname antiguo obtenido del sistema: %s", oldHostname)
 						}
 					}
 					
-					// Leer /etc/hosts
-					hostsContent, err := os.ReadFile(hostsFile)
-					if err != nil {
-						log.Printf("Warning: Could not read /etc/hosts: %v", err)
-					} else {
-						lines := strings.Split(string(hostsContent), "\n")
-						updated := false
-						newLines := []string{}
-						
-						for _, line := range lines {
-							trimmed := strings.TrimSpace(line)
-							// Buscar línea que empiece con 127.0.0.1
-							if strings.HasPrefix(trimmed, "127.0.0.1") {
-								// Reemplazar hostname antiguo con el nuevo, o agregar si no está
-								parts := strings.Fields(trimmed)
-								if len(parts) > 0 && parts[0] == "127.0.0.1" {
-									// Construir nueva línea con localhost y el nuevo hostname
-									newLine := "127.0.0.1\tlocalhost"
-									if req.Hostname != "" {
-										newLine += "\t" + req.Hostname
-									}
-									// Mantener otros hostnames que no sean el antiguo ni el nuevo
-									for i := 1; i < len(parts); i++ {
-										if parts[i] != "localhost" && parts[i] != oldHostname && parts[i] != req.Hostname {
-											newLine += "\t" + parts[i]
-										}
-									}
-									newLines = append(newLines, newLine)
-									updated = true
-									continue
-								}
-							}
-							// Si la línea contiene el hostname antiguo pero no es 127.0.0.1, reemplazarlo
-							if oldHostname != "" && strings.Contains(trimmed, oldHostname) && !strings.HasPrefix(trimmed, "#") && !strings.HasPrefix(trimmed, "127.0.0.1") {
-								line = strings.ReplaceAll(line, oldHostname, req.Hostname)
-							}
-							newLines = append(newLines, line)
-						}
-						
-						// Si no se encontró línea 127.0.0.1, agregarla
-						if !updated {
-							newLines = append([]string{"127.0.0.1\tlocalhost\t" + req.Hostname}, newLines...)
-						}
-						
-						// Siempre escribir directamente el archivo completo (más confiable que sed)
-						newContent := strings.Join(newLines, "\n")
-						// Asegurar que termine con newline
-						if !strings.HasSuffix(newContent, "\n") {
-							newContent += "\n"
-						}
-						
-						// Crear archivo temporal
-						tmpFile := "/tmp/hosts.tmp"
-						if err := os.WriteFile(tmpFile, []byte(newContent), 0644); err != nil {
-							log.Printf("Error creating temp hosts file: %v", err)
-						} else {
-							// Copiar archivo temporal a /etc/hosts con sudo
-							copyCmd := fmt.Sprintf("sudo cp %s %s && sudo chmod 644 %s", tmpFile, hostsFile, hostsFile)
-							if out, err := executeCommand(copyCmd); err != nil {
-								log.Printf("Warning: Could not update /etc/hosts with cp: %v, output: %s", err, out)
-								// Método alternativo: usar cat con sudo
-								writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", hostsFile))
-								writeCmd.Stdin = strings.NewReader(newContent)
-								if err := writeCmd.Run(); err != nil {
-									log.Printf("Warning: Could not update /etc/hosts with cat: %v", err)
-									// Último recurso: usar sed para agregar/actualizar solo la línea 127.0.0.1
-									if oldHostname != "" {
-										// Primero eliminar línea antigua si existe
-										removeCmd := fmt.Sprintf("sudo sed -i '/^127\\.0\\.0\\.1[[:space:]]/d' %s", hostsFile)
-										executeCommand(removeCmd)
-									}
-									// Agregar nueva línea
-									addCmd := fmt.Sprintf("echo '127.0.0.1\tlocalhost\t%s' | sudo tee -a %s > /dev/null", req.Hostname, hostsFile)
-									executeCommand(addCmd)
+					// Usar sed con grep para reemplazar el hostname antiguo por el nuevo
+					if oldHostname != "" && oldHostname != req.Hostname {
+						// Primero verificar que el hostname antiguo existe en el archivo usando grep
+						grepCheckCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -q '\\b%s\\b' %s && echo 'found' || echo 'notfound'", oldHostname, hostsFile))
+						if grepCheckOut, err := grepCheckCmd.Output(); err == nil {
+							if strings.TrimSpace(string(grepCheckOut)) == "found" {
+								// Usar sed para reemplazar el hostname antiguo por el nuevo
+								// \b asegura que coincida palabras completas
+								sedCmd := fmt.Sprintf("sudo sed -i 's/\\b%s\\b/%s/g' %s", oldHostname, req.Hostname, hostsFile)
+								if out, err := executeCommand(sedCmd); err != nil {
+									log.Printf("Warning: sed failed to replace hostname: %v, output: %s", err, out)
+									// Fallback: usar método alternativo
+									fallbackCmd := fmt.Sprintf("sudo sed -i 's/%s/%s/g' %s", oldHostname, req.Hostname, hostsFile)
+									executeCommand(fallbackCmd)
 								} else {
-									log.Printf("Successfully updated /etc/hosts with hostname %s (using cat)", req.Hostname)
+									log.Printf("Successfully replaced hostname %s with %s in /etc/hosts using sed/grep", oldHostname, req.Hostname)
 								}
 							} else {
-								log.Printf("Successfully updated /etc/hosts with hostname %s (using cp)", req.Hostname)
+								log.Printf("Hostname antiguo %s not found in /etc/hosts, adding new hostname", oldHostname)
+								// El hostname antiguo no está en el archivo, agregar el nuevo
+								addCmd := fmt.Sprintf("grep -q '^127\\.0\\.0\\.1[[:space:]]' %s && sudo sed -i 's/^127\\.0\\.0\\.1[[:space:]]/&%s /' %s || echo '127.0.0.1\tlocalhost\t%s' | sudo tee -a %s > /dev/null", hostsFile, req.Hostname, hostsFile, req.Hostname, hostsFile)
+								executeCommand(addCmd)
 							}
-							// Limpiar archivo temporal
-							os.Remove(tmpFile)
+						}
+					} else if oldHostname == "" {
+						// No se encontró hostname antiguo, verificar si ya existe el nuevo
+						grepNewCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -q '\\b%s\\b' %s && echo 'exists' || echo 'notexists'", req.Hostname, hostsFile))
+						if grepNewOut, err := grepNewCmd.Output(); err == nil {
+							if strings.TrimSpace(string(grepNewOut)) == "notexists" {
+								// Agregar el nuevo hostname a la línea 127.0.0.1
+								addCmd := fmt.Sprintf("grep -q '^127\\.0\\.0\\.1[[:space:]]' %s && sudo sed -i 's/^127\\.0\\.0\\.1[[:space:]]/&%s /' %s || echo '127.0.0.1\tlocalhost\t%s' | sudo tee -a %s > /dev/null", hostsFile, req.Hostname, hostsFile, req.Hostname, hostsFile)
+								executeCommand(addCmd)
+								log.Printf("Added new hostname %s to /etc/hosts", req.Hostname)
+							} else {
+								log.Printf("Hostname %s already exists in /etc/hosts", req.Hostname)
+							}
+						}
+					}
+					
+					// Verificar que el cambio se aplicó correctamente usando grep
+					verifyCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -q '\\b%s\\b' %s && echo 'ok' || echo 'fail'", req.Hostname, hostsFile))
+					if verifyOut, err := verifyCmd.Output(); err == nil {
+						if strings.TrimSpace(string(verifyOut)) == "ok" {
+							log.Printf("Verified: hostname %s successfully updated in /etc/hosts", req.Hostname)
+						} else {
+							log.Printf("Warning: Could not verify hostname update in /etc/hosts")
 						}
 					}
 					
