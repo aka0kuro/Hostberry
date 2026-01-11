@@ -516,14 +516,31 @@ country=%s
 	// Eliminar archivo existente
 	executeCommand(fmt.Sprintf("sudo rm -f %s", wpaConfigPath))
 
-	// Escribir archivo de configuración
-	writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", wpaConfigPath))
-	writeCmd.Stdin = strings.NewReader(configContent)
-	if out, err := writeCmd.CombinedOutput(); err != nil {
-		log.Printf("ERROR: Falló escritura del archivo de configuración: %v, output: %s", err, string(out))
+	// Escribir archivo de configuración usando un archivo temporal y cp (más confiable)
+	tmpConfigFile := fmt.Sprintf("/tmp/wpa_supplicant_%s_%d.conf", safeSSID, time.Now().Unix())
+	if err := os.WriteFile(tmpConfigFile, []byte(configContent), 0644); err != nil {
+		log.Printf("ERROR: No se pudo crear archivo temporal: %v", err)
 		result["error"] = fmt.Sprintf("Error al guardar configuración: %v", err)
 		return result
 	}
+	
+	// Copiar archivo temporal a la ubicación final usando cp (tiene permisos en sudoers)
+	cpPath := "/bin/cp"
+	if _, err := os.Stat(cpPath); os.IsNotExist(err) {
+		cpPath = "/usr/bin/cp"
+	}
+	cpCmd := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
+	cpCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+	if out, err := cpCmd.CombinedOutput(); err != nil {
+		log.Printf("ERROR: Falló escritura del archivo de configuración: %v, output: %s", err, string(out))
+		// Limpiar archivo temporal
+		os.Remove(tmpConfigFile)
+		result["error"] = fmt.Sprintf("Error al guardar configuración: %v", err)
+		return result
+	}
+	
+	// Limpiar archivo temporal
+	os.Remove(tmpConfigFile)
 
 	// Establecer permisos correctos
 	executeCommand(fmt.Sprintf("sudo chmod 600 %s", wpaConfigPath))
