@@ -647,7 +647,15 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 				}
 				// Verificar conectividad a Internet
 				hasInternet := false
-				if iface["gateway"] != nil && iface["gateway"] != "" && iface["gateway"] != "192.168.4.1" {
+				gatewayStr := ""
+				if iface["gateway"] != nil {
+					if gw, ok := iface["gateway"].(string); ok {
+						gatewayStr = gw
+					} else {
+						gatewayStr = fmt.Sprintf("%v", iface["gateway"])
+					}
+				}
+				if gatewayStr != "" && gatewayStr != "192.168.4.1" {
 					hasInternet = true
 				} else {
 					pingCmd := exec.Command("sh", "-c", "ping -c 1 -W 1 8.8.8.8 > /dev/null 2>&1 && echo 'ok' || echo 'fail'")
