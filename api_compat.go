@@ -402,12 +402,12 @@ func networkConfigHandler(c *fiber.Ctx) error {
 									// Construir nueva línea con localhost y el nuevo hostname
 									newLine := "127.0.0.1\tlocalhost"
 									if req.Hostname != "" {
-										newLine += " " + req.Hostname
+										newLine += "\t" + req.Hostname
 									}
-									// Mantener otros hostnames que no sean el antiguo
+									// Mantener otros hostnames que no sean el antiguo ni el nuevo
 									for i := 1; i < len(parts); i++ {
 										if parts[i] != "localhost" && parts[i] != oldHostname && parts[i] != req.Hostname {
-											newLine += " " + parts[i]
+											newLine += "\t" + parts[i]
 										}
 									}
 									newLines = append(newLines, newLine)
@@ -424,43 +424,47 @@ func networkConfigHandler(c *fiber.Ctx) error {
 						
 						// Si no se encontró línea 127.0.0.1, agregarla
 						if !updated {
-							newLines = append([]string{"127.0.0.1\tlocalhost " + req.Hostname}, newLines...)
+							newLines = append([]string{"127.0.0.1\tlocalhost\t" + req.Hostname}, newLines...)
 						}
 						
-						// Escribir /etc/hosts con sudo usando sed para reemplazar el hostname antiguo
-						if oldHostname != "" {
-							// Usar sed con grep para reemplazar el hostname antiguo
-							sedCmd := fmt.Sprintf("sudo sed -i 's/\\b%s\\b/%s/g' %s", oldHostname, req.Hostname, hostsFile)
-							if out, err := executeCommand(sedCmd); err != nil {
-								log.Printf("Warning: sed failed, using direct write method: %v, output: %s", err, out)
-								// Fallback: escribir directamente
-								newContent := strings.Join(newLines, "\n")
+						// Siempre escribir directamente el archivo completo (más confiable que sed)
+						newContent := strings.Join(newLines, "\n")
+						// Asegurar que termine con newline
+						if !strings.HasSuffix(newContent, "\n") {
+							newContent += "\n"
+						}
+						
+						// Crear archivo temporal
+						tmpFile := "/tmp/hosts.tmp"
+						if err := os.WriteFile(tmpFile, []byte(newContent), 0644); err != nil {
+							log.Printf("Error creating temp hosts file: %v", err)
+						} else {
+							// Copiar archivo temporal a /etc/hosts con sudo
+							copyCmd := fmt.Sprintf("sudo cp %s %s && sudo chmod 644 %s", tmpFile, hostsFile, hostsFile)
+							if out, err := executeCommand(copyCmd); err != nil {
+								log.Printf("Warning: Could not update /etc/hosts with cp: %v, output: %s", err, out)
+								// Método alternativo: usar cat con sudo
 								writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", hostsFile))
 								writeCmd.Stdin = strings.NewReader(newContent)
 								if err := writeCmd.Run(); err != nil {
-									log.Printf("Warning: Could not update /etc/hosts: %v", err)
-									// Intentar método alternativo con echo
-									altCmd := fmt.Sprintf("echo '127.0.0.1 localhost %s' | sudo tee -a /etc/hosts > /dev/null 2>&1 || true", req.Hostname)
-									executeCommand(altCmd)
+									log.Printf("Warning: Could not update /etc/hosts with cat: %v", err)
+									// Último recurso: usar sed para agregar/actualizar solo la línea 127.0.0.1
+									if oldHostname != "" {
+										// Primero eliminar línea antigua si existe
+										removeCmd := fmt.Sprintf("sudo sed -i '/^127\\.0\\.0\\.1[[:space:]]/d' %s", hostsFile)
+										executeCommand(removeCmd)
+									}
+									// Agregar nueva línea
+									addCmd := fmt.Sprintf("echo '127.0.0.1\tlocalhost\t%s' | sudo tee -a %s > /dev/null", req.Hostname, hostsFile)
+									executeCommand(addCmd)
 								} else {
-									log.Printf("Successfully updated /etc/hosts with hostname %s (direct write)", req.Hostname)
+									log.Printf("Successfully updated /etc/hosts with hostname %s (using cat)", req.Hostname)
 								}
 							} else {
-								log.Printf("Successfully updated /etc/hosts with hostname %s (using sed/grep: replaced %s)", req.Hostname, oldHostname)
+								log.Printf("Successfully updated /etc/hosts with hostname %s (using cp)", req.Hostname)
 							}
-						} else {
-							// Si no se encontró hostname antiguo, escribir directamente
-							newContent := strings.Join(newLines, "\n")
-							writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", hostsFile))
-							writeCmd.Stdin = strings.NewReader(newContent)
-							if err := writeCmd.Run(); err != nil {
-								log.Printf("Warning: Could not update /etc/hosts: %v", err)
-								// Intentar método alternativo con echo
-								altCmd := fmt.Sprintf("echo '127.0.0.1 localhost %s' | sudo tee -a /etc/hosts > /dev/null 2>&1 || true", req.Hostname)
-								executeCommand(altCmd)
-							} else {
-								log.Printf("Successfully updated /etc/hosts with hostname %s", req.Hostname)
-							}
+							// Limpiar archivo temporal
+							os.Remove(tmpFile)
 						}
 					}
 					
