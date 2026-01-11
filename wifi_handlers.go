@@ -559,8 +559,8 @@ country=%s
 			remountOut, remountErr := remountCmd.CombinedOutput()
 			if remountErr != nil {
 				log.Printf("No se pudo remontar como lectura-escritura: %v, output: %s", remountErr, string(remountOut))
-			// Intentar usar directorio alternativo persistente (no se borra al reiniciar)
-			log.Printf("Usando directorio alternativo persistente: %s", WpaSupplicantAltConfigDir)
+				// Intentar usar directorio alternativo persistente (no se borra al reiniciar)
+				log.Printf("Usando directorio alternativo persistente: %s", WpaSupplicantAltConfigDir)
 			// Crear directorio padre primero si no existe
 			parentDir := "/var/lib/hostberry"
 			mkdirParentCmd := exec.Command("sudo", "mkdir", "-p", parentDir)
