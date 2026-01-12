@@ -594,15 +594,13 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	log.Printf("Paso 4: Deteniendo wpa_supplicant existente...")
 	stopWpaSupplicant(interfaceName)
 	
-	// Limpiar sockets antiguos que puedan estar bloqueando
+	// Limpiar sockets antiguos que puedan estar bloqueando (redundante pero seguro)
 	socketDirs := []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"}
 	for _, socketDir := range socketDirs {
 		socketFile := fmt.Sprintf("%s/%s", socketDir, interfaceName)
-		if _, err := os.Stat(socketFile); err == nil {
-			log.Printf("Limpiando socket antiguo: %s", socketFile)
-			executeCommand(fmt.Sprintf("sudo rm -f %s 2>/dev/null || true", socketFile))
-		}
-		// También limpiar cualquier archivo en el directorio (si es escribible)
+		// Ejecutar rm ciegamente sin verificar os.Stat para evitar problemas de permisos
+		executeCommand(fmt.Sprintf("sudo rm -f %s 2>/dev/null || true", socketFile))
+		// También limpiar cualquier archivo en el directorio
 		executeCommand(fmt.Sprintf("sudo rm -f %s/* 2>/dev/null || true", socketDir))
 	}
 	
