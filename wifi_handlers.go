@@ -127,13 +127,31 @@ func stopWpaSupplicant(interfaceName string) {
 	// Detener por interfaz específica
 	executeCommand(fmt.Sprintf("sudo pkill -f 'wpa_supplicant.*-i.*%s' 2>/dev/null || true", interfaceName))
 	executeCommand(fmt.Sprintf("sudo pkill -f 'wpa_supplicant.*%s' 2>/dev/null || true", interfaceName))
+	
+	// Intento agresivo con killall si sigue corriendo
+	executeCommand("sudo killall wpa_supplicant 2>/dev/null || true")
 
-	// Esperar a que termine
-	time.Sleep(1 * time.Second)
+	// Esperar a que termine con verificación
+	for i := 0; i < 5; i++ {
+		checkCmd := exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'wpa_supplicant.*%s'", interfaceName))
+		if out, _ := checkCmd.Output(); strings.TrimSpace(string(out)) == "" {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+		// Si en el último intento sigue vivo, kill -9
+		if i == 4 {
+			log.Printf("Forzando cierre de wpa_supplicant (kill -9)...")
+			executeCommand(fmt.Sprintf("sudo pkill -9 -f 'wpa_supplicant.*%s' 2>/dev/null || true", interfaceName))
+			executeCommand("sudo killall -9 wpa_supplicant 2>/dev/null || true")
+		}
+	}
 
 	// Limpiar sockets en todos los posibles directorios
 	for _, dir := range []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"} {
+		// Eliminar archivo de socket específico
 		executeCommand(fmt.Sprintf("sudo rm -f %s/%s 2>/dev/null || true", dir, interfaceName))
+		// Eliminar directorio si está vacío (opcional, pero ayuda a limpiar)
+		// executeCommand(fmt.Sprintf("sudo rmdir %s 2>/dev/null || true", dir))
 	}
 }
 
