@@ -2161,10 +2161,10 @@ func hostapdConfigHandler(c *fiber.Ctx) error {
 	
 	log.Printf("Using phy: %s (MAC: %s) for virtual interface creation from %s", phyName, macAddress, phyInterface)
 	
-	// 2.5. Crear regla udev para crear ap0 automáticamente (método TheWalrus)
+	// 2.5. Crear regla udev para crear ap0 automáticamente (método TheWalrus - Raspberry Pi 3 B+)
 	// Esta regla asegura que ap0 se cree automáticamente al arrancar el sistema
 	if apInterface == "ap0" {
-		log.Printf("Creating udev rule for automatic ap0 interface creation (TheWalrus method)")
+		log.Printf("Creating udev rule for automatic ap0 interface creation (TheWalrus method - Raspberry Pi 3 B+)")
 		udevRulePath := "/etc/udev/rules.d/70-persistent-net.rules"
 		
 		// Verificar si la regla ya existe

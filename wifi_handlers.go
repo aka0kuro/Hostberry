@@ -526,7 +526,7 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	// Paso 2: Verificar conflictos con otros servicios
 	log.Printf("Paso 2: Verificando conflictos...")
 
-	// En modo AP+STA según TheWalrus, NO desactivamos hostapd ni eliminamos ap0
+	// En modo AP+STA según TheWalrus (Raspberry Pi 3 B+), NO desactivamos hostapd ni eliminamos ap0
 	// Ambos pueden funcionar simultáneamente: ap0 como AP y wlan0 como STA
 	// Solo verificamos que wlan0 esté en modo managed (no AP)
 	hostapdRunning, _ := exec.Command("sh", "-c", "pgrep hostapd 2>/dev/null").Output()
