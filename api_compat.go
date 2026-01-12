@@ -2561,9 +2561,13 @@ rsn_pairwise=CCMP
 	executeCommand(fmt.Sprintf("sudo cp %s %s.backup 2>/dev/null || true", dnsmasqConfigPath, dnsmasqConfigPath))
 	
 	// Configuración mejorada: bind-interfaces y no-dhcp-interface son importantes para AP+STA
+	// Configuración de dnsmasq según método TheWalrus
+	// Solo servir DHCP en ap0 (AP), no en wlan0 (STA)
 	// Esto evita que dnsmasq intente servir DHCP en wlan0 (STA) y solo lo haga en ap0 (AP)
-	dnsmasqContent := fmt.Sprintf(`interface=lo,%s
-no-dhcp-interface=lo,%s
+	dnsmasqContent := fmt.Sprintf(`# Configuración de dnsmasq para modo AP+STA según método TheWalrus
+# Solo servir DHCP en ap0, no en wlan0 (que es STA)
+interface=%s
+no-dhcp-interface=%s
 bind-interfaces
 server=8.8.8.8
 server=8.8.4.4
