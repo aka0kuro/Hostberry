@@ -1596,15 +1596,20 @@ EOF
             DNSMASQ_INTERFACE="$HOSTAPD_INTERFACE"
         fi
         
-        print_info "Creando archivo de configuración de dnsmasq (modo AP+STA)..."
+        print_info "Creando archivo de configuración de dnsmasq (modo AP+STA según TheWalrus)..."
         cat > "$DNSMASQ_CONFIG" <<EOF
-# Configuración de dnsmasq para HostAPD (creada por HostBerry) - Modo AP+STA
+# Configuración de dnsmasq para HostAPD (creada por HostBerry) - Modo AP+STA según TheWalrus
+# Solo servir DHCP en ap0, no en wlan0 (que es STA)
 interface=${DNSMASQ_INTERFACE}
+no-dhcp-interface=${HOSTAPD_INTERFACE}
+bind-interfaces
 dhcp-range=${HOSTAPD_DHCP_START},${HOSTAPD_DHCP_END},255.255.255.0,${HOSTAPD_LEASE_TIME}
 dhcp-option=3,${HOSTAPD_GATEWAY}
 dhcp-option=6,${HOSTAPD_GATEWAY}
 server=8.8.8.8
 server=8.8.4.4
+domain-needed
+bogus-priv
 EOF
         chmod 644 "$DNSMASQ_CONFIG"
         print_success "Archivo de configuración de dnsmasq creado"
