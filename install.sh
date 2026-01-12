@@ -12,6 +12,10 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Estilos
+BOLD='\033[1m'
+DIM='\033[2m'
+
 # Variables de configuración
 INSTALL_DIR="/opt/hostberry"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,37 +32,65 @@ TEMP_CLONE_DIR="/tmp/hostberry-install"
 # Modo de operación
 MODE="install"  # install, update o uninstall
 
+# Mensajes (concisos)
+print_info()    { echo -e "${BLUE}[i]${NC} $1"; }
+print_success() { echo -e "${GREEN}[+]${NC} $1"; }
+print_warning() { echo -e "${YELLOW}[!]${NC} $1"; }
+print_error()   { echo -e "${RED}[x]${NC} $1"; }
+
+# Logo ASCII (basado en website/static/hostberry.png)
+print_logo() {
+    printf "%b" "$GREEN"
+    cat <<'EOF'
+        /\  /\  /\        
+       /  \/  \/  \       
+          \  |  /         
+EOF
+    printf "%b" "$RED"
+    cat <<'EOF'
+      .-================-.
+    .'   __)))__  __)))_ '.
+   /    /  )))  \/  ))) \  \
+  |        )))      )))    |
+  |        )))      )))    |
+  |     .-----------.      |
+  |     |  o     o  |      |
+   \    '-----------'     /
+    '.                  .'
+      '-.____________.-'
+EOF
+    printf "%b\n" "$NC"
+}
+
+print_banner() {
+    local label="$1"
+    local accent="$BLUE"
+    case "$MODE" in
+        install)   accent="$GREEN" ;;
+        update)    accent="$BLUE" ;;
+        uninstall) accent="$RED" ;;
+    esac
+
+    echo ""
+    print_logo
+    printf "%b\n" "${accent}${BOLD}HostBerry${NC} ${DIM}${label}${NC}"
+    echo ""
+}
+
 # Procesar argumentos
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --update) MODE="update" ;;
         --uninstall) MODE="uninstall" ;;
-        *) echo "Opción desconocida: $1"; exit 1 ;;
+        *) print_error "Opción desconocida: $1"; exit 1 ;;
     esac
     shift
 done
 
-# Función para imprimir mensajes
-print_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-print_success() {
-    echo -e "${GREEN}[OK]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
 # Verificar si se ejecuta como root
 check_root() {
     if [ "$EUID" -ne 0 ]; then 
-        print_error "Este script debe ejecutarse como root (usa sudo)"
+        print_error "Ejecuta con sudo/root"
         exit 1
     fi
 }
@@ -93,7 +125,7 @@ detect_os() {
         . /etc/os-release
         OS=$ID
         OS_VERSION=$VERSION_ID
-        print_info "Sistema detectado: $OS $OS_VERSION"
+        print_info "Sistema: $OS $OS_VERSION"
     else
         print_error "No se pudo detectar el sistema operativo"
         exit 1
@@ -103,18 +135,18 @@ detect_os() {
 # Instalar git (necesario para descargar el proyecto)
 install_git() {
     if ! command -v git &> /dev/null; then
-        print_info "Instalando git (necesario para descargar el proyecto)..."
+        print_info "Instalando git..."
         apt-get update -qq
         apt-get install -y git
-        print_success "Git instalado"
+        print_success "Git listo"
     else
-        print_success "Git ya está instalado: $(git --version)"
+        print_success "Git: $(git --version)"
     fi
 }
 
 # Instalar dependencias del sistema
 install_dependencies() {
-    print_info "Instalando dependencias del sistema..."
+    print_info "Instalando dependencias..."
     
     # Actualizar lista de paquetes
     apt-get update -qq
@@ -1779,64 +1811,32 @@ start_service() {
 # Mostrar información final
 show_final_info() {
     echo ""
-    echo -e "${GREEN}========================================${NC}"
-    if [ "$MODE" = "update" ]; then
-        echo -e "${GREEN}  HostBerry actualizado correctamente${NC}"
-    elif [ "$MODE" = "uninstall" ]; then
-        echo -e "${GREEN}  HostBerry desinstalado correctamente${NC}"
+    case "$MODE" in
+        update)    print_success "Actualización completa" ;;
+        uninstall) print_success "Desinstalación completa" ;;
+        *)         print_success "Instalación completa" ;;
+    esac
+
+    # Para desinstalación, no hay endpoints/paths que mostrar
+    if [ "$MODE" = "uninstall" ]; then
+        echo ""
+        return 0
+    fi
+
+    local ip port web_url
+    ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+    port="$(grep -E "^  port:" "$CONFIG_FILE" 2>/dev/null | awk '{print $2}' | tr -d '"' || echo "8000")"
+
+    if [ -n "$ip" ] && [ "$ip" != "127.0.0.1" ]; then
+        web_url="http://${ip}:${port}"
     else
-        echo -e "${GREEN}  HostBerry instalado correctamente${NC}"
+        web_url="http://localhost:${port}"
     fi
-    echo -e "${GREEN}========================================${NC}"
-    echo ""
-    echo -e "${BLUE}Ubicación de instalación:${NC} $INSTALL_DIR"
-    echo -e "${BLUE}Archivo de configuración:${NC} $CONFIG_FILE"
-    echo -e "${BLUE}Logs del servicio:${NC} journalctl -u ${SERVICE_NAME} -f"
-    echo -e "${BLUE}Logs de aplicación:${NC} $LOG_DIR"
-    echo ""
-    echo -e "${YELLOW}Comandos útiles:${NC}"
-    echo "  Iniciar:    sudo systemctl start ${SERVICE_NAME}"
-    echo "  Detener:    sudo systemctl stop ${SERVICE_NAME}"
-    echo "  Reiniciar:  sudo systemctl restart ${SERVICE_NAME}"
-    echo "  Estado:     sudo systemctl status ${SERVICE_NAME}"
-    echo "  Logs:       sudo journalctl -u ${SERVICE_NAME} -f"
-    echo ""
-    
-    # Obtener IP del sistema
-    IP=$(hostname -I | awk '{print $1}')
-    PORT=$(grep -E "^  port:" "$CONFIG_FILE" | awk '{print $2}' | tr -d '"' || echo "8000")
-    
-    echo -e "${GREEN}Accede a la interfaz web:${NC}"
-    if [ -n "$IP" ] && [ "$IP" != "127.0.0.1" ] && [ "$IP" != "" ]; then
-        echo "  🌐 http://${IP}:${PORT}  (desde otros dispositivos en la red)"
-    fi
-    echo "  💻 http://localhost:${PORT}  (desde este dispositivo)"
-    echo "  💻 http://127.0.0.1:${PORT}  (desde este dispositivo)"
-    echo ""
-    echo -e "${BLUE}Nota sobre acceso por red:${NC}"
-    echo "  El servidor está configurado para escuchar en 0.0.0.0 (todas las interfaces)"
-    echo "  Esto permite acceso desde cualquier dispositivo en tu red local usando la IP."
-    if command -v ufw &> /dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
-        if ufw status 2>/dev/null | grep -q "$PORT/tcp"; then
-            echo "  ✅ Firewall UFW configurado - puerto $PORT permitido"
-        else
-            echo "  ⚠️  Firewall UFW activo - verifica que el puerto $PORT esté permitido"
-        fi
-    elif command -v firewall-cmd &> /dev/null; then
-        echo "  ✅ Firewalld configurado - puerto $PORT permitido"
-    else
-        echo "  ℹ️  No se detectó firewall activo"
-    fi
-    echo ""
-    echo -e "${YELLOW}Credenciales por defecto:${NC}"
-    echo "  Usuario: admin"
-    echo "  Contraseña: admin"
-    echo -e "${RED}(Cambia la contraseña en el primer inicio)${NC}"
-    echo ""
-    echo -e "${BLUE}Nota sobre el usuario admin:${NC}"
-    echo "  El usuario admin se crea automáticamente si la base de datos está vacía."
-    echo "  Revisa los logs para verificar la creación:"
-    echo "  sudo journalctl -u ${SERVICE_NAME} -n 50 | grep -i admin"
+
+    print_info "Web:    ${web_url}"
+    print_info "Config: ${CONFIG_FILE}"
+    print_info "Logs:   journalctl -u ${SERVICE_NAME} -f"
+    print_warning "Login:  admin / admin (cámbiala)"
     echo ""
 }
 
@@ -1857,15 +1857,20 @@ main() {
         mode_label="DESINSTALACIÓN"
     fi
 
-    echo ""
-    echo -e "${BLUE}========================================${NC}"
-    echo -e "${BLUE}  HostBerry - ${mode_label}${NC}"
-    echo -e "${BLUE}========================================${NC}"
-    echo ""
+    print_banner "$mode_label"
     
     check_root
     fix_hostname
     detect_os
+
+    # Desinstalación: solo limpiar y salir
+    if [ "$MODE" = "uninstall" ]; then
+        clean_previous_installation
+        cleanup_temp
+        show_final_info
+        return 0
+    fi
+
     install_git
     download_project
     clean_previous_installation
