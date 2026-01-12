@@ -1467,11 +1467,11 @@ create_hostapd_default_config() {
     HOSTAPD_LEASE_TIME="12h"
     
     # Crear archivo de configuración de hostapd si no existe
-    # Modo AP+STA según método del blog de TheWalrus: usar interfaz virtual ap0 para el AP
-    # Esto permite que wlan0 funcione como estación (STA) mientras ap0 funciona como AP
+    # Modo AP+STA según método del blog de TheWalrus (Raspberry Pi 3 B+)
+    # Usar interfaz virtual ap0 para el AP, permitiendo que wlan0 funcione como estación (STA)
     HOSTAPD_CONFIG="/etc/hostapd/hostapd.conf"
     if [ ! -f "$HOSTAPD_CONFIG" ]; then
-        print_info "Creando archivo de configuración de HostAPD (modo AP+STA según TheWalrus): $HOSTAPD_CONFIG"
+        print_info "Creando archivo de configuración de HostAPD (modo AP+STA según TheWalrus - Raspberry Pi 3 B+): $HOSTAPD_CONFIG"
         
         # Obtener el phy de la interfaz WiFi
         PHY_NAME=$(iw dev "$HOSTAPD_INTERFACE" info 2>/dev/null | grep wiphy | awk '{print $2}' || \
