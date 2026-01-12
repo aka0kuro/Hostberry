@@ -1825,7 +1825,8 @@ show_final_info() {
 
     local ip port web_url
     ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
-    port="$(grep -E "^  port:" "$CONFIG_FILE" 2>/dev/null | awk '{print $2}' | tr -d '"' || echo "8000")"
+    port="$(awk '/^[[:space:]]*port:/{gsub(/"/,"",$2); print $2; exit}' "$CONFIG_FILE" 2>/dev/null)"
+    port="${port:-8000}"
 
     if [ -n "$ip" ] && [ "$ip" != "127.0.0.1" ]; then
         web_url="http://${ip}:${port}"
@@ -1860,16 +1861,17 @@ main() {
     print_banner "$mode_label"
     
     check_root
-    fix_hostname
-    detect_os
-
-    # Desinstalación: solo limpiar y salir
+    
+    # Desinstalación: solo limpiar y salir (sin tocar /etc/hosts ni instalar deps)
     if [ "$MODE" = "uninstall" ]; then
         clean_previous_installation
         cleanup_temp
         show_final_info
         return 0
     fi
+
+    fix_hostname
+    detect_os
 
     install_git
     download_project
