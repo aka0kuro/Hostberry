@@ -1570,16 +1570,21 @@ EOF
            grep -q "interface=ap0" "$DNSMASQ_CONFIG" 2>/dev/null; then
             print_info "Configuración de dnsmasq para HostAPD ya existe"
         else
-            print_info "Agregando configuración de dnsmasq para HostAPD (modo AP+STA)..."
+            print_info "Agregando configuración de dnsmasq para HostAPD (modo AP+STA según TheWalrus)..."
             cat >> "$DNSMASQ_CONFIG" <<EOF
 
-# Configuración para HostAPD (agregada por HostBerry) - Modo AP+STA
+# Configuración para HostAPD (agregada por HostBerry) - Modo AP+STA según TheWalrus
+# Solo servir DHCP en ap0, no en wlan0 (que es STA)
 interface=${DNSMASQ_INTERFACE}
+no-dhcp-interface=${HOSTAPD_INTERFACE}
+bind-interfaces
 dhcp-range=${HOSTAPD_DHCP_START},${HOSTAPD_DHCP_END},255.255.255.0,${HOSTAPD_LEASE_TIME}
 dhcp-option=3,${HOSTAPD_GATEWAY}
 dhcp-option=6,${HOSTAPD_GATEWAY}
 server=8.8.8.8
 server=8.8.4.4
+domain-needed
+bogus-priv
 EOF
             print_success "Configuración de dnsmasq actualizada"
         fi
