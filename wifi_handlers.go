@@ -526,37 +526,13 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	// Paso 2: Verificar conflictos con otros servicios
 	log.Printf("Paso 2: Verificando conflictos...")
 
-	// Verificar si hostapd está corriendo y desactivarlo automáticamente
+	// En modo AP+STA según TheWalrus, NO desactivamos hostapd ni eliminamos ap0
+	// Ambos pueden funcionar simultáneamente: ap0 como AP y wlan0 como STA
+	// Solo verificamos que wlan0 esté en modo managed (no AP)
 	hostapdRunning, _ := exec.Command("sh", "-c", "pgrep hostapd 2>/dev/null").Output()
 	if strings.TrimSpace(string(hostapdRunning)) != "" {
-		log.Printf("hostapd está corriendo; desactivándolo automáticamente...")
-		
-		// Detener hostapd y dnsmasq
-		executeCommand("sudo systemctl stop hostapd 2>/dev/null || true")
-		executeCommand("sudo systemctl stop dnsmasq 2>/dev/null || true")
-		
-		// Esperar un momento para que se detenga completamente
-		time.Sleep(2 * time.Second)
-		
-		// Verificar que se detuvo
-		hostapdCheck, _ := exec.Command("sh", "-c", "pgrep hostapd 2>/dev/null").Output()
-		if strings.TrimSpace(string(hostapdCheck)) != "" {
-			log.Printf("Warning: hostapd aún está corriendo después de intentar detenerlo")
-			// Intentar matar el proceso
-			executeCommand("sudo pkill -9 hostapd 2>/dev/null || true")
-			time.Sleep(1 * time.Second)
-		}
-		
-		log.Printf("hostapd desactivado")
-	}
-
-	// Verificar y eliminar interfaz ap0 si existe (modo AP+STA)
-	ap0Check := exec.Command("sh", "-c", "ip link show ap0 2>/dev/null")
-	if ap0Out, err := ap0Check.Output(); err == nil && strings.TrimSpace(string(ap0Out)) != "" {
-		log.Printf("Interfaz ap0 detectada; eliminándola...")
-		executeCommand("sudo iw dev ap0 del 2>/dev/null || true")
-		time.Sleep(1 * time.Second)
-		log.Printf("Interfaz ap0 eliminada")
+		log.Printf("hostapd está corriendo (modo AP+STA); manteniéndolo activo...")
+		log.Printf("En modo AP+STA, ap0 funciona como AP y wlan0 como STA simultáneamente")
 	}
 
 	// Verificar modo de la interfaz
