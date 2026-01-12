@@ -1481,14 +1481,14 @@ create_hostapd_default_config() {
         # Obtener MAC address de la interfaz física para la regla udev
         MAC_ADDRESS=$(cat /sys/class/net/"$HOSTAPD_INTERFACE"/address 2>/dev/null || echo "")
         
-        # Crear regla udev para crear ap0 automáticamente al arrancar (método TheWalrus)
+        # Crear regla udev para crear ap0 automáticamente al arrancar (método TheWalrus - Raspberry Pi 3 B+)
         if [ -n "$MAC_ADDRESS" ] && [ -n "$PHY_NAME" ]; then
-            print_info "Creando regla udev para ap0 (método TheWalrus)..."
+            print_info "Creando regla udev para ap0 (método TheWalrus - Raspberry Pi 3 B+)..."
             UDEV_RULE="/etc/udev/rules.d/70-persistent-net.rules"
             if [ ! -f "$UDEV_RULE" ] || ! grep -q "ap0" "$UDEV_RULE" 2>/dev/null; then
                 cat >> "$UDEV_RULE" <<EOF
 
-# Regla para crear interfaz virtual ap0 automáticamente (método TheWalrus)
+# Regla para crear interfaz virtual ap0 automáticamente (método TheWalrus - Raspberry Pi 3 B+)
 SUBSYSTEM=="ieee80211", ACTION=="add|change", ATTR{macaddress}=="$MAC_ADDRESS", KERNEL=="$PHY_NAME", \
 RUN+="/sbin/iw phy $PHY_NAME interface add ap0 type __ap", \
 RUN+="/bin/ip link set ap0 address $MAC_ADDRESS"
