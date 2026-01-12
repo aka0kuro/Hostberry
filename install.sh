@@ -1524,11 +1524,11 @@ EOF
             AP_INTERFACE="$HOSTAPD_INTERFACE"
             print_info "Usando interfaz física $AP_INTERFACE (modo no concurrente)"
         else
-            print_info "Usando interfaz virtual ap0 (modo AP+STA según TheWalrus)"
+            print_info "Usando interfaz virtual ap0 (modo AP+STA según TheWalrus - Raspberry Pi 3 B+)"
         fi
         
         cat > "$HOSTAPD_CONFIG" <<EOF
-# Configuración de HostAPD para modo AP+STA según método TheWalrus
+# Configuración de HostAPD para modo AP+STA según método TheWalrus (Raspberry Pi 3 B+)
 # Interfaz virtual ap0 para AP, wlan0 para STA
 interface=${AP_INTERFACE}
 driver=nl80211
