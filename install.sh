@@ -1467,22 +1467,51 @@ create_hostapd_default_config() {
     HOSTAPD_LEASE_TIME="12h"
     
     # Crear archivo de configuración de hostapd si no existe
-    # Modo AP+STA: usar interfaz virtual ap0 para el AP, permitiendo que wlan0 funcione como estación
+    # Modo AP+STA según método del blog de TheWalrus: usar interfaz virtual ap0 para el AP
+    # Esto permite que wlan0 funcione como estación (STA) mientras ap0 funciona como AP
     HOSTAPD_CONFIG="/etc/hostapd/hostapd.conf"
     if [ ! -f "$HOSTAPD_CONFIG" ]; then
-        print_info "Creando archivo de configuración de HostAPD (modo AP+STA): $HOSTAPD_CONFIG"
+        print_info "Creando archivo de configuración de HostAPD (modo AP+STA según TheWalrus): $HOSTAPD_CONFIG"
+        
+        # Obtener el phy de la interfaz WiFi
+        PHY_NAME=$(iw dev "$HOSTAPD_INTERFACE" info 2>/dev/null | grep wiphy | awk '{print $2}' || \
+                   cat /sys/class/net/"$HOSTAPD_INTERFACE"/phy80211/name 2>/dev/null || \
+                   echo "phy0")
+        
+        # Obtener MAC address de la interfaz física para la regla udev
+        MAC_ADDRESS=$(cat /sys/class/net/"$HOSTAPD_INTERFACE"/address 2>/dev/null || echo "")
+        
+        # Crear regla udev para crear ap0 automáticamente al arrancar (método TheWalrus)
+        if [ -n "$MAC_ADDRESS" ] && [ -n "$PHY_NAME" ]; then
+            print_info "Creando regla udev para ap0 (método TheWalrus)..."
+            UDEV_RULE="/etc/udev/rules.d/70-persistent-net.rules"
+            if [ ! -f "$UDEV_RULE" ] || ! grep -q "ap0" "$UDEV_RULE" 2>/dev/null; then
+                cat >> "$UDEV_RULE" <<EOF
+
+# Regla para crear interfaz virtual ap0 automáticamente (método TheWalrus)
+SUBSYSTEM=="ieee80211", ACTION=="add|change", ATTR{macaddress}=="$MAC_ADDRESS", KERNEL=="$PHY_NAME", \
+RUN+="/sbin/iw phy $PHY_NAME interface add ap0 type __ap", \
+RUN+="/bin/ip link set ap0 address $MAC_ADDRESS"
+EOF
+                chmod 644 "$UDEV_RULE"
+                print_success "Regla udev creada para ap0"
+                # Recargar reglas udev
+                udevadm control --reload-rules 2>/dev/null || true
+                udevadm trigger 2>/dev/null || true
+            else
+                print_info "Regla udev para ap0 ya existe"
+            fi
+        fi
         
         # Intentar crear interfaz virtual ap0 si no existe
         if ! ip link show ap0 > /dev/null 2>&1; then
             print_info "Creando interfaz virtual ap0 para modo AP+STA..."
-            # Obtener el phy de la interfaz WiFi
-            PHY_NAME=$(iw dev "$HOSTAPD_INTERFACE" info 2>/dev/null | grep wiphy | awk '{print $2}' || \
-                       cat /sys/class/net/"$HOSTAPD_INTERFACE"/phy80211/name 2>/dev/null || \
-                       echo "phy0")
-            
-            # Crear interfaz virtual ap0
             if iw phy "$PHY_NAME" interface add ap0 type __ap 2>/dev/null; then
                 print_success "Interfaz virtual ap0 creada exitosamente"
+                # Configurar MAC address de ap0 igual a wlan0
+                if [ -n "$MAC_ADDRESS" ]; then
+                    ip link set ap0 address "$MAC_ADDRESS" 2>/dev/null || true
+                fi
             else
                 print_warning "No se pudo crear interfaz virtual ap0, usando interfaz física directamente"
                 AP_INTERFACE="$HOSTAPD_INTERFACE"
@@ -1495,7 +1524,7 @@ create_hostapd_default_config() {
             AP_INTERFACE="$HOSTAPD_INTERFACE"
             print_info "Usando interfaz física $AP_INTERFACE (modo no concurrente)"
         else
-            print_info "Usando interfaz virtual ap0 (modo AP+STA)"
+            print_info "Usando interfaz virtual ap0 (modo AP+STA según TheWalrus)"
         fi
         
         cat > "$HOSTAPD_CONFIG" <<EOF
