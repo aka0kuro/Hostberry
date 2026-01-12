@@ -2161,25 +2161,43 @@ func hostapdConfigHandler(c *fiber.Ctx) error {
 	
 	log.Printf("Using phy: %s (MAC: %s) for virtual interface creation from %s", phyName, macAddress, phyInterface)
 	
-	// 2.5. Crear regla udev para crear ap0 automáticamente (basado en el script ap_sta_config.sh)
+	// 2.5. Crear regla udev para crear ap0 automáticamente (método TheWalrus)
+	// Esta regla asegura que ap0 se cree automáticamente al arrancar el sistema
 	if apInterface == "ap0" {
-		log.Printf("Creating udev rule for automatic ap0 interface creation")
-		udevRuleContent := fmt.Sprintf(`SUBSYSTEM=="ieee80211", ACTION=="add|change", ATTR{macaddress}=="%s", KERNEL=="%s", \
+		log.Printf("Creating udev rule for automatic ap0 interface creation (TheWalrus method)")
+		udevRulePath := "/etc/udev/rules.d/70-persistent-net.rules"
+		
+		// Verificar si la regla ya existe
+		checkCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -q 'ap0' %s 2>/dev/null && echo 'exists' || echo 'not_exists'", udevRulePath))
+		checkOut, _ := checkCmd.Output()
+		if strings.TrimSpace(string(checkOut)) != "exists" {
+			udevRuleContent := fmt.Sprintf(`# Regla para crear interfaz virtual ap0 automáticamente (método TheWalrus)
+SUBSYSTEM=="ieee80211", ACTION=="add|change", ATTR{macaddress}=="%s", KERNEL=="%s", \
 RUN+="/sbin/iw phy %s interface add ap0 type __ap", \
 RUN+="/bin/ip link set ap0 address %s"
 `, macAddress, phyName, phyName, macAddress)
-		
-		udevRulePath := "/etc/udev/rules.d/70-persistent-net.rules"
-		tmpUdevFile := "/tmp/70-persistent-net.rules.tmp"
-		if err := os.WriteFile(tmpUdevFile, []byte(udevRuleContent), 0644); err == nil {
-			executeCommand(fmt.Sprintf("sudo cp %s %s && sudo chmod 644 %s", tmpUdevFile, udevRulePath, udevRulePath))
-			os.Remove(tmpUdevFile)
-			log.Printf("Created udev rule for automatic ap0 creation")
-			// Recargar reglas udev
-			executeCommand("sudo udevadm control --reload-rules 2>/dev/null || true")
-			executeCommand("sudo udevadm trigger 2>/dev/null || true")
+			
+			tmpUdevFile := "/tmp/70-persistent-net.rules.tmp"
+			if err := os.WriteFile(tmpUdevFile, []byte(udevRuleContent), 0644); err == nil {
+				// Si el archivo existe, agregar la regla al final
+				if _, err := os.Stat(udevRulePath); err == nil {
+					// Leer contenido existente
+					existingContent, _ := os.ReadFile(udevRulePath)
+					// Agregar nueva regla
+					combinedContent := string(existingContent) + "\n" + udevRuleContent
+					os.WriteFile(tmpUdevFile, []byte(combinedContent), 0644)
+				}
+				executeCommand(fmt.Sprintf("sudo cp %s %s && sudo chmod 644 %s", tmpUdevFile, udevRulePath, udevRulePath))
+				os.Remove(tmpUdevFile)
+				log.Printf("Created udev rule for automatic ap0 creation (TheWalrus method)")
+				// Recargar reglas udev
+				executeCommand("sudo udevadm control --reload-rules 2>/dev/null || true")
+				executeCommand("sudo udevadm trigger 2>/dev/null || true")
+			} else {
+				log.Printf("Warning: Could not create udev rule: %v", err)
+			}
 		} else {
-			log.Printf("Warning: Could not create udev rule: %v", err)
+			log.Printf("udev rule for ap0 already exists")
 		}
 	}
 	
