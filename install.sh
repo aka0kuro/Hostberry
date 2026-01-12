@@ -1528,6 +1528,8 @@ EOF
         fi
         
         cat > "$HOSTAPD_CONFIG" <<EOF
+# Configuración de HostAPD para modo AP+STA según método TheWalrus
+# Interfaz virtual ap0 para AP, wlan0 para STA
 interface=${AP_INTERFACE}
 driver=nl80211
 ssid=${HOSTAPD_SSID}
@@ -1538,6 +1540,8 @@ wpa_passphrase=${HOSTAPD_PASSWORD}
 wpa_key_mgmt=WPA-PSK
 wpa_pairwise=TKIP
 rsn_pairwise=CCMP
+# Asegurar que wlan0 esté en modo managed (no AP)
+# Esto se hace automáticamente cuando wpa_supplicant se ejecuta en wlan0
 EOF
         chmod 644 "$HOSTAPD_CONFIG"
         print_success "Archivo de configuración de HostAPD creado con valores por defecto"
