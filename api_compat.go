@@ -2171,7 +2171,7 @@ func hostapdConfigHandler(c *fiber.Ctx) error {
 		checkCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -q 'ap0' %s 2>/dev/null && echo 'exists' || echo 'not_exists'", udevRulePath))
 		checkOut, _ := checkCmd.Output()
 		if strings.TrimSpace(string(checkOut)) != "exists" {
-			udevRuleContent := fmt.Sprintf(`# Regla para crear interfaz virtual ap0 automáticamente (método TheWalrus)
+			udevRuleContent := fmt.Sprintf(`# Regla para crear interfaz virtual ap0 automáticamente (método TheWalrus - Raspberry Pi 3 B+)
 SUBSYSTEM=="ieee80211", ACTION=="add|change", ATTR{macaddress}=="%s", KERNEL=="%s", \
 RUN+="/sbin/iw phy %s interface add ap0 type __ap", \
 RUN+="/bin/ip link set ap0 address %s"
@@ -2189,7 +2189,7 @@ RUN+="/bin/ip link set ap0 address %s"
 				}
 				executeCommand(fmt.Sprintf("sudo cp %s %s && sudo chmod 644 %s", tmpUdevFile, udevRulePath, udevRulePath))
 				os.Remove(tmpUdevFile)
-				log.Printf("Created udev rule for automatic ap0 creation (TheWalrus method)")
+				log.Printf("Created udev rule for automatic ap0 creation (TheWalrus method - Raspberry Pi 3 B+)")
 				// Recargar reglas udev
 				executeCommand("sudo udevadm control --reload-rules 2>/dev/null || true")
 				executeCommand("sudo udevadm trigger 2>/dev/null || true")
