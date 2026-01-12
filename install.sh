@@ -1574,10 +1574,10 @@ EOF
            grep -q "interface=ap0" "$DNSMASQ_CONFIG" 2>/dev/null; then
             print_info "Configuración de dnsmasq para HostAPD ya existe"
         else
-            print_info "Agregando configuración de dnsmasq para HostAPD (modo AP+STA según TheWalrus)..."
+            print_info "Agregando configuración de dnsmasq para HostAPD (modo AP+STA según TheWalrus - Raspberry Pi 3 B+)..."
             cat >> "$DNSMASQ_CONFIG" <<EOF
 
-# Configuración para HostAPD (agregada por HostBerry) - Modo AP+STA según TheWalrus
+# Configuración para HostAPD (agregada por HostBerry) - Modo AP+STA según TheWalrus (Raspberry Pi 3 B+)
 # Solo servir DHCP en ap0, no en wlan0 (que es STA)
 interface=${DNSMASQ_INTERFACE}
 no-dhcp-interface=${HOSTAPD_INTERFACE}
@@ -1600,9 +1600,9 @@ EOF
             DNSMASQ_INTERFACE="$HOSTAPD_INTERFACE"
         fi
         
-        print_info "Creando archivo de configuración de dnsmasq (modo AP+STA según TheWalrus)..."
+        print_info "Creando archivo de configuración de dnsmasq (modo AP+STA según TheWalrus - Raspberry Pi 3 B+)..."
         cat > "$DNSMASQ_CONFIG" <<EOF
-# Configuración de dnsmasq para HostAPD (creada por HostBerry) - Modo AP+STA según TheWalrus
+# Configuración de dnsmasq para HostAPD (creada por HostBerry) - Modo AP+STA según TheWalrus (Raspberry Pi 3 B+)
 # Solo servir DHCP en ap0, no en wlan0 (que es STA)
 interface=${DNSMASQ_INTERFACE}
 no-dhcp-interface=${HOSTAPD_INTERFACE}
