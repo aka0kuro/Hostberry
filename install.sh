@@ -1505,10 +1505,28 @@ create_hostapd_default_config() {
     if [ ! -f "$HOSTAPD_CONFIG" ]; then
         print_info "Creando archivo de configuración de HostAPD (modo AP+STA según TheWalrus - Raspberry Pi 3 B+): $HOSTAPD_CONFIG"
         
-        # Obtener el phy de la interfaz WiFi
-        PHY_NAME=$(iw dev "$HOSTAPD_INTERFACE" info 2>/dev/null | grep wiphy | awk '{print $2}' || \
-                   cat /sys/class/net/"$HOSTAPD_INTERFACE"/phy80211/name 2>/dev/null || \
-                   echo "phy0")
+        # Validar interfaz WiFi
+        if [ ! -d "/sys/class/net/${HOSTAPD_INTERFACE}" ]; then
+            print_warning "Interfaz WiFi no encontrada: ${HOSTAPD_INTERFACE}. Se usará esa interfaz si existe luego."
+        fi
+
+        # Verificar si iw está disponible para gestionar interfaces virtuales
+        if ! command -v iw &> /dev/null; then
+            print_warning "iw no está disponible; no se puede crear ap0. Se usará la interfaz física."
+            AP_INTERFACE="$HOSTAPD_INTERFACE"
+        fi
+
+        # Obtener el phy de la interfaz WiFi (si iw está disponible)
+        PHY_NAME=""
+        if command -v iw &> /dev/null; then
+            PHY_NAME=$(iw dev "$HOSTAPD_INTERFACE" info 2>/dev/null | grep wiphy | awk '{print $2}')
+            if [ -z "$PHY_NAME" ]; then
+                PHY_NAME=$(cat /sys/class/net/"$HOSTAPD_INTERFACE"/phy80211/name 2>/dev/null || true)
+            fi
+            if [ -z "$PHY_NAME" ]; then
+                PHY_NAME="phy0"
+            fi
+        fi
         
         # Obtener MAC address de la interfaz física para la regla udev
         MAC_ADDRESS=$(cat /sys/class/net/"$HOSTAPD_INTERFACE"/address 2>/dev/null || echo "")
@@ -1535,28 +1553,32 @@ EOF
             fi
         fi
         
-        # Intentar crear interfaz virtual ap0 si no existe
-        if ! ip link show ap0 > /dev/null 2>&1; then
-            print_info "Creando interfaz virtual ap0 para modo AP+STA..."
-            if iw phy "$PHY_NAME" interface add ap0 type __ap 2>/dev/null; then
-                print_success "Interfaz virtual ap0 creada exitosamente"
-                # Configurar MAC address de ap0 igual a wlan0
-                if [ -n "$MAC_ADDRESS" ]; then
-                    ip link set ap0 address "$MAC_ADDRESS" 2>/dev/null || true
+        # Intentar crear interfaz virtual ap0 si no existe (solo si iw está disponible)
+        if command -v iw &> /dev/null; then
+            if ! ip link show ap0 > /dev/null 2>&1; then
+                print_info "Creando interfaz virtual ap0 para modo AP+STA..."
+                if iw phy "$PHY_NAME" interface add ap0 type __ap 2>/dev/null || \
+                   iw dev "$HOSTAPD_INTERFACE" interface add ap0 type __ap 2>/dev/null; then
+                    print_success "Interfaz virtual ap0 creada exitosamente"
+                    # Configurar MAC address de ap0 igual a wlan0
+                    if [ -n "$MAC_ADDRESS" ]; then
+                        ip link set ap0 address "$MAC_ADDRESS" 2>/dev/null || true
+                    fi
+                else
+                    print_warning "No se pudo crear interfaz virtual ap0, usando interfaz física directamente"
+                    print_info "Sugerencia: tu driver puede no soportar AP+STA. Verifica con: iw list | grep -A5 -i 'valid interface combinations'"
+                    AP_INTERFACE="$HOSTAPD_INTERFACE"
                 fi
-            else
-                print_warning "No se pudo crear interfaz virtual ap0, usando interfaz física directamente"
-                AP_INTERFACE="$HOSTAPD_INTERFACE"
             fi
         fi
-        
+
         # Usar ap0 si existe, sino usar la interfaz física
-        AP_INTERFACE="ap0"
-        if ! ip link show ap0 > /dev/null 2>&1; then
-            AP_INTERFACE="$HOSTAPD_INTERFACE"
-            print_info "Usando interfaz física $AP_INTERFACE (modo no concurrente)"
-        else
+        AP_INTERFACE="$HOSTAPD_INTERFACE"
+        if ip link show ap0 > /dev/null 2>&1; then
+            AP_INTERFACE="ap0"
             print_info "Usando interfaz virtual ap0 (modo AP+STA según TheWalrus - Raspberry Pi 3 B+)"
+        else
+            print_info "Usando interfaz física $AP_INTERFACE (modo no concurrente)"
         fi
         
         cat > "$HOSTAPD_CONFIG" <<EOF
