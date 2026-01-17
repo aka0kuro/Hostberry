@@ -633,7 +633,10 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	nmActiveOut, _ := nmActiveCmd.Output()
 	nmState := strings.TrimSpace(string(nmActiveOut))
 	if nmState == "connected" || nmState == "connecting" {
-		log.Printf("NetworkManager está gestionando una conexión activa, no se detendrá")
+		log.Printf("NetworkManager está gestionando una conexión activa; intentando liberar %s...", interfaceName)
+		// Forzar a NM a dejar de gestionar la interfaz WiFi para evitar conflictos con DHCP
+		executeCommand(fmt.Sprintf("sudo nmcli dev disconnect %s 2>/dev/null || true", interfaceName))
+		executeCommand(fmt.Sprintf("sudo nmcli dev set %s managed no 2>/dev/null || true", interfaceName))
 	} else {
 		log.Printf("Deteniendo NetworkManager para evitar conflictos...")
 		executeCommand("sudo systemctl stop NetworkManager 2>/dev/null || true")
@@ -1062,11 +1065,10 @@ country=%s
 				log.Printf("IP obtenida: %s", ip)
 			} else {
 				log.Printf("Esperando IP... (intento %d/10)", ipAttempt+1)
-				// Intentar DHCP si no hay proceso corriendo
-				dhcpCheck := exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'dhclient.*%s\\|udhcpc.*%s' 2>/dev/null", interfaceName, interfaceName))
-				if dhcpOut, _ := dhcpCheck.Output(); len(dhcpOut) == 0 {
-					executeCommand(fmt.Sprintf("sudo dhclient -v %s 2>/dev/null || sudo udhcpc -i %s 2>/dev/null || true", interfaceName, interfaceName))
-				}
+				// Intentar DHCP de forma agresiva (limpiar y solicitar)
+				executeCommand(fmt.Sprintf("sudo dhclient -r %s 2>/dev/null || true", interfaceName))
+				executeCommand(fmt.Sprintf("sudo pkill -f 'dhclient.*%s|udhcpc.*%s' 2>/dev/null || true", interfaceName, interfaceName))
+				executeCommand(fmt.Sprintf("sudo dhclient -v %s 2>/dev/null || sudo udhcpc -i %s -q -n 2>/dev/null || true", interfaceName, interfaceName))
 			}
 		}
 
