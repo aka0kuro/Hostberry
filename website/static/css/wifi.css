@@ -370,6 +370,26 @@ body.light-theme .wifi-interface-select-icon {
     min-height: 32px;
 }
 
+@media (max-width: 768px) {
+    .wifi-buttons-row {
+        flex-wrap: wrap;
+    }
+
+    .wifi-buttons-row .btn {
+        flex: 1 1 calc(50% - 0.25rem);
+    }
+
+    .wifi-buttons-row .btn:last-child {
+        flex: 1 1 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .wifi-buttons-row .btn {
+        flex: 1 1 100%;
+    }
+}
+
 /* Info Grid */
 .info-grid {
     display: grid;
