@@ -1787,7 +1787,16 @@ EOF
             chmod 644 "$AP0_SERVICE"
             systemctl daemon-reload 2>/dev/null || true
             systemctl enable create-ap0.service 2>/dev/null || true
-            print_success "Servicio systemd para ap0 creado y habilitado"
+            systemctl start create-ap0.service 2>/dev/null || true
+            print_success "Servicio systemd para ap0 creado, habilitado e iniciado"
+            
+            # Esperar un momento y verificar que ap0 se creó
+            sleep 2
+            if ip link show ap0 > /dev/null 2>&1; then
+                print_success "Interfaz ap0 creada y verificada por el servicio systemd"
+            else
+                print_warning "El servicio se inició pero ap0 no está disponible aún (puede necesitar reinicio)"
+            fi
         else
             print_info "Servicio systemd para ap0 ya existe"
         fi
