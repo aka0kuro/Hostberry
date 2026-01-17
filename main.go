@@ -347,6 +347,7 @@ func setupRoutes(app *fiber.App) {
 		hostapd.Get("/clients", hostapdClientsHandler)
 		hostapd.Get("/config", hostapdGetConfigHandler)
 		hostapd.Get("/diagnostics", hostapdDiagnosticsHandler)
+		hostapd.Post("/create-ap0", hostapdCreateAp0Handler)
 		hostapd.Post("/toggle", hostapdToggleHandler)
 		hostapd.Post("/restart", hostapdRestartHandler)
 		hostapd.Post("/config", hostapdConfigHandler)
