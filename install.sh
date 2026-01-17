@@ -291,10 +291,8 @@ install_dependencies() {
         GO_TAR="go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
         GO_URL="https://go.dev/dl/${GO_TAR}"
         
-        print_info "Descargando Go ${GO_VERSION}..."
+        print_info "Instalando Go ${GO_VERSION}..."
         wget -q "${GO_URL}" -O "/tmp/${GO_TAR}"
-        
-        print_info "Instalando Go..."
         rm -rf /usr/local/go
         tar -C /usr/local -xzf "/tmp/${GO_TAR}"
         rm "/tmp/${GO_TAR}"
@@ -304,27 +302,15 @@ install_dependencies() {
             echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
         fi
         export PATH=$PATH:/usr/local/go/bin
-        
-        print_success "Go ${GO_VERSION} instalado"
-    else
-        print_success "Go ya está instalado: $(go version)"
-        export PATH=$PATH:/usr/local/go/bin
     fi
     
-    # Lua ya no se requiere - todo está en Go ahora
-    
-    # Verificar e instalar iw si no está disponible (ya está en DEPS, pero verificamos por si acaso)
+    # Verificar e instalar iw si no está disponible
     if ! command -v iw &> /dev/null; then
-        print_info "Instalando iw (herramienta para gestión WiFi)..."
-        apt-get install -y iw || print_warning "No se pudo instalar iw, puede que no esté disponible en este sistema"
-    else
-        print_success "iw ya está instalado"
+        apt-get install -y iw > /dev/null 2>&1 || true
     fi
     
     # Instalar otras dependencias
-    apt-get install -y $DEPS
-    
-    print_success "Dependencias instaladas"
+    apt-get install -y $DEPS > /dev/null 2>&1
 }
 
 # Descargar proyecto de GitHub (siempre desde GitHub, nunca local)
