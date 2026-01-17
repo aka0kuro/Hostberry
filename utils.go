@@ -1,46 +1,77 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
+	"time"
 )
 
-// createDefaultAdmin crea un usuario administrador por defecto
+const (
+	defaultCommandTimeout = 30 * time.Second
+	cacheTTL             = 5 * time.Second
+)
+
+type cachedResult struct {
+	output    string
+	err       error
+	timestamp time.Time
+}
+
+var (
+	commandCache = make(map[string]*cachedResult)
+	cacheMutex  sync.RWMutex
+	sudoAvailable *bool
+)
+
 func createDefaultAdmin() {
 	var count int64
 	if err := db.Model(&User{}).Count(&count).Error; err != nil {
-		log.Printf("⚠️  Error contando usuarios: %v", err)
+		if appConfig.Server.Debug {
+			log.Printf("Error contando usuarios: %v", err)
+		}
 		return
 	}
 	
-	log.Printf("📊 Usuarios en BD: %d", count)
+	if appConfig.Server.Debug {
+		log.Printf("Usuarios en BD: %d", count)
+	}
 	
 	if count == 0 {
-		log.Println("🔧 Creando usuario admin por defecto...")
-		// Crear usuario admin por defecto
+		if appConfig.Server.Debug {
+			log.Println("Creando usuario admin por defecto...")
+		}
 		admin, err := Register("admin", "admin", "admin@hostberry.local")
 		if err != nil {
-			log.Printf("❌ Error creando usuario admin: %v", err)
-			log.Printf("⚠️  Intenta crear el usuario manualmente o elimina la BD y reinicia")
+			log.Printf("Error creando usuario admin: %v", err)
 		} else {
-			log.Printf("✅ Usuario admin creado exitosamente")
-			log.Printf("   Usuario: admin")
-			log.Printf("   Contraseña: admin")
-			log.Printf("   Email: admin@hostberry.local")
-			log.Printf("⚠️  IMPORTANTE: Cambia la contraseña después del primer inicio")
+			if appConfig.Server.Debug {
+				log.Printf("Usuario admin creado exitosamente")
+			}
 			_ = admin
 		}
-	} else {
-		log.Printf("ℹ️  Ya existen %d usuarios en la BD, no se crea admin por defecto", count)
 	}
 }
 
-// executeCommand ejecuta un comando del sistema de forma segura
-// Usa execCommand internamente para manejar sudo automáticamente
 func executeCommand(cmd string) (string, error) {
-	// Lista blanca de comandos permitidos
+	return executeCommandWithTimeout(cmd, defaultCommandTimeout)
+}
+
+func executeCommandWithTimeout(cmd string, timeout time.Duration) (string, error) {
+	cacheKey := cmd + "|" + timeout.String()
+	
+	cacheMutex.RLock()
+	if cached, exists := commandCache[cacheKey]; exists {
+		if time.Since(cached.timestamp) < cacheTTL {
+			cacheMutex.RUnlock()
+			return cached.output, cached.err
+		}
+	}
+	cacheMutex.RUnlock()
+	
 	allowedCommands := []string{
 		"hostname", "hostnamectl", "uname", "cat", "grep", "awk", "sed", "cut", "head", "tail",
 		"top", "free", "df", "nproc",
@@ -49,21 +80,19 @@ func executeCommand(cmd string) (string, error) {
 		"sudo", "sh", "reboot", "shutdown", "poweroff",
 		"rfkill", "ifconfig", "iwconfig",
 		"hostapd", "hostapd_cli", "dnsmasq", "iptables", "sysctl", "tee", "cp", "mkdir", "echo", "chmod", "bash", "cat",
+		"dhclient", "udhcpc", "wpa_supplicant", "wpa_cli", "pkill", "killall",
 	}
 	
-	// Comandos que NO necesitan sudo (pueden ejecutarse directamente)
 	noSudoCommands := []string{
 		"hostname", "uname", "cat", "grep", "awk", "sed", "cut", "head", "tail",
 		"free", "df", "nproc", "pgrep",
 	}
 	
-	// Validar comando (extraer el comando base, ignorando sudo si está presente)
 	parts := strings.Fields(cmd)
 	if len(parts) == 0 {
 		return "", nil
 	}
 	
-	// Si el primer argumento es "sudo", usar el segundo como comando
 	commandIndex := 0
 	hasSudo := false
 	if len(parts) > 1 && parts[0] == "sudo" {
@@ -85,10 +114,9 @@ func executeCommand(cmd string) (string, error) {
 	}
 	
 	if !allowed {
-		return "", exec.ErrNotFound // Devolver error para que handlers lo reporten
+		return "", exec.ErrNotFound
 	}
 	
-	// Si el comando no necesita sudo y no se especificó sudo, ejecutar directamente
 	needsSudo := true
 	for _, noSudoCmd := range noSudoCommands {
 		if command == noSudoCmd {
@@ -97,60 +125,62 @@ func executeCommand(cmd string) (string, error) {
 		}
 	}
 	
-	// Si el comando no necesita sudo, remover sudo del comando
 	if !needsSudo && hasSudo {
 		cmd = strings.Join(parts[1:], " ")
 	}
 	
-	// Usar execCommand para manejar sudo automáticamente
-	// execCommand remueve "sudo" si está presente y lo agrega si es necesario
-	cmdObj := execCommand(cmd)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 	
-	// Configurar variables de entorno para evitar logs de sudo en sistemas read-only
-	// También configurar HOSTNAME para evitar el warning de "unable to resolve host"
-	hostname := os.Getenv("HOSTNAME")
-	if hostname == "" {
-		if h, err := exec.Command("hostname").Output(); err == nil {
-			hostname = strings.TrimSpace(string(h))
-		}
-	}
+	cmdObj := execCommand(cmd)
 	cmdObj.Env = append(os.Environ(),
 		"SUDO_ASKPASS=/bin/false",
-		"SUDO_LOG_FILE=", // Deshabilitar log de sudo
-		"HOSTNAME="+hostname, // Establecer HOSTNAME para evitar warnings
+		"SUDO_LOG_FILE=",
+		"HOSTNAME="+getHostname(),
+	)
+	
+	cmdObj = exec.CommandContext(ctx, cmdObj.Path, cmdObj.Args[1:]...)
+	cmdObj.Env = append(os.Environ(),
+		"SUDO_ASKPASS=/bin/false",
+		"SUDO_LOG_FILE=",
+		"HOSTNAME="+getHostname(),
 	)
 	
 	out, err := cmdObj.CombinedOutput()
-	outputStr := string(out)
+	outputStr := filterSudoErrorString(string(out))
 	
-	// Filtrar mensajes de error de sudo relacionados con read-only file system y hostname
-	outputStr = filterSudoErrorString(outputStr)
-	
-	// Si hay error pero la salida filtrada tiene contenido válido, usar la salida
-	if err != nil && outputStr != "" {
-		// Verificar si el error es solo por los mensajes de log de sudo
-		errStr := err.Error()
-		if strings.Contains(errStr, "exit status") && outputStr != "" {
-			// El comando puede haber funcionado pero sudo reportó un error de log
-			// Intentar usar la salida si parece válida
-			return strings.TrimSpace(outputStr), nil
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			err = exec.ErrNotFound
+		}
+		if outputStr == "" {
+			cacheMutex.Lock()
+			commandCache[cacheKey] = &cachedResult{output: "", err: err, timestamp: time.Now()}
+			cacheMutex.Unlock()
+			return "", err
 		}
 	}
 	
-	if err != nil {
-		return "", err
-	}
+	result := strings.TrimSpace(outputStr)
 	
-	return strings.TrimSpace(outputStr), nil
+	cacheMutex.Lock()
+	commandCache[cacheKey] = &cachedResult{output: result, err: err, timestamp: time.Now()}
+	if len(commandCache) > 100 {
+		for k := range commandCache {
+			if time.Since(commandCache[k].timestamp) > cacheTTL*2 {
+				delete(commandCache, k)
+			}
+		}
+	}
+	cacheMutex.Unlock()
+	
+	return result, err
 }
 
-// filterSudoErrors filtra mensajes de error de sudo relacionados con read-only file system y hostname
-// Esta función está duplicada en executeCommand, pero se mantiene para compatibilidad
 func filterSudoErrors(output []byte) string {
 	return filterSudoErrorString(string(output))
 }
 
-// filterSudoErrorString es la versión reutilizable del filtro
 func filterSudoErrorString(output string) string {
 	lines := strings.Split(output, "\n")
 	var cleanLines []string
@@ -168,11 +198,17 @@ func filterSudoErrorString(output string) string {
 	return strings.Join(cleanLines, "\n")
 }
 
-// canUseSudo verifica si el proceso puede usar sudo o si ya es root
-var sudoAvailable *bool // Cache del resultado
+func getHostname() string {
+	hostname := os.Getenv("HOSTNAME")
+	if hostname == "" {
+		if h, err := exec.Command("hostname").Output(); err == nil {
+			hostname = strings.TrimSpace(string(h))
+		}
+	}
+	return hostname
+}
 
 func canUseSudo() bool {
-	// Si ya tenemos el resultado en cache, usarlo
 	if sudoAvailable != nil {
 		return *sudoAvailable
 	}
@@ -182,62 +218,57 @@ func canUseSudo() bool {
 		sudoAvailable = &result
 	}()
 	
-	// Si ya somos root, no necesitamos sudo
 	if os.Geteuid() == 0 {
-		return false // No necesitamos sudo, ya somos root
+		return false
 	}
 	
-	// Verificar si sudo está disponible
-	sudoCheck := exec.Command("sh", "-c", "command -v sudo 2>/dev/null")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	
+	sudoCheck := exec.CommandContext(ctx, "sh", "-c", "command -v sudo 2>/dev/null")
 	if sudoCheck.Run() != nil {
-		return false // Sudo no está instalado
+		return false
 	}
 	
-	// Intentar ejecutar un comando simple con sudo para verificar si funciona
-	testCmd := exec.Command("sh", "-c", "sudo -n true 2>&1")
+	testCmd := exec.CommandContext(ctx, "sh", "-c", "sudo -n true 2>&1")
 	output, err := testCmd.CombinedOutput()
 	outputStr := strings.ToLower(string(output))
 	
-	// Si el comando funcionó (sin error), sudo está disponible y funciona
 	if err == nil {
 		result = true
 		return true
 	}
 	
-	// Si el error es sobre "no new privileges", no podemos usar sudo
 	if strings.Contains(outputStr, "no new privileges") {
 		result = false
 		return false
 	}
 	
-	// Si el error es sobre contraseña o permisos, sudo está disponible pero puede no funcionar
-	// En este caso, asumimos que puede funcionar si está configurado en sudoers
 	if strings.Contains(outputStr, "password") || strings.Contains(outputStr, "a password is required") {
-		// Sudo está disponible pero necesita contraseña o no tiene permisos NOPASSWD
-		// Intentar verificar si tenemos permisos específicos para comandos WiFi
-		result = true // Asumimos que puede funcionar si está en sudoers
+		result = true
 		return true
 	}
 	
 	return false
 }
 
-// execCommand ejecuta un comando, usando sudo solo si es necesario y está disponible
 func execCommand(cmd string) *exec.Cmd {
-	// Si el comando ya incluye sudo, removerlo y usar nuestra lógica
 	cmd = strings.TrimSpace(cmd)
 	cmd = strings.TrimPrefix(cmd, "sudo ")
 	
-	// Si ya somos root, ejecutar sin sudo
 	if os.Geteuid() == 0 {
 		return exec.Command("sh", "-c", cmd)
 	}
 	
-	// Si podemos usar sudo, agregarlo
 	if canUseSudo() {
 		cmd = "sudo " + cmd
 	}
-	// Si no podemos usar sudo, intentar ejecutar sin sudo (puede fallar pero lo intentamos)
 	
 	return exec.Command("sh", "-c", cmd)
+}
+
+func clearCommandCache() {
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	commandCache = make(map[string]*cachedResult)
 }
