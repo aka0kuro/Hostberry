@@ -558,16 +558,6 @@ func wifiScanHandler(c *fiber.Ctx) error {
 	}
 	return c.JSON([]fiber.Map{})
 }
-
-	var networks []fiber.Map
-
-	if interfaceName == "" {
-		interfaceName = detectWiFiInterface()
-	}
-
-	wifiEnabled := false
-	
-	rfkillCheck := execCommand("rfkill list wifi 2>/dev/null")
 	rfkillOut, _ := rfkillCheck.Output()
 	rfkillStr := strings.ToLower(string(filterSudoErrors(rfkillOut)))
 	if !strings.Contains(rfkillStr, "hard blocked: yes") && !strings.Contains(rfkillStr, "soft blocked: yes") {
