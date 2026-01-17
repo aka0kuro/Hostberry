@@ -48,16 +48,44 @@ print_logo() {
 EOF
     printf "%b" "$RED"
     cat <<'EOF'
-      .-================-.
-    .'   __)))__  __)))_ '.
-   /    /  )))  \/  ))) \  \
-  |        )))      )))    |
-  |        )))      )))    |
-  |     .-----------.      |
-  |     |  o     o  |      |
-   \    '-----------'     /
-    '.                  .'
-      '-.____________.-'
+                                    x                                
+                                  +$$$$                              
+                  XXX;           +$$$$        ;X$X                   
+                 .$$$$$$$$.      $$$X    .$$$$$$$$.                  
+                  $$$$$$$$$$$   $$$$   $$$$$$$$$$$                   
+                  :$$$$$$$$$$$: $$$. :$$$$$$$$$$$:                   
+                   ;$$$$$$$$$$$$$$$.$$$$$$$$$$$$;                    
+                     $$$$$$$$$$$$$$+$$$$$$$$$$$                      
+                       $$$$$$$$$$$$$$$$$$$$$$                        
+                 ;XXXXXXXX$$XXXXXXXXXXX$$XXXXXXXXX;                  
+              :XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.               
+             XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX              
+            XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX;             
+            XXXXXXXXXXXXXXX;:::::::::::::XXXXXXXXXXXXXXX             
+         XXXXXXXXXXXXXXX:::::::;XXXx::::::::XXXXXXXXXXXXXXX          
+       XXXXXXXXXXXXXXX::::;XXXXXXXXXXXXXX:::::XXXXXXXXXXXXXX.        
+      .XXXXXXXXXXXXXXXXxXXXXX;:::::::::XXXXXXXXXXXXXXXXXXXXXX        
+      XXXXXXXXXXXX:XXXXXXX;::::::::::::::XXXXXXX;:XXXXXXXXXXX.       
+      :XXXXXXXXX+:::XXXXXXX::XXXXXXXXXX::XXXXXXX:::xXXXXXXXXX        
+       XXXXXXXX+::XXXXxXXXXXXXXX:::;XXXXXXXXXXXXXx::XXXXXXXXX        
+        xXXXXXX:::XXX:::XXXXXX::::::::XXXXXX:::XXX:::XXXXXX:         
+          XXXXX::XXX;::XXXXXXXXXXXXXXXXXXXXXX::+XXX::XXXXX           
+         XXXXXX::XXXX::::::XXXXXXXXXXXXXX::::::XXXX::XXXXXX          
+         XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX          
+         XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX$XXXXXXXXXXXXXXXXX          
+         XXXXXXXXXXXXXX::::::::::::::::::::::$XXXXXXXXXXXXx          
+          XXXXXXXXXXXX::::::::::::::::::::::::XXXXXXXXXXX;           
+            XXXXXXXXXX::.XX::+$X::::::::::::::XXXXXXXXX+             
+               ;XXXXXX::::::::::::::::::::::::XXXXXX:                
+               :XXXXXXXX$$$$$$$$$$$$$$$$$$$$XXXXXXXX:                
+                XXXXXXXXXXXXXXXXXXX$$XXXXXXXXXXXXXXX                 
+                 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX                  
+                   XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX                    
+                          XXXXXXXXXXXXXXXX                           
+                          .XXXXXXXXXXXXXX                            
+                            XXXXXXXXXXX:                             
+                                :;X:                                 
+
 EOF
     printf "%b\n" "$NC"
 }
