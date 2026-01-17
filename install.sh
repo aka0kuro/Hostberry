@@ -973,7 +973,6 @@ EOF
     # Agregar permisos para reboot si está disponible
     if [ -n "$REBOOT_PATH" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $REBOOT_PATH" >> "/etc/sudoers.d/hostberry"
- reboot: $REBOOT_PATH"
     fi
     
     # También agregar permisos para systemctl (más moderno y confiable)
@@ -982,40 +981,33 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH reboot" >> "/etc/sudoers.d/hostberry"
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH poweroff" >> "/etc/sudoers.d/hostberry"
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH shutdown" >> "/etc/sudoers.d/hostberry"
- systemctl: $SYSTEMCTL_PATH"
     fi
     
     # Agregar permisos WiFi si los comandos están disponibles
     if [ -n "$NMCLI_PATH" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $NMCLI_PATH" >> "/etc/sudoers.d/hostberry"
- nmcli: $NMCLI_PATH"
     fi
     
     if [ -n "$RFKILL_PATH" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $RFKILL_PATH" >> "/etc/sudoers.d/hostberry"
- rfkill: $RFKILL_PATH"
     fi
     
     if [ -n "$IFCONFIG_PATH" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $IFCONFIG_PATH" >> "/etc/sudoers.d/hostberry"
- ifconfig: $IFCONFIG_PATH"
     fi
     
     if [ -n "$IW_PATH" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $IW_PATH" >> "/etc/sudoers.d/hostberry"
- iw: $IW_PATH"
     fi
     
     if [ -n "$IWCONFIG_PATH" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $IWCONFIG_PATH" >> "/etc/sudoers.d/hostberry"
- iwconfig: $IWCONFIG_PATH"
     fi
     
     # Agregar permisos para hostapd y systemctl hostapd
     if command -v hostapd &> /dev/null; then
         HOSTAPD_PATH=$(command -v hostapd)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $HOSTAPD_PATH" >> "/etc/sudoers.d/hostberry"
- hostapd: $HOSTAPD_PATH"
     fi
     
     if command -v hostapd_cli &> /dev/null; then
@@ -1086,7 +1078,6 @@ EOF
     if command -v hostnamectl &> /dev/null; then
         HOSTNAMECTL_PATH=$(command -v hostnamectl)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $HOSTNAMECTL_PATH" >> "/etc/sudoers.d/hostberry"
- hostnamectl: $HOSTNAMECTL_PATH"
     elif [ -f "/usr/bin/hostnamectl" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/hostnamectl" >> "/etc/sudoers.d/hostberry"
  hostnamectl: /usr/bin/hostnamectl"
@@ -1095,7 +1086,6 @@ EOF
     if command -v hostname &> /dev/null; then
         HOSTNAME_PATH=$(command -v hostname)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $HOSTNAME_PATH" >> "/etc/sudoers.d/hostberry"
- hostname: $HOSTNAME_PATH"
     elif [ -f "/bin/hostname" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/hostname" >> "/etc/sudoers.d/hostberry"
  hostname: /bin/hostname"
@@ -1105,7 +1095,6 @@ EOF
     if command -v ip &> /dev/null; then
         IP_PATH=$(command -v ip)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $IP_PATH" >> "/etc/sudoers.d/hostberry"
- ip: $IP_PATH"
     elif [ -f "/usr/sbin/ip" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/ip" >> "/etc/sudoers.d/hostberry"
  ip: /usr/sbin/ip"
@@ -1118,7 +1107,6 @@ EOF
     if command -v pkill &> /dev/null; then
         PKILL_PATH=$(command -v pkill)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $PKILL_PATH" >> "/etc/sudoers.d/hostberry"
- pkill: $PKILL_PATH"
     elif [ -f "/usr/bin/pkill" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/pkill" >> "/etc/sudoers.d/hostberry"
  pkill: /usr/bin/pkill"
@@ -1128,7 +1116,6 @@ EOF
     if command -v pgrep &> /dev/null; then
         PGREP_PATH=$(command -v pgrep)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $PGREP_PATH" >> "/etc/sudoers.d/hostberry"
- pgrep: $PGREP_PATH"
     elif [ -f "/usr/bin/pgrep" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/pgrep" >> "/etc/sudoers.d/hostberry"
  pgrep: /usr/bin/pgrep"
@@ -1138,7 +1125,6 @@ EOF
     if command -v dhclient &> /dev/null; then
         DHCPCLIENT_PATH=$(command -v dhclient)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $DHCPCLIENT_PATH" >> "/etc/sudoers.d/hostberry"
- dhclient: $DHCPCLIENT_PATH"
     elif [ -f "/usr/sbin/dhclient" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/dhclient" >> "/etc/sudoers.d/hostberry"
  dhclient: /usr/sbin/dhclient"
@@ -1147,7 +1133,6 @@ EOF
     if command -v udhcpc &> /dev/null; then
         UDHCPC_PATH=$(command -v udhcpc)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $UDHCPC_PATH" >> "/etc/sudoers.d/hostberry"
- udhcpc: $UDHCPC_PATH"
     elif [ -f "/usr/sbin/udhcpc" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/udhcpc" >> "/etc/sudoers.d/hostberry"
  udhcpc: /usr/sbin/udhcpc"
@@ -1157,7 +1142,6 @@ EOF
     if command -v sysctl &> /dev/null; then
         SYSCTL_PATH=$(command -v sysctl)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSCTL_PATH" >> "/etc/sudoers.d/hostberry"
- sysctl: $SYSCTL_PATH"
     elif [ -f "/usr/sbin/sysctl" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/sysctl" >> "/etc/sudoers.d/hostberry"
  sysctl: /usr/sbin/sysctl"
@@ -1170,7 +1154,6 @@ EOF
     if command -v iptables &> /dev/null; then
         IPTABLES_PATH=$(command -v iptables)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $IPTABLES_PATH" >> "/etc/sudoers.d/hostberry"
- iptables: $IPTABLES_PATH"
     elif [ -f "/usr/sbin/iptables" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/iptables" >> "/etc/sudoers.d/hostberry"
  iptables: /usr/sbin/iptables"
@@ -1184,7 +1167,6 @@ EOF
     if command -v cp &> /dev/null; then
         CP_PATH=$(command -v cp)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $CP_PATH" >> "/etc/sudoers.d/hostberry"
- cp: $CP_PATH"
     elif [ -f "/bin/cp" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/cp" >> "/etc/sudoers.d/hostberry"
  cp: /bin/cp"
@@ -1202,7 +1184,6 @@ EOF
     if command -v chmod &> /dev/null; then
         CHMOD_PATH=$(command -v chmod)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $CHMOD_PATH" >> "/etc/sudoers.d/hostberry"
- chmod: $CHMOD_PATH"
     elif [ -f "/bin/chmod" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/chmod" >> "/etc/sudoers.d/hostberry"
  chmod: /bin/chmod"
@@ -1212,7 +1193,6 @@ EOF
     if command -v tee &> /dev/null; then
         TEE_PATH=$(command -v tee)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $TEE_PATH" >> "/etc/sudoers.d/hostberry"
- tee: $TEE_PATH"
     elif [ -f "/usr/bin/tee" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/tee" >> "/etc/sudoers.d/hostberry"
  tee: /usr/bin/tee"
@@ -1222,7 +1202,6 @@ EOF
     if command -v cat &> /dev/null; then
         CAT_PATH=$(command -v cat)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $CAT_PATH" >> "/etc/sudoers.d/hostberry"
- cat: $CAT_PATH"
     elif [ -f "/bin/cat" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/cat" >> "/etc/sudoers.d/hostberry"
  cat: /bin/cat"
@@ -1232,7 +1211,6 @@ EOF
     if command -v grep &> /dev/null; then
         GREP_PATH=$(command -v grep)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $GREP_PATH" >> "/etc/sudoers.d/hostberry"
- grep: $GREP_PATH"
     elif [ -f "/bin/grep" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/grep" >> "/etc/sudoers.d/hostberry"
  grep: /bin/grep"
@@ -1245,7 +1223,6 @@ EOF
     if command -v sed &> /dev/null; then
         SED_PATH=$(command -v sed)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SED_PATH" >> "/etc/sudoers.d/hostberry"
- sed: $SED_PATH"
     elif [ -f "/bin/sed" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/sed" >> "/etc/sudoers.d/hostberry"
  sed: /bin/sed"
@@ -1258,7 +1235,6 @@ EOF
     if command -v mount &> /dev/null; then
         MOUNT_PATH=$(command -v mount)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $MOUNT_PATH" >> "/etc/sudoers.d/hostberry"
- mount: $MOUNT_PATH"
     elif [ -f "/bin/mount" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/mount" >> "/etc/sudoers.d/hostberry"
  mount: /bin/mount"
