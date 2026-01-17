@@ -156,8 +156,8 @@ func stopWpaSupplicant(interfaceName string) {
 }
 
 // startWpaSupplicant inicia wpa_supplicant con la configuración dada
-func startWpaSupplicant(interfaceName, configPath string) error {
-	log.Printf("Iniciando wpa_supplicant para %s con config %s", interfaceName, configPath)
+func startWpaSupplicant(interfaceName, configPath, runDir string) error {
+	log.Printf("Iniciando wpa_supplicant para %s con config %s (runDir: %s)", interfaceName, configPath, runDir)
 
 	// Verificar que el archivo de configuración existe
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
@@ -204,7 +204,11 @@ func startWpaSupplicant(interfaceName, configPath string) error {
 	// -i: interfaz
 	// -c: archivo de configuración
 	// -D: driver (nl80211 primero, luego wext como fallback)
-	startCmd := exec.Command("sudo", wpaSupplicantPath, "-B", "-i", interfaceName, "-c", configPath, "-D", "nl80211,wext")
+	args := []string{wpaSupplicantPath, "-B", "-i", interfaceName, "-c", configPath, "-D", "nl80211,wext"}
+	if runDir != "" {
+		args = append(args, "-C", runDir)
+	}
+	startCmd := exec.Command("sudo", args...)
 	startCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 	startOut, startErr := startCmd.CombinedOutput()
 	if startErr != nil {
@@ -279,40 +283,46 @@ func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, err
 	log.Printf("Esperando conexión con wpa_cli para %s...", interfaceName)
 
 	// Intentar encontrar el socket en todos los posibles directorios
-	socketPaths := []string{
-		fmt.Sprintf("/run/wpa_supplicant/%s", interfaceName),
-		fmt.Sprintf("/var/run/wpa_supplicant/%s", interfaceName),
-		fmt.Sprintf("/tmp/wpa_supplicant/%s", interfaceName),
-	}
-	// Agregar el directorio activo al inicio si está configurado
+	socketDirs := []string{}
 	if activeRunDir != "" {
-		socketPaths = append([]string{fmt.Sprintf("%s/%s", activeRunDir, interfaceName)}, socketPaths...)
+		socketDirs = append(socketDirs, activeRunDir)
+	}
+	socketDirs = append(socketDirs, "/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant")
+	// Dedupe simple
+	seen := map[string]bool{}
+	uniqueDirs := []string{}
+	for _, dir := range socketDirs {
+		if dir == "" || seen[dir] {
+			continue
+		}
+		seen[dir] = true
+		uniqueDirs = append(uniqueDirs, dir)
 	}
 
 	var workingSocketDir string
 	for attempt := 0; attempt < maxAttempts; attempt++ {
-		// Buscar socket existente
-		for _, socketPath := range socketPaths {
+		workingSocketDir = ""
+		for _, dir := range uniqueDirs {
+			socketPath := fmt.Sprintf("%s/%s", dir, interfaceName)
 			if _, err := os.Stat(socketPath); err == nil {
-				workingSocketDir = socketPath[:strings.LastIndex(socketPath, "/")]
 				log.Printf("Socket encontrado en: %s", socketPath)
-
+				workingSocketDir = dir
 				// Ajustar permisos del socket
 				executeCommand(fmt.Sprintf("sudo chmod 660 %s 2>/dev/null || true", socketPath))
 				executeCommand(fmt.Sprintf("sudo chown root:netdev %s 2>/dev/null || true", socketPath))
-				break
+			}
+
+			// Intentar ping aunque el socket no se haya detectado aún
+			pingCmd := fmt.Sprintf("sudo wpa_cli -i %s -p %s ping", interfaceName, dir)
+			pingOut, _ := executeCommand(pingCmd)
+			if strings.Contains(pingOut, "PONG") {
+				log.Printf("wpa_cli respondió correctamente desde %s", dir)
+				return dir, nil
 			}
 		}
 
 		if workingSocketDir != "" {
-			// Intentar ping
-			pingCmd := fmt.Sprintf("sudo wpa_cli -i %s -p %s ping", interfaceName, workingSocketDir)
-			pingOut, _ := executeCommand(pingCmd)
-			if strings.Contains(pingOut, "PONG") {
-				log.Printf("wpa_cli respondió correctamente desde %s", workingSocketDir)
-				return workingSocketDir, nil
-			}
-			log.Printf("Intento %d/%d: wpa_cli no respondió PONG, respuesta: %s", attempt+1, maxAttempts, strings.TrimSpace(pingOut))
+			log.Printf("Intento %d/%d: wpa_cli sin PONG aún (socket detectado en %s)", attempt+1, maxAttempts, workingSocketDir)
 		} else {
 			log.Printf("Intento %d/%d: Socket no encontrado aún", attempt+1, maxAttempts)
 		}
@@ -810,7 +820,7 @@ country=%s
 
 	// Paso 6: Iniciar wpa_supplicant
 	log.Printf("Paso 6: Iniciando wpa_supplicant...")
-	if err := startWpaSupplicant(interfaceName, wpaConfigPath); err != nil {
+	if err := startWpaSupplicant(interfaceName, wpaConfigPath, runDir); err != nil {
 		log.Printf("ERROR: %v", err)
 		result["error"] = "No se pudo iniciar wpa_supplicant. Verifica la instalación."
 		return result
