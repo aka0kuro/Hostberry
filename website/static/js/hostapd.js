@@ -725,6 +725,23 @@
     }
     
     waitForHostBerry(async () => {
+      // Crear ap0 si no existe
+      try {
+        const ap0Resp = await HostBerry.apiRequest('/api/v1/hostapd/create-ap0', {
+          method: 'POST'
+        });
+        if (ap0Resp && ap0Resp.ok) {
+          const ap0Result = await ap0Resp.json();
+          if (ap0Result.success && !ap0Result.exists) {
+            console.log('ap0 interface created successfully');
+          } else if (ap0Result.exists) {
+            console.log('ap0 interface already exists');
+          }
+        }
+      } catch (e) {
+        console.error('Error creating ap0 interface:', e);
+      }
+      
       loadHostAPDStatus();
       loadAccessPoints();
       loadClients();
