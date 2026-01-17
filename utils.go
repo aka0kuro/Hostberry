@@ -133,12 +133,8 @@ func executeCommandWithTimeout(cmd string, timeout time.Duration) (string, error
 	defer cancel()
 	
 	baseCmd := execCommand(cmd)
-	var cmdObj *exec.Cmd
-	if len(baseCmd.Args) > 0 {
-		cmdObj = exec.CommandContext(ctx, baseCmd.Args[0], baseCmd.Args[1:]...)
-	} else {
-		cmdObj = exec.CommandContext(ctx, "sh", "-c", cmd)
-	}
+	cmdObj := exec.CommandContext(ctx, baseCmd.Path)
+	cmdObj.Args = baseCmd.Args
 	cmdObj.Env = append(os.Environ(),
 		"SUDO_ASKPASS=/bin/false",
 		"SUDO_LOG_FILE=",
