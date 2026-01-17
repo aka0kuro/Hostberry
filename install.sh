@@ -703,8 +703,6 @@ download_go_deps() {
     local retries="${HOSTBERRY_GO_MOD_RETRIES:-5}"
     local sleep_secs="${HOSTBERRY_GO_MOD_RETRY_SLEEP:-4}"
 
-    print_info "Go env: GOPROXY=$(go env GOPROXY 2>/dev/null || echo 'desconocido'), GOSUMDB=$(go env GOSUMDB 2>/dev/null || echo 'desconocido')"
-
     # 1) Intentar con el entorno actual
     for ((i=1; i<=retries; i++)); do
         if try_go_mod_download "" "$i" "$retries"; then
@@ -715,7 +713,6 @@ download_go_deps() {
     done
 
     # 2) Fallback a modo directo (sin proxy)
-    print_warning "No se pudo descargar usando GOPROXY actual. Probando fallback: GOPROXY=direct"
     for ((i=1; i<=retries; i++)); do
         if try_go_mod_download "GOPROXY=direct" "$i" "$retries"; then
             export HOSTBERRY_GO_MOD_ENV="GOPROXY=direct"
@@ -726,7 +723,6 @@ download_go_deps() {
 
     # 3) (Opcional) último recurso: desactivar sumdb (menos seguro)
     if [ "${HOSTBERRY_ALLOW_GOSUMDB_OFF:-0}" = "1" ]; then
-        print_warning "Último recurso habilitado: GOPROXY=direct GOSUMDB=off (menos seguro)."
         for ((i=1; i<=retries; i++)); do
             if try_go_mod_download "GOPROXY=direct GOSUMDB=off" "$i" "$retries"; then
                 export HOSTBERRY_GO_MOD_ENV="GOPROXY=direct GOSUMDB=off"
@@ -736,11 +732,7 @@ download_go_deps() {
         done
     fi
 
-    print_error "Error al descargar dependencias de Go."
-    print_info "Posibles causas: conexión lenta, DNS, bloqueo a proxy.golang.org, reloj del sistema o CA certificates."
-    print_info "Puedes probar manualmente:"
-    print_info "  - GOPROXY=direct go mod download"
-    print_info "  - (último recurso) HOSTBERRY_ALLOW_GOSUMDB_OFF=1 GOPROXY=direct GOSUMDB=off go mod download"
+    print_error "Error al descargar dependencias de Go"
     return 1
 }
 
