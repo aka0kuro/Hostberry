@@ -1194,10 +1194,8 @@ EOF
     if command -v mkdir &> /dev/null; then
         MKDIR_PATH=$(command -v mkdir)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $MKDIR_PATH" >> "/etc/sudoers.d/hostberry"
- mkdir: $MKDIR_PATH"
     elif [ -f "/bin/mkdir" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/mkdir" >> "/etc/sudoers.d/hostberry"
- mkdir: /bin/mkdir"
     fi
     
     # chmod (para establecer permisos de archivos)
