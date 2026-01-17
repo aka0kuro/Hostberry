@@ -1763,6 +1763,36 @@ else
     fi
 fi
     
+    # Crear servicio systemd para crear ap0 al arrancar (si se necesita)
+    if command -v iw &> /dev/null && [ -n "$PHY_NAME" ] && [ -n "$MAC_ADDRESS" ]; then
+        AP0_SERVICE="/etc/systemd/system/create-ap0.service"
+        if [ ! -f "$AP0_SERVICE" ]; then
+            print_info "Creando servicio systemd para crear ap0 al arrancar..."
+            cat > "$AP0_SERVICE" <<EOF
+[Unit]
+Description=Create virtual WiFi interface ap0 for AP+STA mode
+After=network-pre.target
+Before=network.target hostapd.service
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'if ! ip link show ap0 > /dev/null 2>&1; then /sbin/iw phy ${PHY_NAME} interface add ap0 type __ap && /bin/ip link set ap0 address ${MAC_ADDRESS} && /bin/ip link set ap0 up; fi'
+ExecStop=/bin/bash -c 'if ip link show ap0 > /dev/null 2>&1; then /bin/ip link set ap0 down && /sbin/iw dev ap0 del; fi'
+
+[Install]
+WantedBy=multi-user.target
+EOF
+            chmod 644 "$AP0_SERVICE"
+            systemctl daemon-reload 2>/dev/null || true
+            systemctl enable create-ap0.service 2>/dev/null || true
+            print_success "Servicio systemd para ap0 creado y habilitado"
+        else
+            print_info "Servicio systemd para ap0 ya existe"
+        fi
+    fi
+    
     # Crear archivo de override de systemd para hostapd si no existe
     OVERRIDE_DIR="/etc/systemd/system/hostapd.service.d"
     OVERRIDE_FILE="${OVERRIDE_DIR}/override.conf"
@@ -1770,6 +1800,10 @@ fi
         print_info "Creando archivo de override de systemd para hostapd..."
         mkdir -p "$OVERRIDE_DIR"
         cat > "$OVERRIDE_FILE" <<EOF
+[Unit]
+After=create-ap0.service
+Requires=create-ap0.service
+
 [Service]
 ExecStart=
 ExecStart=/usr/sbin/hostapd -B ${HOSTAPD_CONFIG}
