@@ -645,14 +645,12 @@ install_files() {
         else
             cat > "$CONFIG_FILE" <<EOF
 server:
-  host: "0.0.0.0"
   port: 8000
   debug: false
   read_timeout: 30
   write_timeout: 30
 
 database:
-  type: "sqlite"
 
 security:
   token_expiry: 60
@@ -1031,10 +1029,8 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $WPA_CLI_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/usr/sbin/wpa_cli" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/wpa_cli" >> "/etc/sudoers.d/hostberry"
- wpa_cli: /usr/sbin/wpa_cli"
     elif [ -f "/sbin/wpa_cli" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /sbin/wpa_cli" >> "/etc/sudoers.d/hostberry"
- wpa_cli: /sbin/wpa_cli"
     fi
     
     # Agregar permisos para systemctl con wpa_supplicant
@@ -1074,7 +1070,6 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $HOSTNAMECTL_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/usr/bin/hostnamectl" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/hostnamectl" >> "/etc/sudoers.d/hostberry"
- hostnamectl: /usr/bin/hostnamectl"
     fi
     
     if command -v hostname &> /dev/null; then
@@ -1082,7 +1077,6 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $HOSTNAME_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/bin/hostname" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/hostname" >> "/etc/sudoers.d/hostberry"
- hostname: /bin/hostname"
     fi
     
     # Agregar permisos para ip (configuración de interfaces de red)
@@ -1091,10 +1085,8 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $IP_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/usr/sbin/ip" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/ip" >> "/etc/sudoers.d/hostberry"
- ip: /usr/sbin/ip"
     elif [ -f "/sbin/ip" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /sbin/ip" >> "/etc/sudoers.d/hostberry"
- ip: /sbin/ip"
     fi
     
     # Agregar permisos para pkill (para detener procesos wpa_supplicant)
@@ -1103,7 +1095,6 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $PKILL_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/usr/bin/pkill" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/pkill" >> "/etc/sudoers.d/hostberry"
- pkill: /usr/bin/pkill"
     fi
     
     # Agregar permisos para pgrep (para verificar procesos)
@@ -1112,7 +1103,6 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $PGREP_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/usr/bin/pgrep" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/pgrep" >> "/etc/sudoers.d/hostberry"
- pgrep: /usr/bin/pgrep"
     fi
     
     # Agregar permisos para dhclient y udhcpc (para obtener IP)
@@ -1121,7 +1111,6 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $DHCPCLIENT_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/usr/sbin/dhclient" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/dhclient" >> "/etc/sudoers.d/hostberry"
- dhclient: /usr/sbin/dhclient"
     fi
     
     if command -v udhcpc &> /dev/null; then
@@ -1129,7 +1118,6 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $UDHCPC_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/usr/sbin/udhcpc" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/udhcpc" >> "/etc/sudoers.d/hostberry"
- udhcpc: /usr/sbin/udhcpc"
     fi
     
     # Agregar permisos para sysctl (habilitar IP forwarding)
@@ -1138,10 +1126,8 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSCTL_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/usr/sbin/sysctl" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/sysctl" >> "/etc/sudoers.d/hostberry"
- sysctl: /usr/sbin/sysctl"
     elif [ -f "/sbin/sysctl" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /sbin/sysctl" >> "/etc/sudoers.d/hostberry"
- sysctl: /sbin/sysctl"
     fi
     
     # Agregar permisos para iptables (configuración de NAT)
@@ -1150,10 +1136,8 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $IPTABLES_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/usr/sbin/iptables" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/iptables" >> "/etc/sudoers.d/hostberry"
- iptables: /usr/sbin/iptables"
     elif [ -f "/sbin/iptables" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /sbin/iptables" >> "/etc/sudoers.d/hostberry"
- iptables: /sbin/iptables"
     fi
     
     # Agregar permisos para comandos básicos necesarios para hostapd
@@ -1163,7 +1147,6 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $CP_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/bin/cp" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/cp" >> "/etc/sudoers.d/hostberry"
- cp: /bin/cp"
     fi
     
     # mkdir (para crear directorios de configuración)
@@ -1180,7 +1163,6 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $CHMOD_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/bin/chmod" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/chmod" >> "/etc/sudoers.d/hostberry"
- chmod: /bin/chmod"
     fi
     
     # tee (para escribir archivos de configuración)
@@ -1189,7 +1171,6 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $TEE_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/usr/bin/tee" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/tee" >> "/etc/sudoers.d/hostberry"
- tee: /usr/bin/tee"
     fi
     
     # cat (para leer archivos y pasarlos a tee)
@@ -1198,7 +1179,6 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $CAT_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/bin/cat" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/cat" >> "/etc/sudoers.d/hostberry"
- cat: /bin/cat"
     fi
     
     # grep (para buscar en archivos como /etc/hosts)
@@ -1207,10 +1187,8 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $GREP_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/bin/grep" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/grep" >> "/etc/sudoers.d/hostberry"
- grep: /bin/grep"
     elif [ -f "/usr/bin/grep" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/grep" >> "/etc/sudoers.d/hostberry"
- grep: /usr/bin/grep"
     fi
     
     # sed (para reemplazar texto en archivos como /etc/hosts)
@@ -1219,10 +1197,8 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SED_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/bin/sed" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/sed" >> "/etc/sudoers.d/hostberry"
- sed: /bin/sed"
     elif [ -f "/usr/bin/sed" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/sed" >> "/etc/sudoers.d/hostberry"
- sed: /usr/bin/sed"
     fi
     
     # mount (para remontar sistemas de archivos de solo lectura como lectura-escritura)
@@ -1231,10 +1207,8 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $MOUNT_PATH" >> "/etc/sudoers.d/hostberry"
     elif [ -f "/bin/mount" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/mount" >> "/etc/sudoers.d/hostberry"
- mount: /bin/mount"
     elif [ -f "/usr/bin/mount" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/mount" >> "/etc/sudoers.d/hostberry"
- mount: /usr/bin/mount"
     fi
     
     # Crear directorio /etc/hostapd con permisos correctos
