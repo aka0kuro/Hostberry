@@ -209,18 +209,20 @@
                                 <i class="bi bi-unlock me-2"></i>
                                 <span>{{ call .t "wifi.unblock_wifi" "Unblock WiFi" }}</span>
                             </button>
-                            <button class="btn btn-secondary btn-lg w-100 mb-2" id="toggle-software-switch-btn" onclick="toggleSoftwareSwitch()">
-                                <i class="bi bi-toggle-off" id="software-switch-icon"></i>
-                                <span id="software-switch-text">{{ call .t "wifi.enable_software_switch" "Enable Software Switch" }}</span>
-                            </button>
-                            <button class="btn btn-primary btn-lg w-100 mb-2" id="toggle-wifi-btn" onclick="toggleWiFi()">
-                                <i class="bi bi-wifi" id="toggle-wifi-icon"></i>
-                                <span id="toggle-wifi-text">{{ call .t "wifi.enable_wifi" "Enable WiFi" }}</span>
-                            </button>
-                            <button class="btn btn-info btn-lg w-100" id="scan-btn" onclick="scanNetworks()">
-                                <i class="bi bi-search me-2"></i>
-                                <span>{{ call .t "wifi.scan_networks" "Scan Networks" }}</span>
-                            </button>
+                            <div class="wifi-buttons-row">
+                                <button class="btn btn-secondary btn-sm" id="toggle-software-switch-btn" onclick="toggleSoftwareSwitch()">
+                                    <i class="bi bi-toggle-off" id="software-switch-icon"></i>
+                                    <span id="software-switch-text">{{ call .t "wifi.enable_software_switch" "Enable Software Switch" }}</span>
+                                </button>
+                                <button class="btn btn-primary btn-sm" id="toggle-wifi-btn" onclick="toggleWiFi()">
+                                    <i class="bi bi-wifi" id="toggle-wifi-icon"></i>
+                                    <span id="toggle-wifi-text">{{ call .t "wifi.enable_wifi" "Enable WiFi" }}</span>
+                                </button>
+                                <button class="btn btn-info btn-sm" id="scan-btn" onclick="scanNetworks()">
+                                    <i class="bi bi-search me-2"></i>
+                                    <span>{{ call .t "wifi.scan_networks" "Scan Networks" }}</span>
+                                </button>
+                            </div>
                             <div class="text-muted small mt-2">
                                 {{ call .t "wifi.wpa_cli_help" "If you see 'wpa_cli can't communicate', try restarting HostBerry or selecting another interface." }}
                             </div>
