@@ -60,10 +60,6 @@ type SecurityConfig struct {
 	RateLimitRPS int    `yaml:"rate_limit_rps"`
 }
 
-type LuaConfig struct {
-	ScriptsPath string `yaml:"scripts_path"`
-	Enabled     bool   `yaml:"enabled"`
-}
 
 var appConfig Config
 func main() {
