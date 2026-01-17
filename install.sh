@@ -829,28 +829,16 @@ build_project() {
 
 # Configurar firewall
 configure_firewall() {
-    print_info "Configurando firewall..."
-    
     PORT=$(grep -E "^  port:" "$CONFIG_FILE" 2>/dev/null | awk '{print $2}' | tr -d '"' || echo "8000")
     
     # Verificar si ufw está instalado y activo
     if command -v ufw &> /dev/null; then
         if ufw status | grep -q "Status: active"; then
-            print_info "Firewall UFW activo, permitiendo puerto $PORT..."
             ufw allow "$PORT/tcp" 2>/dev/null || true
-            print_success "Puerto $PORT permitido en firewall"
-        else
-            print_info "Firewall UFW instalado pero no activo"
         fi
     elif command -v firewall-cmd &> /dev/null; then
-        # Firewalld (CentOS/RHEL)
-        print_info "Configurando firewalld..."
         firewall-cmd --permanent --add-port="$PORT/tcp" 2>/dev/null || true
         firewall-cmd --reload 2>/dev/null || true
-        print_success "Puerto $PORT configurado en firewalld"
-    else
-        print_info "No se encontró firewall configurado (ufw o firewalld)"
-        print_warning "Asegúrate de permitir el puerto $PORT en tu firewall manualmente"
     fi
 }
 
