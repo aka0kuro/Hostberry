@@ -968,13 +968,12 @@ EOF
     # Agregar permisos para shutdown si está disponible
     if [ -n "$SHUTDOWN_PATH" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SHUTDOWN_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para shutdown: $SHUTDOWN_PATH"
     fi
     
     # Agregar permisos para reboot si está disponible
     if [ -n "$REBOOT_PATH" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $REBOOT_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para reboot: $REBOOT_PATH"
+ reboot: $REBOOT_PATH"
     fi
     
     # También agregar permisos para systemctl (más moderno y confiable)
@@ -983,73 +982,73 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH reboot" >> "/etc/sudoers.d/hostberry"
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH poweroff" >> "/etc/sudoers.d/hostberry"
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH shutdown" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para systemctl: $SYSTEMCTL_PATH"
+ systemctl: $SYSTEMCTL_PATH"
     fi
     
     # Agregar permisos WiFi si los comandos están disponibles
     if [ -n "$NMCLI_PATH" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $NMCLI_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para nmcli: $NMCLI_PATH"
+ nmcli: $NMCLI_PATH"
     fi
     
     if [ -n "$RFKILL_PATH" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $RFKILL_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para rfkill: $RFKILL_PATH"
+ rfkill: $RFKILL_PATH"
     fi
     
     if [ -n "$IFCONFIG_PATH" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $IFCONFIG_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para ifconfig: $IFCONFIG_PATH"
+ ifconfig: $IFCONFIG_PATH"
     fi
     
     if [ -n "$IW_PATH" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $IW_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para iw: $IW_PATH"
+ iw: $IW_PATH"
     fi
     
     if [ -n "$IWCONFIG_PATH" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $IWCONFIG_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para iwconfig: $IWCONFIG_PATH"
+ iwconfig: $IWCONFIG_PATH"
     fi
     
     # Agregar permisos para hostapd y systemctl hostapd
     if command -v hostapd &> /dev/null; then
         HOSTAPD_PATH=$(command -v hostapd)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $HOSTAPD_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para hostapd: $HOSTAPD_PATH"
+ hostapd: $HOSTAPD_PATH"
     fi
     
     if command -v hostapd_cli &> /dev/null; then
         HOSTAPD_CLI_PATH=$(command -v hostapd_cli)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $HOSTAPD_CLI_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para hostapd_cli: $HOSTAPD_CLI_PATH"
+ hostapd_cli: $HOSTAPD_CLI_PATH"
     fi
     
     # Agregar permisos para wpa_supplicant y wpa_cli (para modo STA)
     if command -v wpa_supplicant &> /dev/null; then
         WPA_SUPPLICANT_PATH=$(command -v wpa_supplicant)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $WPA_SUPPLICANT_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para wpa_supplicant: $WPA_SUPPLICANT_PATH"
+ wpa_supplicant: $WPA_SUPPLICANT_PATH"
     fi
     
     # Agregar permisos para rutas estándar de wpa_supplicant (por si no está en PATH)
     for wpa_path in "/usr/sbin/wpa_supplicant" "/sbin/wpa_supplicant" "/usr/bin/wpa_supplicant" "/bin/wpa_supplicant"; do
         if [ -f "$wpa_path" ]; then
             echo "$USER_NAME ALL=(ALL) NOPASSWD: $wpa_path" >> "/etc/sudoers.d/hostberry"
-            print_info "Permisos agregados para wpa_supplicant: $wpa_path"
+ wpa_supplicant: $wpa_path"
         fi
     done
     
     if command -v wpa_cli &> /dev/null; then
         WPA_CLI_PATH=$(command -v wpa_cli)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $WPA_CLI_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para wpa_cli: $WPA_CLI_PATH"
+ wpa_cli: $WPA_CLI_PATH"
     elif [ -f "/usr/sbin/wpa_cli" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/wpa_cli" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para wpa_cli: /usr/sbin/wpa_cli"
+ wpa_cli: /usr/sbin/wpa_cli"
     elif [ -f "/sbin/wpa_cli" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /sbin/wpa_cli" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para wpa_cli: /sbin/wpa_cli"
+ wpa_cli: /sbin/wpa_cli"
     fi
     
     # Agregar permisos para systemctl con wpa_supplicant
@@ -1060,7 +1059,7 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH restart wpa_supplicant" >> "/etc/sudoers.d/hostberry"
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH status wpa_supplicant" >> "/etc/sudoers.d/hostberry"
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH stop NetworkManager" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para systemctl wpa_supplicant"
+ systemctl wpa_supplicant"
     fi
     
     # Agregar permisos para systemctl con hostapd y dnsmasq
@@ -1080,104 +1079,104 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH disable dnsmasq" >> "/etc/sudoers.d/hostberry"
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH unmask dnsmasq" >> "/etc/sudoers.d/hostberry"
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH daemon-reload" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para systemctl hostapd y dnsmasq"
+ systemctl hostapd y dnsmasq"
     fi
     
     # Agregar permisos para hostnamectl y hostname (cambio de hostname)
     if command -v hostnamectl &> /dev/null; then
         HOSTNAMECTL_PATH=$(command -v hostnamectl)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $HOSTNAMECTL_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para hostnamectl: $HOSTNAMECTL_PATH"
+ hostnamectl: $HOSTNAMECTL_PATH"
     elif [ -f "/usr/bin/hostnamectl" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/hostnamectl" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para hostnamectl: /usr/bin/hostnamectl"
+ hostnamectl: /usr/bin/hostnamectl"
     fi
     
     if command -v hostname &> /dev/null; then
         HOSTNAME_PATH=$(command -v hostname)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $HOSTNAME_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para hostname: $HOSTNAME_PATH"
+ hostname: $HOSTNAME_PATH"
     elif [ -f "/bin/hostname" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/hostname" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para hostname: /bin/hostname"
+ hostname: /bin/hostname"
     fi
     
     # Agregar permisos para ip (configuración de interfaces de red)
     if command -v ip &> /dev/null; then
         IP_PATH=$(command -v ip)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $IP_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para ip: $IP_PATH"
+ ip: $IP_PATH"
     elif [ -f "/usr/sbin/ip" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/ip" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para ip: /usr/sbin/ip"
+ ip: /usr/sbin/ip"
     elif [ -f "/sbin/ip" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /sbin/ip" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para ip: /sbin/ip"
+ ip: /sbin/ip"
     fi
     
     # Agregar permisos para pkill (para detener procesos wpa_supplicant)
     if command -v pkill &> /dev/null; then
         PKILL_PATH=$(command -v pkill)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $PKILL_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para pkill: $PKILL_PATH"
+ pkill: $PKILL_PATH"
     elif [ -f "/usr/bin/pkill" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/pkill" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para pkill: /usr/bin/pkill"
+ pkill: /usr/bin/pkill"
     fi
     
     # Agregar permisos para pgrep (para verificar procesos)
     if command -v pgrep &> /dev/null; then
         PGREP_PATH=$(command -v pgrep)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $PGREP_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para pgrep: $PGREP_PATH"
+ pgrep: $PGREP_PATH"
     elif [ -f "/usr/bin/pgrep" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/pgrep" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para pgrep: /usr/bin/pgrep"
+ pgrep: /usr/bin/pgrep"
     fi
     
     # Agregar permisos para dhclient y udhcpc (para obtener IP)
     if command -v dhclient &> /dev/null; then
         DHCPCLIENT_PATH=$(command -v dhclient)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $DHCPCLIENT_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para dhclient: $DHCPCLIENT_PATH"
+ dhclient: $DHCPCLIENT_PATH"
     elif [ -f "/usr/sbin/dhclient" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/dhclient" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para dhclient: /usr/sbin/dhclient"
+ dhclient: /usr/sbin/dhclient"
     fi
     
     if command -v udhcpc &> /dev/null; then
         UDHCPC_PATH=$(command -v udhcpc)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $UDHCPC_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para udhcpc: $UDHCPC_PATH"
+ udhcpc: $UDHCPC_PATH"
     elif [ -f "/usr/sbin/udhcpc" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/udhcpc" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para udhcpc: /usr/sbin/udhcpc"
+ udhcpc: /usr/sbin/udhcpc"
     fi
     
     # Agregar permisos para sysctl (habilitar IP forwarding)
     if command -v sysctl &> /dev/null; then
         SYSCTL_PATH=$(command -v sysctl)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSCTL_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para sysctl: $SYSCTL_PATH"
+ sysctl: $SYSCTL_PATH"
     elif [ -f "/usr/sbin/sysctl" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/sysctl" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para sysctl: /usr/sbin/sysctl"
+ sysctl: /usr/sbin/sysctl"
     elif [ -f "/sbin/sysctl" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /sbin/sysctl" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para sysctl: /sbin/sysctl"
+ sysctl: /sbin/sysctl"
     fi
     
     # Agregar permisos para iptables (configuración de NAT)
     if command -v iptables &> /dev/null; then
         IPTABLES_PATH=$(command -v iptables)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $IPTABLES_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para iptables: $IPTABLES_PATH"
+ iptables: $IPTABLES_PATH"
     elif [ -f "/usr/sbin/iptables" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/iptables" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para iptables: /usr/sbin/iptables"
+ iptables: /usr/sbin/iptables"
     elif [ -f "/sbin/iptables" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /sbin/iptables" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para iptables: /sbin/iptables"
+ iptables: /sbin/iptables"
     fi
     
     # Agregar permisos para comandos básicos necesarios para hostapd
@@ -1185,89 +1184,89 @@ EOF
     if command -v cp &> /dev/null; then
         CP_PATH=$(command -v cp)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $CP_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para cp: $CP_PATH"
+ cp: $CP_PATH"
     elif [ -f "/bin/cp" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/cp" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para cp: /bin/cp"
+ cp: /bin/cp"
     fi
     
     # mkdir (para crear directorios de configuración)
     if command -v mkdir &> /dev/null; then
         MKDIR_PATH=$(command -v mkdir)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $MKDIR_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para mkdir: $MKDIR_PATH"
+ mkdir: $MKDIR_PATH"
     elif [ -f "/bin/mkdir" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/mkdir" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para mkdir: /bin/mkdir"
+ mkdir: /bin/mkdir"
     fi
     
     # chmod (para establecer permisos de archivos)
     if command -v chmod &> /dev/null; then
         CHMOD_PATH=$(command -v chmod)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $CHMOD_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para chmod: $CHMOD_PATH"
+ chmod: $CHMOD_PATH"
     elif [ -f "/bin/chmod" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/chmod" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para chmod: /bin/chmod"
+ chmod: /bin/chmod"
     fi
     
     # tee (para escribir archivos de configuración)
     if command -v tee &> /dev/null; then
         TEE_PATH=$(command -v tee)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $TEE_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para tee: $TEE_PATH"
+ tee: $TEE_PATH"
     elif [ -f "/usr/bin/tee" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/tee" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para tee: /usr/bin/tee"
+ tee: /usr/bin/tee"
     fi
     
     # cat (para leer archivos y pasarlos a tee)
     if command -v cat &> /dev/null; then
         CAT_PATH=$(command -v cat)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $CAT_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para cat: $CAT_PATH"
+ cat: $CAT_PATH"
     elif [ -f "/bin/cat" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/cat" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para cat: /bin/cat"
+ cat: /bin/cat"
     fi
     
     # grep (para buscar en archivos como /etc/hosts)
     if command -v grep &> /dev/null; then
         GREP_PATH=$(command -v grep)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $GREP_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para grep: $GREP_PATH"
+ grep: $GREP_PATH"
     elif [ -f "/bin/grep" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/grep" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para grep: /bin/grep"
+ grep: /bin/grep"
     elif [ -f "/usr/bin/grep" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/grep" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para grep: /usr/bin/grep"
+ grep: /usr/bin/grep"
     fi
     
     # sed (para reemplazar texto en archivos como /etc/hosts)
     if command -v sed &> /dev/null; then
         SED_PATH=$(command -v sed)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SED_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para sed: $SED_PATH"
+ sed: $SED_PATH"
     elif [ -f "/bin/sed" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/sed" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para sed: /bin/sed"
+ sed: /bin/sed"
     elif [ -f "/usr/bin/sed" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/sed" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para sed: /usr/bin/sed"
+ sed: /usr/bin/sed"
     fi
     
     # mount (para remontar sistemas de archivos de solo lectura como lectura-escritura)
     if command -v mount &> /dev/null; then
         MOUNT_PATH=$(command -v mount)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $MOUNT_PATH" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para mount: $MOUNT_PATH"
+ mount: $MOUNT_PATH"
     elif [ -f "/bin/mount" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /bin/mount" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para mount: /bin/mount"
+ mount: /bin/mount"
     elif [ -f "/usr/bin/mount" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/mount" >> "/etc/sudoers.d/hostberry"
-        print_info "Permisos agregados para mount: /usr/bin/mount"
+ mount: /usr/bin/mount"
     fi
     
     # Crear directorio /etc/hostapd con permisos correctos
