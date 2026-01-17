@@ -362,70 +362,20 @@ install_dependencies() {
     print_success "Dependencias instaladas"
 }
 
-# Descargar proyecto de GitHub si es necesario
+# Descargar proyecto de GitHub (siempre desde GitHub, nunca local)
 download_project() {
-    # En modo update, verificar primero si tenemos código local con todos los archivos
     if [ "$MODE" = "update" ]; then
-        # Verificar si estamos en un repositorio git válido con todos los archivos necesarios
-        local has_all_files=true
-        for item in "website" "locales" "main.go" "go.mod"; do
-            if [ ! -e "${SCRIPT_DIR}/${item}" ]; then
-                has_all_files=false
-                break
-            fi
-        done
-        
-        # Si tenemos todos los archivos localmente, usar el directorio actual (preferir código local)
-        if [ "$has_all_files" = true ]; then
-            print_info "Modo actualización: usando código local en ${SCRIPT_DIR}"
-            print_warning "⚠️  Si quieres actualizar desde GitHub, ejecuta desde un directorio vacío o sin el repo completo"
-            return 0
-        fi
-        
-        # Si no tenemos código local, descargar desde GitHub
-        print_info "Modo actualización: descargando desde GitHub (no se encontró código local)..."
-        
-        # Limpiar directorio temporal si existe
-        if [ -d "$TEMP_CLONE_DIR" ]; then
-            rm -rf "$TEMP_CLONE_DIR"
-        fi
-        
-        # Clonar repositorio
-        if git clone "$GITHUB_REPO" "$TEMP_CLONE_DIR" 2>/dev/null; then
-            print_success "Proyecto descargado desde GitHub"
-            SCRIPT_DIR="$TEMP_CLONE_DIR"
-            return 0
-        else
-            print_error "Error al descargar el proyecto desde GitHub"
-            print_info "Verifica tu conexión a internet y que el repositorio sea accesible"
-            exit 1
-        fi
+        print_info "Modo actualización: descargando desde GitHub..."
+    else
+        print_info "Descargando proyecto desde GitHub..."
     fi
-    
-    # En modo install, verificar si estamos en un repositorio git válido con todos los archivos necesarios
-    local has_all_files=true
-    for item in "website" "locales" "main.go" "go.mod"; do
-        if [ ! -e "${SCRIPT_DIR}/${item}" ]; then
-            has_all_files=false
-            break
-        fi
-    done
-    
-    # Si tenemos todos los archivos, usar el directorio actual
-    if [ "$has_all_files" = true ]; then
-        print_info "Usando proyecto local en ${SCRIPT_DIR}"
-        return 0
-    fi
-    
-    # Si no, descargar de GitHub
-    print_info "Descargando proyecto desde GitHub..."
     
     # Limpiar directorio temporal si existe
     if [ -d "$TEMP_CLONE_DIR" ]; then
         rm -rf "$TEMP_CLONE_DIR"
     fi
     
-    # Clonar repositorio
+    # Clonar repositorio desde GitHub
     if git clone "$GITHUB_REPO" "$TEMP_CLONE_DIR" 2>/dev/null; then
         print_success "Proyecto descargado desde GitHub"
         SCRIPT_DIR="$TEMP_CLONE_DIR"
