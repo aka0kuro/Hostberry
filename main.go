@@ -1039,7 +1039,3 @@ func securityMiddleware(c *fiber.Ctx) error {
 			}
 		}
 	}
-
-	return stats
-}
-*/
