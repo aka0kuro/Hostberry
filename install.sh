@@ -793,61 +793,36 @@ build_project() {
         exit 1
     fi
     
-    print_info "Go versión: $(go version)"
+    # Verificar estructura antes de compilar
+    if [ ! -f "${INSTALL_DIR}/main.go" ]; then
+        print_error "Error: main.go no encontrado"
+        exit 1
+    fi
+    
+    if [ ! -d "${INSTALL_DIR}/website/templates" ]; then
+        print_error "Error: Directorio de templates no encontrado"
+        exit 1
+    fi
     
     # Descargar dependencias
-    print_info "Descargando dependencias de Go..."
     if ! download_go_deps; then
         exit 1
     fi
     
-    if ! env $HOSTBERRY_GO_MOD_ENV go mod tidy; then
-        print_warning "Advertencia: go mod tidy tuvo problemas, continuando..."
-    fi
-    
-    # Verificar estructura antes de compilar
-    print_info "Verificando estructura antes de compilar..."
-    print_info "  - main.go: ${INSTALL_DIR}/main.go"
-    if [ -f "${INSTALL_DIR}/main.go" ]; then
-        print_success "  ✅ main.go encontrado"
-    else
-        print_error "  ❌ main.go NO encontrado"
-        exit 1
-    fi
-    
-    print_info "  - templates: ${INSTALL_DIR}/website/templates"
-    if [ -d "${INSTALL_DIR}/website/templates" ]; then
-        TEMPLATE_LIST=$(ls -1 "${INSTALL_DIR}/website/templates"/*.html 2>/dev/null | wc -l)
-        print_success "  ✅ Directorio de templates encontrado con $TEMPLATE_LIST archivos"
-        # Listar algunos templates para verificación
-        print_info "  Templates encontrados:"
-        ls -1 "${INSTALL_DIR}/website/templates"/*.html 2>/dev/null | head -5 | while read file; do
-            print_info "    - $(basename "$file")"
-        done
-    else
-        print_error "  ❌ Directorio de templates NO encontrado"
-        exit 1
-    fi
+    env $HOSTBERRY_GO_MOD_ENV go mod tidy > /dev/null 2>&1 || true
     
     # Compilar
-    print_info "Compilando binario (los templates se embebarán automáticamente desde ${INSTALL_DIR}/website/templates)..."
-    print_info "La directiva //go:embed buscará templates en: website/templates (relativo a main.go en ${INSTALL_DIR})"
-    print_info "Directorio actual: $(pwd)"
-    
+    print_info "Compilando..."
     if CGO_ENABLED=1 go build -ldflags="-s -w" -o "${INSTALL_DIR}/hostberry" .; then
         if [ -f "${INSTALL_DIR}/hostberry" ]; then
             chmod +x "${INSTALL_DIR}/hostberry"
             chown "$USER_NAME:$GROUP_NAME" "${INSTALL_DIR}/hostberry"
-            BINARY_SIZE=$(du -h "${INSTALL_DIR}/hostberry" | cut -f1)
-            print_success "Compilación exitosa (templates embebidos en el binario)"
-            print_info "Tamaño del binario: $BINARY_SIZE"
         else
-            print_error "Error: El binario no se creó en ${INSTALL_DIR}/hostberry"
+            print_error "Error: El binario no se creó"
             exit 1
         fi
     else
         print_error "Error en la compilación"
-        print_info "Revisa los errores de compilación arriba"
         exit 1
     fi
 }
