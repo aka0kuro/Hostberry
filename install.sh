@@ -42,43 +42,31 @@ print_error()   { echo -e "${RED}[x]${NC} $1"; }
 print_logo() {
     printf "%b" "$RED"
     cat <<'EOF'
-                                    x                                
-                                  +$$$$                              
-                  XXX;           +$$$$        ;X$X                   
-                 .$$$$$$$$.      $$$X    .$$$$$$$$.                  
-                  $$$$$$$$$$$   $$$$   $$$$$$$$$$$                   
-                  :$$$$$$$$$$$: $$$. :$$$$$$$$$$$:                   
-                   ;$$$$$$$$$$$$$$$.$$$$$$$$$$$$;                    
-                     $$$$$$$$$$$$$$+$$$$$$$$$$$                      
-                       $$$$$$$$$$$$$$$$$$$$$$                        
-                 ;XXXXXXXX$$XXXXXXXXXXX$$XXXXXXXXX;                  
-              :XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.               
-             XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX              
-            XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX;             
-            XXXXXXXXXXXXXXX;:::::::::::::XXXXXXXXXXXXXXX             
-         XXXXXXXXXXXXXXX:::::::;XXXx::::::::XXXXXXXXXXXXXXX          
-       XXXXXXXXXXXXXXX::::;XXXXXXXXXXXXXX:::::XXXXXXXXXXXXXX.        
-      .XXXXXXXXXXXXXXXXxXXXXX;:::::::::XXXXXXXXXXXXXXXXXXXXXX        
-      XXXXXXXXXXXX:XXXXXXX;::::::::::::::XXXXXXX;:XXXXXXXXXXX.       
-      :XXXXXXXXX+:::XXXXXXX::XXXXXXXXXX::XXXXXXX:::xXXXXXXXXX        
-       XXXXXXXX+::XXXXxXXXXXXXXX:::;XXXXXXXXXXXXXx::XXXXXXXXX        
-        xXXXXXX:::XXX:::XXXXXX::::::::XXXXXX:::XXX:::XXXXXX:         
-          XXXXX::XXX;::XXXXXXXXXXXXXXXXXXXXXX::+XXX::XXXXX           
-         XXXXXX::XXXX::::::XXXXXXXXXXXXXX::::::XXXX::XXXXXX          
-         XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX          
-         XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX$XXXXXXXXXXXXXXXXX          
-         XXXXXXXXXXXXXX::::::::::::::::::::::$XXXXXXXXXXXXx          
-          XXXXXXXXXXXX::::::::::::::::::::::::XXXXXXXXXXX;           
-            XXXXXXXXXX::.XX::+$X::::::::::::::XXXXXXXXX+             
-               ;XXXXXX::::::::::::::::::::::::XXXXXX:                
-               :XXXXXXXX$$$$$$$$$$$$$$$$$$$$XXXXXXXX:                
-                XXXXXXXXXXXXXXXXXXX$$XXXXXXXXXXXXXXX                 
-                 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX                  
-                   XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX                    
-                          XXXXXXXXXXXXXXXX                           
-                          .XXXXXXXXXXXXXX                            
-                            XXXXXXXXXXX:                             
-                                :;X:                                 
+                       $x                    
+                      $$$                    
+            $$$$$$   $$$  .$$$$$$            
+            $$$$$$$$ $$ .$$$$$$$             
+             $$$$$$$$$$$$$$$$$$              
+               $$$$$$$$$$$$$$.               
+          XXXXXXXXXXXXXXXXXXXXXXXX           
+        :XXXXXXXXXXXXXXXXXXXXXXXXXXX         
+        XXXXXXXXXXX;:::::XXXXXXXXXXX.        
+     .XXXXXXXXX:::::XXXX:::::XXXXXXXXX+      
+    XXXXXXXXXXX:XXXX;:::XXXX:+XXXXXXXXXX     
+    XXXXXXX::XXXX::::XX+:::XXXX::XXXXXXX     
+    :XXXXX::XXXXXXXXXXXXXXXXXXXX::XXXXXX     
+      XXXX:XX;:XXXXX:XX::XXXX::XX::XXX:      
+      XXX+:XXX:::XXXXXXXXXX::::XX::XXX       
+      XXXXXXXXXXXXXXX$XXXXXXXXXXXXXXXXx      
+      XXXXXXXXX::::::::::::::XXXXXXXXX       
+       XXXXXXX::X$:$X:::::::::XXXXXXX        
+          XXXX::::::::::::::::XXXX           
+          XXXXXX$XXXXXXXXXXXXXXXXX           
+           XXXXXXXXXXXXXXXXXXXXXX            
+              xXXXXXXXXXXXXXXX               
+                 .XXXXXXXXX                  
+                    XXXX.                    
+                            
 
 EOF
     printf "%b\n" "$NC"
