@@ -310,6 +310,14 @@ func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, err
 	var workingSocketDir string
 	var lastPingOutput string
 	var lastStatusOutput string
+	var lastPingErr error
+	var lastStatusErr error
+
+	runWpaCli := func(args ...string) (string, error) {
+		cmd := exec.Command("sudo", args...)
+		out, err := cmd.CombinedOutput()
+		return strings.TrimSpace(string(out)), err
+	}
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		workingSocketDir = ""
 		for _, dir := range uniqueDirs {
@@ -323,27 +331,54 @@ func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, err
 			}
 
 			// Intentar ping aunque el socket no se haya detectado aún
-			pingCmd := fmt.Sprintf("sudo wpa_cli -i %s -p %s ping", interfaceName, dir)
-			pingOut, _ := executeCommand(pingCmd)
-			lastPingOutput = strings.TrimSpace(pingOut)
+			pingOut, pingErr := runWpaCli("wpa_cli", "-i", interfaceName, "-p", dir, "ping")
+			lastPingOutput = pingOut
+			lastPingErr = pingErr
 			if lastPingOutput != "" {
 				log.Printf("wpa_cli ping (%s): %s", dir, lastPingOutput)
 			}
-			if strings.Contains(pingOut, "PONG") {
+			if pingErr != nil && lastPingOutput != "" {
+				log.Printf("wpa_cli ping error (%s): %v", dir, pingErr)
+			}
+			if strings.Contains(lastPingOutput, "PONG") {
 				log.Printf("wpa_cli respondió correctamente desde %s", dir)
 				return dir, nil
 			}
 
 			// Fallback: intentar status (algunas builds responden aquí aunque ping falle)
-			statusCmd := fmt.Sprintf("sudo wpa_cli -i %s -p %s status", interfaceName, dir)
-			statusOut, _ := executeCommand(statusCmd)
-			lastStatusOutput = strings.TrimSpace(statusOut)
+			statusOut, statusErr := runWpaCli("wpa_cli", "-i", interfaceName, "-p", dir, "status")
+			lastStatusOutput = statusOut
+			lastStatusErr = statusErr
 			if lastStatusOutput != "" {
 				log.Printf("wpa_cli status (%s): %s", dir, lastStatusOutput)
 			}
-			if strings.Contains(statusOut, "wpa_state=") {
+			if statusErr != nil && lastStatusOutput != "" {
+				log.Printf("wpa_cli status error (%s): %v", dir, statusErr)
+			}
+			if strings.Contains(lastStatusOutput, "wpa_state=") {
 				log.Printf("wpa_cli respondió con status válido desde %s", dir)
 				return dir, nil
+			}
+
+			// Fallback 2: intentar interfaz global si existe
+			globalSocket := fmt.Sprintf("%s/global", dir)
+			if _, err := os.Stat(globalSocket); err == nil {
+				globalPingOut, globalPingErr := runWpaCli("wpa_cli", "-g", dir, "-i", interfaceName, "ping")
+				if strings.TrimSpace(globalPingOut) != "" {
+					log.Printf("wpa_cli global ping (%s): %s", dir, strings.TrimSpace(globalPingOut))
+				}
+				if globalPingErr == nil && strings.Contains(globalPingOut, "PONG") {
+					log.Printf("wpa_cli respondió correctamente desde interfaz global en %s", dir)
+					return dir, nil
+				}
+				globalStatusOut, globalStatusErr := runWpaCli("wpa_cli", "-g", dir, "-i", interfaceName, "status")
+				if strings.TrimSpace(globalStatusOut) != "" {
+					log.Printf("wpa_cli global status (%s): %s", dir, strings.TrimSpace(globalStatusOut))
+				}
+				if globalStatusErr == nil && strings.Contains(globalStatusOut, "wpa_state=") {
+					log.Printf("wpa_cli respondió con status válido desde interfaz global en %s", dir)
+					return dir, nil
+				}
 			}
 		}
 
@@ -357,7 +392,7 @@ func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, err
 	}
 
 	if lastPingOutput != "" || lastStatusOutput != "" {
-		return "", fmt.Errorf("wpa_cli no pudo comunicarse con wpa_supplicant después de %d intentos (último ping: %s, último status: %s)", maxAttempts, lastPingOutput, lastStatusOutput)
+		return "", fmt.Errorf("wpa_cli no pudo comunicarse con wpa_supplicant después de %d intentos (último ping: %s, error: %v; último status: %s, error: %v)", maxAttempts, lastPingOutput, lastPingErr, lastStatusOutput, lastStatusErr)
 	}
 	return "", fmt.Errorf("wpa_cli no pudo comunicarse con wpa_supplicant después de %d intentos", maxAttempts)
 }
