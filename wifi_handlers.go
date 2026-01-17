@@ -659,6 +659,11 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 		os.Remove(testFile)
 		log.Printf("Directorio de socket verificado como escribible: %s", runDir)
 	}
+
+	// Asegurar permisos del directorio de socket (para wpa_supplicant y wpa_cli)
+	executeCommand(fmt.Sprintf("sudo mkdir -p %s 2>/dev/null || true", runDir))
+	executeCommand(fmt.Sprintf("sudo chmod 775 %s 2>/dev/null || true", runDir))
+	executeCommand(fmt.Sprintf("sudo chown root:netdev %s 2>/dev/null || true", runDir))
 	
 	configContent := fmt.Sprintf(`ctrl_interface=DIR=%s GROUP=netdev
 ctrl_interface_group=netdev
