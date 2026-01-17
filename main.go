@@ -611,9 +611,6 @@ func wifiScanHandler(c *fiber.Ctx) error {
 	return c.JSON([]fiber.Map{})
 }
 
-// wifiScanFallback eliminada - no se usa, la funcionalidad está en wifiScanHandler y scanWiFiNetworks
-/*
-func wifiScanFallback(c *fiber.Ctx, interfaceName string) error {
 	var networks []fiber.Map
 
 	// Si no se especifica interfaz, detectar automáticamente
@@ -925,8 +922,6 @@ func securityMiddleware(c *fiber.Ctx) error {
 	return c.Next()
 }
 
-// getSystemStats está ahora en system_handlers.go
-/*func getSystemStats() fiber.Map {
 	stats := fiber.Map{
 		"cpu_usage":      0.0,
 		"memory_usage":   0.0,
