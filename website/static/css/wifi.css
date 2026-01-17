@@ -516,7 +516,10 @@ body.light-theme .network-card-ssid {
     color: var(--hb-text-muted);
     margin-top: 0;
     line-height: 1.2;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
 }
 
 body.light-theme .network-card-details {
