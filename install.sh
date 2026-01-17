@@ -152,7 +152,7 @@ install_dependencies() {
     apt-get update -qq
     
     # Instalar dependencias básicas
-    DEPS="wget curl build-essential iw"
+    DEPS="wget curl build-essential iw isc-dhcp-client"
     
     # Instalar hostapd y herramientas relacionadas
     print_info "Instalando hostapd, wpa_supplicant y herramientas WiFi..."
