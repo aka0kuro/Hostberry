@@ -352,6 +352,20 @@ body.light-theme .wifi-interface-select-icon {
     width: 100%;
 }
 
+.wifi-buttons-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.wifi-buttons-row .btn {
+    width: 100%;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
 /* Info Grid */
 .info-grid {
     display: grid;

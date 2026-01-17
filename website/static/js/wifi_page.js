@@ -463,6 +463,10 @@
         if (!statusResp.ok) return;
         const statusData = await statusResp.json();
 
+        if (statusData.soft_blocked || !statusData.enabled) {
+          showAlert('info', t('wifi.activating', 'Activating WiFi...'));
+        }
+
         if (statusData.soft_blocked) {
           await apiRequest('/api/v1/wifi/software-switch', { method: 'POST' });
         }
@@ -472,6 +476,9 @@
 
         // Esperar un poco para que el sistema aplique el cambio
         await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Forzar refresco del estado después de activar
+        await loadConnectionStatus();
       } catch (error) {
         console.error(t('wifi.toggle_error', 'Error toggling WiFi') + ':', error);
       }
