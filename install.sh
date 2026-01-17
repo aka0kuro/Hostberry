@@ -40,12 +40,6 @@ print_error()   { echo -e "${RED}[x]${NC} $1"; }
 
 # Logo ASCII (basado en website/static/hostberry.png)
 print_logo() {
-    printf "%b" "$GREEN"
-    cat <<'EOF'
-        /\  /\  /\        
-       /  \/  \/  \       
-          \  |  /         
-EOF
     printf "%b" "$RED"
     cat <<'EOF'
                                     x                                
