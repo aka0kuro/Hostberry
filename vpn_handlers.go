@@ -8,11 +8,9 @@ import (
 	"strings"
 )
 
-// getVPNStatus obtiene el estado de VPN (reemplaza vpn_status.lua)
 func getVPNStatus() map[string]interface{} {
 	result := make(map[string]interface{})
 
-	// Verificar OpenVPN
 	openvpnCmd := exec.Command("sh", "-c", "systemctl is-active openvpn 2>/dev/null || pgrep openvpn > /dev/null && echo active || echo inactive")
 	openvpnOut, _ := openvpnCmd.Output()
 	openvpnStatus := strings.TrimSpace(string(openvpnOut))
@@ -25,7 +23,6 @@ func getVPNStatus() map[string]interface{} {
 		"status": openvpnStatus,
 	}
 
-	// Verificar WireGuard
 	wgCmd := exec.Command("sh", "-c", "wg show 2>/dev/null | head -1")
 	wgOut, _ := wgCmd.Output()
 	wgActive := strings.TrimSpace(string(wgOut)) != ""
@@ -36,7 +33,6 @@ func getVPNStatus() map[string]interface{} {
 	}
 
 	if wgActive {
-		// Obtener interfaces WireGuard
 		wgInterfacesCmd := exec.Command("sh", "-c", "wg show interfaces 2>/dev/null")
 		if wgInterfacesOut, err := wgInterfacesCmd.Output(); err == nil {
 			interfaces := strings.Split(strings.TrimSpace(string(wgInterfacesOut)), "\n")
@@ -58,7 +54,6 @@ func getVPNStatus() map[string]interface{} {
 	return result
 }
 
-// connectVPN conecta a una VPN (reemplaza vpn_connect.lua)
 func connectVPN(config, vpnType, user string) map[string]interface{} {
 	result := make(map[string]interface{})
 
@@ -78,7 +73,6 @@ func connectVPN(config, vpnType, user string) map[string]interface{} {
 	log.Printf("Conectando VPN tipo: %s (usuario: %s)", vpnType, user)
 
 	if vpnType == "openvpn" {
-		// Guardar configuración
 		configFile := "/etc/openvpn/client.conf"
 		if err := os.WriteFile(configFile, []byte(config), 0644); err != nil {
 			result["success"] = false
@@ -86,7 +80,6 @@ func connectVPN(config, vpnType, user string) map[string]interface{} {
 			return result
 		}
 
-		// Iniciar OpenVPN
 		cmd := "sudo systemctl start openvpn@client"
 		if out, err := executeCommand(cmd); err != nil {
 			result["success"] = false
@@ -99,7 +92,6 @@ func connectVPN(config, vpnType, user string) map[string]interface{} {
 			result["message"] = "OpenVPN iniciado"
 		}
 	} else if vpnType == "wireguard" {
-		// Guardar configuración WireGuard
 		configFile := "/etc/wireguard/wg0.conf"
 		if err := os.WriteFile(configFile, []byte(config), 0600); err != nil {
 			result["success"] = false
@@ -107,7 +99,6 @@ func connectVPN(config, vpnType, user string) map[string]interface{} {
 			return result
 		}
 
-		// Activar interfaz
 		cmd := "sudo wg-quick up wg0"
 		if out, err := executeCommand(cmd); err != nil {
 			result["success"] = false
@@ -127,11 +118,9 @@ func connectVPN(config, vpnType, user string) map[string]interface{} {
 	return result
 }
 
-// getWireGuardStatus obtiene el estado de WireGuard (reemplaza wireguard_status.lua)
 func getWireGuardStatus() map[string]interface{} {
 	result := make(map[string]interface{})
 
-	// Verificar si WireGuard está activo
 	wgCmd := exec.Command("sh", "-c", "wg show 2>/dev/null")
 	wgOut, _ := wgCmd.Output()
 	wgActive := strings.TrimSpace(string(wgOut)) != ""
@@ -140,7 +129,6 @@ func getWireGuardStatus() map[string]interface{} {
 	result["interfaces"] = []map[string]interface{}{}
 
 	if wgActive {
-		// Obtener interfaces
 		interfacesCmd := exec.Command("sh", "-c", "wg show interfaces 2>/dev/null")
 		if interfacesOut, err := interfacesCmd.Output(); err == nil {
 			interfaces := strings.Split(strings.TrimSpace(string(interfacesOut)), "\n")
@@ -153,7 +141,6 @@ func getWireGuardStatus() map[string]interface{} {
 						"name": iface,
 					}
 
-					// Obtener detalles de la interfaz
 					detailsCmd := exec.Command("sh", "-c", fmt.Sprintf("wg show %s 2>/dev/null", iface))
 					if detailsOut, err := detailsCmd.Output(); err == nil {
 						interfaceInfo["details"] = strings.TrimSpace(string(detailsOut))
@@ -175,7 +162,6 @@ func getWireGuardStatus() map[string]interface{} {
 	return result
 }
 
-// configureWireGuard configura WireGuard (reemplaza wireguard_config.lua)
 func configureWireGuard(config, user string) map[string]interface{} {
 	result := make(map[string]interface{})
 
@@ -191,7 +177,6 @@ func configureWireGuard(config, user string) map[string]interface{} {
 
 	log.Printf("Configurando WireGuard (usuario: %s)", user)
 
-	// Guardar configuración
 	configFile := "/etc/wireguard/wg0.conf"
 	if err := os.WriteFile(configFile, []byte(config), 0600); err != nil {
 		result["success"] = false
@@ -201,10 +186,8 @@ func configureWireGuard(config, user string) map[string]interface{} {
 		return result
 	}
 
-	// Recargar configuración si ya está activo
 	wgStatusCmd := exec.Command("sh", "-c", "wg show wg0 2>/dev/null")
 	if wgStatusOut, err := wgStatusCmd.Output(); err == nil && strings.TrimSpace(string(wgStatusOut)) != "" {
-		// Reiniciar interfaz
 		executeCommand("sudo wg-quick down wg0 2>/dev/null")
 		executeCommand("sudo wg-quick up wg0 2>/dev/null")
 		result["message"] = "WireGuard reiniciado con nueva configuración"

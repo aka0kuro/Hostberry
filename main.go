@@ -24,13 +24,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:embed website/templates
 var templatesFS embed.FS
 
-//go:embed website/static
 var staticFS embed.FS
 
-// Configuración de la aplicación
 type Config struct {
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
@@ -65,44 +62,35 @@ type SecurityConfig struct {
 
 var appConfig Config
 
-// generateRandomSecret genera un secreto aleatorio de 32 bytes
 func generateRandomSecret() string {
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
-		// Fallback si rand falla
 		return fmt.Sprintf("%d-%d", time.Now().UnixNano(), os.Getpid())
 	}
 	return hex.EncodeToString(bytes)
 }
 
 func main() {
-	// Cargar configuración
 	if err := loadConfig(); err != nil {
 		log.Fatalf("Error cargando configuración: %v", err)
 	}
 
 
-	// Inicializar i18n
 	if err := InitI18n("locales"); err != nil {
 		log.Printf("⚠️  Advertencia: Error inicializando i18n: %v", err)
 	}
 
-	// Inicializar base de datos
 	if err := initDatabase(); err != nil {
 		log.Fatalf("❌ Error inicializando base de datos: %v", err)
 	}
 
-	// Crear usuario admin por defecto si no existe
 	log.Println("🔐 Verificando usuario admin por defecto...")
 	createDefaultAdmin()
 
-	// Crear aplicación Fiber
 	app := createApp()
 
-	// Configurar rutas
 	setupRoutes(app)
 
-	// Iniciar servidor
 	addr := fmt.Sprintf("%s:%d", appConfig.Server.Host, appConfig.Server.Port)
 	log.Printf("🚀 HostBerry iniciando en %s", addr)
 	log.Printf("📋 Configuración: Debug=%v, Timeout=%ds/%ds",
@@ -110,7 +98,6 @@ func main() {
 		appConfig.Server.ReadTimeout,
 		appConfig.Server.WriteTimeout)
 
-	// Manejo graceful de shutdown
 	go func() {
 		sigint := make(chan os.Signal, 1)
 		signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
@@ -131,10 +118,8 @@ func main() {
 }
 
 func loadConfig() error {
-	// Intentar cargar desde config.yaml, si no existe usar defaults
 	data, err := os.ReadFile("config.yaml")
 	if err != nil {
-		// Configuración por defecto
 		appConfig = Config{
 			Server: ServerConfig{
 				Host:         DefaultServerHost,
@@ -161,7 +146,6 @@ func loadConfig() error {
 }
 
 func createApp() *fiber.App {
-	// Configurar templates
 	engine := createTemplateEngine()
 	if engine == nil {
 		log.Fatal("❌ Error crítico: No se pudo crear el engine de templates")
@@ -176,27 +160,20 @@ func createApp() *fiber.App {
 		ErrorHandler: errorHandler,
 	})
 
-	// Verificar que el engine se asignó correctamente
 	if app.Config().Views == nil {
 		log.Fatal("❌ Error crítico: Views no se asignó correctamente a la app")
 	}
 	log.Println("✅ Engine de templates asignado correctamente a Fiber app")
 
-	// IMPORTANTE: Registrar archivos estáticos ANTES de aplicar middlewares globales
-	// para evitar que cualquier middleware intercepte /static/*
 	setupStaticFiles(app)
 
-	// Middlewares globales
-	// Configurar logger con formato más legible
 	app.Use(logger.New(logger.Config{
 		Format:     "${time} | ${status} | ${latency} | ${ip} | ${method} | ${path}\n",
 		TimeFormat: "15:04:05",
 		TimeZone:   "Local",
 		Output:     os.Stdout,
-		// Filtrar archivos estáticos para reducir ruido
 		Next: func(c *fiber.Ctx) bool {
 			path := c.Path()
-			// Omitir logs de archivos estáticos comunes
 			return strings.HasPrefix(path, "/static/") &&
 				(strings.HasSuffix(path, ".css") ||
 					strings.HasSuffix(path, ".js") ||
@@ -213,10 +190,8 @@ func createApp() *fiber.App {
 		},
 	}))
 	app.Use(compress.New())
-	// CORS más restrictivo: solo permitir orígenes específicos en producción
 	corsOrigins := "*"
 	if !appConfig.Server.Debug {
-		// En producción, solo permitir localhost y la IP del servidor
 		corsOrigins = "http://localhost:" + fmt.Sprintf("%d", appConfig.Server.Port) + ",http://127.0.0.1:" + fmt.Sprintf("%d", appConfig.Server.Port)
 	}
 	app.Use(cors.New(cors.Config{
@@ -227,28 +202,19 @@ func createApp() *fiber.App {
 		MaxAge:           3600,
 	}))
 
-	// Middleware de seguridad se aplica a rutas específicas con requireAuth
 
-	// Middleware de logging
 	app.Use(loggingMiddleware)
 
-	// Middleware de idioma (debe ir antes de las rutas)
 	app.Use(LanguageMiddleware)
 
-	// Middleware de Request ID para tracing
 	app.Use(requestIDMiddleware)
 
-	// Rate limiting (solo para APIs)
 	app.Use("/api/", rateLimitMiddleware)
 
 	return app
 }
 
-// setupStaticFiles registra los archivos estáticos ANTES de cualquier middleware
-// para asegurar que /static/* siempre se sirva correctamente sin interceptación
 func setupStaticFiles(app *fiber.App) {
-	// Archivos estáticos: preferir filesystem (para poder actualizar JS/CSS sin recompilar),
-	// fallback a embebidos si no existe ./website/static.
 	if _, err := os.Stat("./website/static"); err == nil {
 		app.Static("/static", "./website/static", fiber.Static{
 			Compress:  true,
@@ -256,13 +222,11 @@ func setupStaticFiles(app *fiber.App) {
 		})
 		log.Println("✅ Archivos estáticos cargados desde sistema de archivos")
 	} else {
-		// Fallback: estáticos embebidos
 		staticSubFS, err := fs.Sub(staticFS, "website/static")
 		if err != nil {
 			log.Printf("⚠️  Error preparando archivos estáticos embebidos: %v", err)
 			log.Printf("⚠️  No se encontraron archivos estáticos ni en filesystem ni embebidos")
 		} else {
-			// Usar handler personalizado para archivos embebidos
 			app.Get("/static/*", func(c *fiber.Ctx) error {
 				path := c.Params("*")
 				file, err := staticSubFS.Open(path)
@@ -285,19 +249,16 @@ func setupStaticFiles(app *fiber.App) {
 }
 
 func setupRoutes(app *fiber.App) {
-	// Health check endpoints (sin autenticación)
 	app.Get("/health", healthCheckHandler)
 	app.Get("/health/ready", readinessCheckHandler)
 	app.Get("/health/live", livenessCheckHandler)
 
-	// Rutas web
 	web := app.Group("/")
 	{
 		web.Get("/login", loginHandler)
 		web.Get("/first-login", firstLoginPageHandler)
 		web.Get("/", indexHandler)
 
-		// Páginas protegidas (requieren token por cookie o query ?token=)
 		protected := web.Group("/", requireAuth)
 		protected.Get("/dashboard", dashboardHandler)
 		protected.Get("/settings", settingsHandler)
@@ -314,10 +275,8 @@ func setupRoutes(app *fiber.App) {
 		protected.Get("/update", updatePageHandler)
 	}
 
-	// API v1
 	api := app.Group("/api/v1")
 	{
-		// Autenticación
 		auth := api.Group("/auth")
 		{
 			auth.Post("/login", loginAPIHandler)
@@ -329,7 +288,6 @@ func setupRoutes(app *fiber.App) {
 			auth.Post("/preferences", requireAuth, updatePreferencesAPIHandler)
 		}
 
-		// Sistema
 		system := api.Group("/system", requireAuth)
 		{
 			system.Get("/stats", systemStatsHandler)
@@ -345,7 +303,6 @@ func setupRoutes(app *fiber.App) {
 			system.Post("/shutdown", systemShutdownHandler)
 		}
 
-		// Red
 		network := api.Group("/network", requireAuth)
 		{
 			network.Get("/status", networkStatusHandler)
@@ -356,7 +313,6 @@ func setupRoutes(app *fiber.App) {
 			network.Post("/config", networkConfigHandler)
 		}
 
-		// WiFi
 		wifi := api.Group("/wifi", requireAuth)
 		{
 			wifi.Get("/status", wifiStatusHandler)
@@ -372,7 +328,6 @@ func setupRoutes(app *fiber.App) {
 			wifi.Post("/config", wifiConfigHandler)
 		}
 
-		// VPN
 		vpn := api.Group("/vpn", requireAuth)
 		{
 			vpn.Get("/status", vpnStatusHandler)
@@ -386,7 +341,6 @@ func setupRoutes(app *fiber.App) {
 			vpn.Post("/certificates/generate", vpnCertificatesGenerateHandler)
 		}
 
-		// HostAPD
 		hostapd := api.Group("/hostapd", requireAuth)
 		{
 		hostapd.Get("/access-points", hostapdAccessPointsHandler)
@@ -398,16 +352,13 @@ func setupRoutes(app *fiber.App) {
 		hostapd.Post("/config", hostapdConfigHandler)
 		}
 
-		// Help
 		help := api.Group("/help", requireAuth)
 		{
 			help.Post("/contact", helpContactHandler)
 		}
 
-		// Translations (para carga dinámica)
 		api.Get("/translations/:lang", translationsHandler)
 
-		// WireGuard
 		wireguard := api.Group("/wireguard", requireAuth)
 		{
 			wireguard.Get("/status", wireguardStatusHandler)
@@ -419,7 +370,6 @@ func setupRoutes(app *fiber.App) {
 			wireguard.Post("/restart", wireguardRestartHandler)
 		}
 
-		// AdBlock
 		adblock := api.Group("/adblock", requireAuth)
 		{
 			adblock.Get("/status", adblockStatusHandler)
@@ -428,8 +378,6 @@ func setupRoutes(app *fiber.App) {
 		}
 	}
 
-	// Compat legacy: /api/wifi/* usado por wifi_scan.js
-	// IMPORTANTE: NO usar app.Group("/api", ...) porque intercepta /api/v1/*
 	wifiLegacy := app.Group("/api/wifi", requireAuth)
 	wifiLegacy.Get("/status", wifiLegacyStatusHandler)
 	wifiLegacy.Get("/stored_networks", wifiLegacyStoredNetworksHandler)
@@ -438,28 +386,22 @@ func setupRoutes(app *fiber.App) {
 	wifiLegacy.Post("/disconnect", wifiLegacyDisconnectHandler)
 }
 
-// Handlers básicos
 func indexHandler(c *fiber.Ctx) error {
-	// Intentar obtener token de cookie o query
 	token := c.Cookies("access_token")
 	if token == "" {
 		token = c.Query("token")
 	}
 
-	// Si hay token, validarlo
 	if token != "" {
 		claims, err := ValidateToken(token)
 		if err == nil {
-			// Token válido, verificar usuario
 			var user User
 			if err := db.First(&user, claims.UserID).Error; err == nil && user.IsActive {
-				// Usuario válido y activo, redirigir a dashboard
 				return c.Redirect("/dashboard")
 			}
 		}
 	}
 
-	// No hay token válido o usuario no válido, redirigir a login
 	return c.Redirect("/login")
 }
 
@@ -478,7 +420,6 @@ func loginHandler(c *fiber.Ctx) error {
 func settingsHandler(c *fiber.Ctx) error {
 	configs, _ := GetAllConfigs()
 
-	// Asegurar valores por defecto si no existen
 	if _, exists := configs["max_login_attempts"]; !exists || configs["max_login_attempts"] == "" {
 		configs["max_login_attempts"] = "3"
 	}
@@ -501,7 +442,6 @@ func settingsHandler(c *fiber.Ctx) error {
 	})
 }
 
-// Handlers de API
 func systemStatsHandler(c *fiber.Ctx) error {
 	stats := getSystemStats()
 	return c.JSON(stats)
@@ -525,9 +465,7 @@ func systemRestartHandler(c *fiber.Ctx) error {
 	return c.JSON(result)
 }
 
-// detectWiFiInterface detecta automáticamente la interfaz WiFi
 func detectWiFiInterface() string {
-	// Intentar con ip primero (sin sudo, solo lectura)
 	cmd := exec.Command("sh", "-c", "ip -o link show | awk -F': ' '{print $2}' | grep -E '^wlan|^wl' | head -1")
 	out, err := cmd.Output()
 	if err == nil {
@@ -537,16 +475,12 @@ func detectWiFiInterface() string {
 		}
 	}
 
-	// Último fallback: usar interfaz por defecto
 	return DefaultWiFiInterface
 }
 
-// wifiInterfacesHandler devuelve las interfaces WiFi disponibles
-// Usa solo ip/iw, sin nmcli
 func wifiInterfacesHandler(c *fiber.Ctx) error {
 	var interfaces []fiber.Map
 
-	// Buscar interfaces wlan* usando ip
 	cmd := exec.Command("sh", "-c", "ip -o link show | awk -F': ' '{print $2}' | grep -E '^wlan|^wl'")
 	out, err := cmd.Output()
 	if err == nil {
@@ -554,7 +488,6 @@ func wifiInterfacesHandler(c *fiber.Ctx) error {
 		for _, ifaceName := range lines {
 			ifaceName = strings.TrimSpace(ifaceName)
 			if ifaceName != "" {
-				// Verificar estado usando /sys/class/net
 				stateCmd := exec.Command("sh", "-c", fmt.Sprintf("cat /sys/class/net/%s/operstate 2>/dev/null", ifaceName))
 				stateOut, _ := stateCmd.Output()
 				state := strings.TrimSpace(string(stateOut))
@@ -571,7 +504,6 @@ func wifiInterfacesHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// Si no hay interfaces, agregar interfaz por defecto como opción
 	if len(interfaces) == 0 {
 		interfaces = append(interfaces, fiber.Map{
 			"name":  DefaultWiFiInterface,
@@ -587,7 +519,6 @@ func wifiInterfacesHandler(c *fiber.Ctx) error {
 }
 
 func wifiScanHandler(c *fiber.Ctx) error {
-	// Verificar que el usuario esté autenticado
 	userInterface := c.Locals("user")
 	if userInterface == nil {
 		log.Printf("ERROR: Usuario no encontrado en wifiScanHandler")
@@ -604,7 +535,6 @@ func wifiScanHandler(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Obtener interfaz del query o body
 	interfaceName := c.Query("interface", "")
 	if interfaceName == "" {
 		var req struct {
@@ -615,7 +545,6 @@ func wifiScanHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// Si no se especifica interfaz, detectar automáticamente
 	if interfaceName == "" {
 		interfaceName = detectWiFiInterface()
 	}
@@ -632,15 +561,12 @@ func wifiScanHandler(c *fiber.Ctx) error {
 
 	var networks []fiber.Map
 
-	// Si no se especifica interfaz, detectar automáticamente
 	if interfaceName == "" {
 		interfaceName = detectWiFiInterface()
 	}
 
-	// Verificar que WiFi esté habilitado (usar rfkill en lugar de solo nmcli)
 	wifiEnabled := false
 	
-	// Método 1: Verificar con rfkill
 	rfkillCheck := execCommand("rfkill list wifi 2>/dev/null")
 	rfkillOut, _ := rfkillCheck.Output()
 	rfkillStr := strings.ToLower(string(filterSudoErrors(rfkillOut)))
@@ -648,7 +574,6 @@ func wifiScanHandler(c *fiber.Ctx) error {
 		wifiEnabled = true
 	}
 	
-	// Método 2: Si rfkill no funcionó, verificar con nmcli (solo si NetworkManager está corriendo)
 	if !wifiEnabled {
 		if out, _ := exec.Command("pgrep", "NetworkManager").Output(); len(out) > 0 {
 			wifiCheck := execCommand("nmcli -t -f WIFI g 2>/dev/null")
@@ -660,7 +585,6 @@ func wifiScanHandler(c *fiber.Ctx) error {
 		}
 	}
 	
-	// Método 3: Verificar que la interfaz esté activa
 	if !wifiEnabled {
 		ipCheck := execCommand(fmt.Sprintf("ip link show %s 2>/dev/null | grep -i 'state UP'", interfaceName))
 		ipOut, _ := ipCheck.Output()
@@ -678,7 +602,6 @@ func wifiScanHandler(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Asegurar que la interfaz esté en modo managed (no AP) para poder escanear
 	iwInfoCmd := execCommand(fmt.Sprintf("iw dev %s info 2>/dev/null", interfaceName))
 	iwInfoOut, _ := iwInfoCmd.Output()
 	iwInfoStr := string(iwInfoOut)
@@ -688,12 +611,9 @@ func wifiScanHandler(c *fiber.Ctx) error {
 		time.Sleep(1 * time.Second)
 	}
 	
-	// Asegurar que la interfaz esté activa
 	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null", interfaceName))
 	time.Sleep(500 * time.Millisecond)
 
-	// Método 1: Intentar con nmcli (solo si NetworkManager está corriendo)
-	// Verificar si NetworkManager está corriendo
 	nmCheck := exec.Command("pgrep", "NetworkManager")
 	if nmOut, _ := nmCheck.Output(); len(nmOut) > 0 {
 		cmd := execCommand("nmcli -t -f SSID,SIGNAL,SECURITY,CHAN dev wifi list 2>&1")
@@ -744,10 +664,8 @@ func wifiScanHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// Método 2: Usar iw directamente (más confiable cuando NetworkManager no está disponible)
 	log.Printf("📡 Escaneando con iw en interfaz %s...", interfaceName)
 	
-	// Asegurar que la interfaz esté activa antes de escanear
 	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null", interfaceName))
 	time.Sleep(1 * time.Second)
 	
@@ -758,9 +676,7 @@ func wifiScanHandler(c *fiber.Ctx) error {
 		currentNetwork := make(map[string]interface{})
 		for _, line := range lines {
 			line = strings.TrimSpace(line)
-			// Detectar inicio de nuevo BSS (nueva red)
 			if strings.HasPrefix(line, "BSS ") {
-				// Guardar red anterior si existe
 				if ssid, ok := currentNetwork["ssid"].(string); ok && ssid != "" {
 					networks = append(networks, fiber.Map{
 						"ssid":     currentNetwork["ssid"],
@@ -769,13 +685,11 @@ func wifiScanHandler(c *fiber.Ctx) error {
 						"channel":  currentNetwork["channel"],
 					})
 				}
-				// Iniciar nueva red
 				currentNetwork = make(map[string]interface{})
 				currentNetwork["security"] = "Open"  // Por defecto Open, se actualizará si se detecta seguridad
 				currentNetwork["signal"] = 0
 				currentNetwork["channel"] = ""
 			} else if strings.HasPrefix(line, "SSID:") {
-				// Si encontramos SSID sin BSS previo, guardar red anterior
 				if ssid, ok := currentNetwork["ssid"].(string); ok && ssid != "" {
 					networks = append(networks, fiber.Map{
 						"ssid":     currentNetwork["ssid"],
@@ -784,7 +698,6 @@ func wifiScanHandler(c *fiber.Ctx) error {
 						"channel":  currentNetwork["channel"],
 					})
 				}
-				// Iniciar nueva red
 				currentNetwork = make(map[string]interface{})
 				ssid := strings.TrimSpace(strings.TrimPrefix(line, "SSID:"))
 				if ssid != "" {
@@ -794,17 +707,13 @@ func wifiScanHandler(c *fiber.Ctx) error {
 					currentNetwork["channel"] = ""
 				}
 			} else if strings.Contains(line, "signal:") {
-				// Formato de iw scan: "signal: -45.00 dBm" o "signal: -45 dBm"
 				parts := strings.Fields(line)
 				for i, part := range parts {
 					if part == "signal:" && i+1 < len(parts) {
 						signalStr := strings.TrimSpace(parts[i+1])
-						// Remover "dBm" si está presente
 						signalStr = strings.TrimSuffix(signalStr, "dBm")
 						signalStr = strings.TrimSpace(signalStr)
-						// Parsear como float primero para manejar decimales
 						if signalFloat, err := strconv.ParseFloat(signalStr, 64); err == nil {
-							// Convertir a entero (redondear)
 							signalInt := int(signalFloat)
 							currentNetwork["signal"] = signalInt
 							log.Printf("Parsed signal: %d dBm from line: %s", signalInt, line)
@@ -815,16 +724,13 @@ func wifiScanHandler(c *fiber.Ctx) error {
 					}
 				}
 			} else if strings.Contains(line, "freq:") {
-				// Formato: "freq: 2412" o "freq: 2412 [MHz]"
 				parts := strings.Fields(line)
 				for i, part := range parts {
 					if part == "freq:" && i+1 < len(parts) {
 						freqStr := strings.TrimSpace(parts[i+1])
-						// Remover "[MHz]" si está presente
 						freqStr = strings.TrimSuffix(freqStr, "[MHz]")
 						freqStr = strings.TrimSpace(freqStr)
 						if f, err := strconv.Atoi(freqStr); err == nil {
-							// Convertir frecuencia a canal
 							if f >= 2412 && f <= 2484 {
 								channel := (f-2412)/5 + 1
 								currentNetwork["channel"] = strconv.Itoa(channel)
@@ -843,7 +749,6 @@ func wifiScanHandler(c *fiber.Ctx) error {
 					}
 				}
 			} else if strings.Contains(line, "RSN:") {
-				// RSN (Robust Security Network) indica WPA2 o WPA3
 				if strings.Contains(line, "WPA3") || strings.Contains(line, "SAE") || strings.Contains(line, "suite-B") {
 					currentNetwork["security"] = "WPA3"
 				} else {
@@ -851,27 +756,22 @@ func wifiScanHandler(c *fiber.Ctx) error {
 				}
 				log.Printf("Detected security: %s from RSN line: %s", currentNetwork["security"], line)
 			} else if strings.Contains(line, "WPA:") {
-				// WPA indica WPA2 (WPA1 es raro)
 				currentNetwork["security"] = "WPA2"
 				log.Printf("Detected security: WPA2 from WPA line: %s", line)
 			} else if strings.Contains(line, "capability:") {
-				// Detectar si tiene Privacy (WEP o protegida)
 				if strings.Contains(line, "Privacy") {
-					// Solo establecer WEP si no se ha detectado otra seguridad
 					if sec, ok := currentNetwork["security"].(string); !ok || sec == "Open" || sec == "" {
 						currentNetwork["security"] = "WEP"
 						log.Printf("Detected security: WEP from capability line")
 					}
 				}
 			} else if strings.Contains(line, "WPS:") {
-				// Si tiene WPS, probablemente es WPA2
 				if sec, ok := currentNetwork["security"].(string); !ok || sec == "Open" || sec == "" {
 					currentNetwork["security"] = "WPA2"
 					log.Printf("Detected security: WPA2 from WPS line")
 				}
 			}
 		}
-		// Guardar última red si existe
 		if ssid, ok := currentNetwork["ssid"].(string); ok && ssid != "" {
 			networks = append(networks, fiber.Map{
 				"ssid":     currentNetwork["ssid"],
@@ -881,7 +781,6 @@ func wifiScanHandler(c *fiber.Ctx) error {
 			})
 		}
 		
-		// Eliminar duplicados basándose en SSID (mantener el que tiene mejor señal)
 		seen := make(map[string]fiber.Map)
 		for _, net := range networks {
 			ssid, ok := net["ssid"].(string)
@@ -890,7 +789,6 @@ func wifiScanHandler(c *fiber.Ctx) error {
 				if !exists {
 					seen[ssid] = net
 				} else {
-					// Si ya existe, mantener el que tiene mejor señal
 					existingSignal := 0
 					currentSignal := 0
 					if s, ok := existing["signal"].(int); ok {
@@ -899,14 +797,12 @@ func wifiScanHandler(c *fiber.Ctx) error {
 					if s, ok := net["signal"].(int); ok {
 						currentSignal = s
 					}
-					// Si la señal actual es mejor (más alta, menos negativa), reemplazar
 					if currentSignal > existingSignal {
 						seen[ssid] = net
 					}
 				}
 			}
 		}
-		// Convertir map a slice
 		uniqueNetworks := []fiber.Map{}
 		for _, net := range seen {
 			uniqueNetworks = append(uniqueNetworks, net)
@@ -922,7 +818,6 @@ func wifiScanHandler(c *fiber.Ctx) error {
 		}
 	}
 
-	// Si no hay redes encontradas, retornar array vacío con mensaje
 	log.Printf("⚠️  No se encontraron redes WiFi")
 	return c.JSON(fiber.Map{
 		"success":  true,
@@ -931,9 +826,7 @@ func wifiScanHandler(c *fiber.Ctx) error {
 	})
 }
 
-// Middlewares
 func securityMiddleware(c *fiber.Ctx) error {
-	// Headers de seguridad
 	c.Set("X-Content-Type-Options", "nosniff")
 	c.Set("X-Frame-Options", "DENY")
 	c.Set("X-XSS-Protection", "1; mode=block")
@@ -953,11 +846,8 @@ func securityMiddleware(c *fiber.Ctx) error {
 		"os_version":     "Linux",
 	}
 
-	// Intentar obtener datos reales del sistema
-	// CPU usage - usar /proc/stat (más confiable)
 	cpuOut, cpuErr := executeCommand("grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$3+$4+$5)} END {print usage}'")
 	if cpuErr == nil && strings.TrimSpace(cpuOut) != "" {
-		// Normalizar: reemplazar coma por punto para locales que usan coma
 		cpuOut = strings.ReplaceAll(strings.TrimSpace(cpuOut), ",", ".")
 		if cpu, err := strconv.ParseFloat(cpuOut, 64); err == nil && cpu >= 0 && cpu <= 100 {
 			stats["cpu_usage"] = cpu
@@ -969,7 +859,6 @@ func securityMiddleware(c *fiber.Ctx) error {
 		log.Printf("⚠️  Error ejecutando comando CPU: %v", cpuErr)
 	}
 
-	// Fallback alternativo para CPU usando top
 	if stats["cpu_usage"] == 0.0 {
 		cpuOut2, cpuErr2 := executeCommand("top -bn1 | grep 'Cpu(s)' | awk -F'id,' '{split($1,a,\"%\"); for(i in a){if(a[i] ~ /^[0-9]/){print 100-a[i];break}}}'")
 		if cpuErr2 == nil && strings.TrimSpace(cpuOut2) != "" {
@@ -981,10 +870,8 @@ func securityMiddleware(c *fiber.Ctx) error {
 		}
 	}
 
-	// Memory usage
 	memOut, memErr := executeCommand("free | grep Mem | awk '{printf \"%.2f\", $3/$2 * 100.0}'")
 	if memErr == nil && strings.TrimSpace(memOut) != "" {
-		// Normalizar: reemplazar coma por punto
 		memOut = strings.ReplaceAll(strings.TrimSpace(memOut), ",", ".")
 		if mem, err := strconv.ParseFloat(memOut, 64); err == nil && mem >= 0 && mem <= 100 {
 			stats["memory_usage"] = mem
@@ -996,7 +883,6 @@ func securityMiddleware(c *fiber.Ctx) error {
 		log.Printf("⚠️  Error ejecutando comando Memory: %v", memErr)
 	}
 
-	// Disk usage - usar método más simple
 	diskOut, diskErr := executeCommand("df / | tail -1 | awk '{print $5}' | sed 's/%//'")
 	if diskErr == nil && strings.TrimSpace(diskOut) != "" {
 		if disk, err := strconv.ParseFloat(strings.TrimSpace(diskOut), 64); err == nil && disk >= 0 && disk <= 100 {
@@ -1009,36 +895,30 @@ func securityMiddleware(c *fiber.Ctx) error {
 		log.Printf("⚠️  Error ejecutando comando Disk: %v", diskErr)
 	}
 
-	// Uptime
 	if uptimeOut, err := executeCommand("cat /proc/uptime | awk '{print int($1)}'"); err == nil {
 		if uptime, err := strconv.Atoi(strings.TrimSpace(uptimeOut)); err == nil {
 			stats["uptime"] = uptime
 		}
 	}
 
-	// CPU cores
 	if coresOut, err := executeCommand("nproc"); err == nil {
 		if cores, err := strconv.Atoi(strings.TrimSpace(coresOut)); err == nil && cores > 0 {
 			stats["cpu_cores"] = cores
 		}
 	}
 
-	// Hostname
 	if hostname, err := executeCommand("hostname"); err == nil && hostname != "" {
 		stats["hostname"] = hostname
 	}
 
-	// Kernel version
 	if kernel, err := executeCommand("uname -r"); err == nil && kernel != "" {
 		stats["kernel_version"] = kernel
 	}
 
-	// Architecture
 	if arch, err := executeCommand("uname -m"); err == nil && arch != "" {
 		stats["architecture"] = arch
 	}
 
-	// OS version
 	if osRelease, err := os.ReadFile("/etc/os-release"); err == nil {
 		lines := strings.Split(string(osRelease), "\n")
 		for _, line := range lines {

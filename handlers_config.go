@@ -12,7 +12,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// systemConfigHandler maneja la actualización de configuraciones del sistema
 func systemConfigHandler(c *fiber.Ctx) error {
 	var req map[string]interface{}
 	if err := c.BodyParser(&req); err != nil {
@@ -27,9 +26,7 @@ func systemConfigHandler(c *fiber.Ctx) error {
 	updatedKeys := []string{}
 	errors := []string{}
 	
-	// Procesar cada clave de configuración
 	for key, value := range req {
-		// Convertir valor a string
 		var valueStr string
 		switch v := value.(type) {
 		case string:
@@ -44,17 +41,14 @@ func systemConfigHandler(c *fiber.Ctx) error {
 			valueStr = fmt.Sprintf("%v", v)
 		}
 		
-		// Guardar en BD
 		if err := SetConfig(key, valueStr); err != nil {
 			log.Printf("⚠️ Error guardando configuración %s: %v", key, err)
 			errors = append(errors, fmt.Sprintf("Error guardando %s", key))
 		}
 		
-		// Aplicar cambios del sistema
 		if key == "timezone" && valueStr != "" {
 			tz := strings.TrimSpace(valueStr)
 			
-			// Validar timezone (básico)
 			if strings.Contains(tz, "..") || strings.Contains(tz, ";") {
 				errors = append(errors, "Zona horaria inválida")
 				continue
@@ -66,7 +60,6 @@ func systemConfigHandler(c *fiber.Ctx) error {
 				continue
 			}
 			
-			// Ejecutar comando
 			cmd := exec.Command("sudo", "/usr/local/sbin/hostberry-safe/set-timezone", tz)
 			output, err := cmd.CombinedOutput()
 			if err != nil {
@@ -75,7 +68,6 @@ func systemConfigHandler(c *fiber.Ctx) error {
 				
 				baseMsg := "No se pudo aplicar la zona horaria al sistema"
 				if combined != "" {
-					// Detectar error de sudo
 					if strings.Contains(strings.ToLower(combined), "sudo") && 
 					   (strings.Contains(strings.ToLower(combined), "password") || strings.Contains(strings.ToLower(combined), "required")) {
 						errors = append(errors, "Permisos insuficientes (sudo requerido)")
@@ -90,9 +82,7 @@ func systemConfigHandler(c *fiber.Ctx) error {
 			}
 		}
 		
-		// Aplicar cambios de seguridad
 		if key == "session_timeout" {
-			// Actualizar TokenExpiry en la configuración de la app
 			if timeout, err := strconv.Atoi(valueStr); err == nil && timeout > 0 {
 				appConfig.Security.TokenExpiry = timeout
 				log.Printf("✅ Session timeout actualizado: %d minutos", timeout)
@@ -100,27 +90,20 @@ func systemConfigHandler(c *fiber.Ctx) error {
 		}
 		
 		if key == "max_login_attempts" {
-			// Esta configuración se usa en el middleware de autenticación
-			// Se guarda en BD y se lee cuando es necesario
 			log.Printf("✅ Max login attempts actualizado: %s", valueStr)
 		}
 		
-		// Aplicar cambios de rendimiento
 		if key == "cache_enabled" {
-			// La configuración de cache se guarda en BD y se aplica cuando se usa
 			log.Printf("✅ Cache enabled actualizado: %s", valueStr)
 		}
 		
 		if key == "compression_enabled" {
-			// La compresión ya está habilitada globalmente en Fiber
-			// Esta configuración se guarda para referencia
 			log.Printf("✅ Compression enabled actualizado: %s", valueStr)
 		}
 		
 		updatedKeys = append(updatedKeys, key)
 	}
 
-	// Construir respuesta
 	response := fiber.Map{
 		"message":      "Configuración guardada",
 		"updated_keys": updatedKeys,
@@ -128,7 +111,6 @@ func systemConfigHandler(c *fiber.Ctx) error {
 	
 	if len(errors) > 0 {
 		response["errors"] = errors
-		// Si hubo errores, el mensaje debería reflejarlo parcialmente
 		response["message"] = fmt.Sprintf("Configuración guardada con advertencias (Algunos errores: %s)", strings.Join(errors, ", "))
 	} else {
 		response["message"] = "Configuración actualizada exitosamente"

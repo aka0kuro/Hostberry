@@ -11,25 +11,18 @@ import (
 	"time"
 )
 
-// Directorio estándar para configuración de wpa_supplicant
 const WpaSupplicantConfigDir = "/etc/wpa_supplicant"
-// Directorio alternativo persistente si /etc es de solo lectura (no se borra al reiniciar)
 const WpaSupplicantAltConfigDir = "/var/lib/hostberry/wpa_supplicant"
 
-// Variables para directorios de socket (se determinan dinámicamente)
 var activeRunDir string
 
-// getRunDir retorna el directorio de socket activo (escribible)
 func getRunDir() string {
 	if activeRunDir != "" {
 		return activeRunDir
 	}
-	// Intentar determinar el directorio de socket escribible
 	candidates := []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"}
 	for _, dir := range candidates {
-		// Verificar que el directorio existe o puede crearse
 		if _, err := os.Stat(dir); err == nil {
-			// Verificar que es escribible intentando crear un archivo temporal
 			testFile := fmt.Sprintf("%s/.test_write", dir)
 			if err := os.WriteFile(testFile, []byte("test"), 0644); err == nil {
 				os.Remove(testFile)
@@ -40,9 +33,7 @@ func getRunDir() string {
 				log.Printf("Directorio %s no es escribible: %v", dir, err)
 			}
 		} else {
-			// Intentar crear el directorio
 			if err := os.MkdirAll(dir, 0755); err == nil {
-				// Verificar que es escribible
 				testFile := fmt.Sprintf("%s/.test_write", dir)
 				if err := os.WriteFile(testFile, []byte("test"), 0644); err == nil {
 					os.Remove(testFile)
@@ -53,40 +44,33 @@ func getRunDir() string {
 			}
 		}
 	}
-	// Fallback: usar /tmp que siempre debería ser escribible
 	activeRunDir = "/tmp/wpa_supplicant"
 	os.MkdirAll(activeRunDir, 0755)
 	log.Printf("Usando directorio de socket por defecto (fallback): %s", activeRunDir)
 	return activeRunDir
 }
 
-// ensureWpaSupplicantDirs asegura que los directorios necesarios existan con permisos correctos
 func ensureWpaSupplicantDirs() error {
-	// Crear directorio de configuración (generalmente siempre funciona)
 	if _, err := os.Stat(WpaSupplicantConfigDir); os.IsNotExist(err) {
 		log.Printf("Creando directorio de configuración: %s", WpaSupplicantConfigDir)
 		cmd := exec.Command("sudo", "mkdir", "-p", WpaSupplicantConfigDir)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			log.Printf("Warning: no se pudo crear %s: %v (output: %s)", WpaSupplicantConfigDir, err, string(out))
-			// No es fatal, intentamos continuar
 		}
 	}
 	exec.Command("sudo", "chmod", "755", WpaSupplicantConfigDir).Run()
 	exec.Command("sudo", "chown", "root:netdev", WpaSupplicantConfigDir).Run()
 
-	// Intentar crear directorio de socket en orden de preferencia
 	runDirCandidates := []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"}
 	var createdDir string
 
 	for _, dir := range runDirCandidates {
-		// Verificar si ya existe
 		if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
 			log.Printf("Directorio de socket ya existe: %s", dir)
 			createdDir = dir
 			break
 		}
 
-		// Intentar crear
 		log.Printf("Intentando crear directorio de socket: %s", dir)
 		cmd := exec.Command("sudo", "mkdir", "-p", dir)
 		if out, err := cmd.CombinedOutput(); err != nil {
@@ -94,7 +78,6 @@ func ensureWpaSupplicantDirs() error {
 			continue
 		}
 
-		// Verificar que se creó
 		if _, err := os.Stat(dir); err == nil {
 			log.Printf("Directorio de socket creado: %s", dir)
 			createdDir = dir
@@ -103,42 +86,34 @@ func ensureWpaSupplicantDirs() error {
 	}
 
 	if createdDir == "" {
-		// Último recurso: usar /tmp
 		createdDir = "/tmp/wpa_supplicant"
 		os.MkdirAll(createdDir, 0775)
 		log.Printf("Usando directorio temporal: %s", createdDir)
 	}
 
-	// Configurar permisos
 	exec.Command("sudo", "chmod", "775", createdDir).Run()
 	exec.Command("sudo", "chown", "root:netdev", createdDir).Run()
 
-	// Guardar el directorio activo
 	activeRunDir = createdDir
 	log.Printf("Directorio de socket activo: %s", activeRunDir)
 
 	return nil
 }
 
-// stopWpaSupplicant detiene todas las instancias de wpa_supplicant para una interfaz
 func stopWpaSupplicant(interfaceName string) {
 	log.Printf("Deteniendo wpa_supplicant para interfaz %s...", interfaceName)
 
-	// Detener por interfaz específica
 	executeCommand(fmt.Sprintf("sudo pkill -f 'wpa_supplicant.*-i.*%s' 2>/dev/null || true", interfaceName))
 	executeCommand(fmt.Sprintf("sudo pkill -f 'wpa_supplicant.*%s' 2>/dev/null || true", interfaceName))
 	
-	// Intento agresivo con killall si sigue corriendo
 	executeCommand("sudo killall wpa_supplicant 2>/dev/null || true")
 
-	// Esperar a que termine con verificación
 	for i := 0; i < 5; i++ {
 		checkCmd := exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'wpa_supplicant.*%s'", interfaceName))
 		if out, _ := checkCmd.Output(); strings.TrimSpace(string(out)) == "" {
 			break
 		}
 		time.Sleep(500 * time.Millisecond)
-		// Si en el último intento sigue vivo, kill -9
 		if i == 4 {
 			log.Printf("Forzando cierre de wpa_supplicant (kill -9)...")
 			executeCommand(fmt.Sprintf("sudo pkill -9 -f 'wpa_supplicant.*%s' 2>/dev/null || true", interfaceName))
@@ -146,35 +121,26 @@ func stopWpaSupplicant(interfaceName string) {
 		}
 	}
 
-	// Limpiar sockets en todos los posibles directorios
 	for _, dir := range []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"} {
-		// Eliminar archivo de socket específico
 		executeCommand(fmt.Sprintf("sudo rm -f %s/%s 2>/dev/null || true", dir, interfaceName))
-		// Eliminar directorio si está vacío (opcional, pero ayuda a limpiar)
-		// executeCommand(fmt.Sprintf("sudo rmdir %s 2>/dev/null || true", dir))
 	}
 }
 
-// startWpaSupplicant inicia wpa_supplicant con la configuración dada
 func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 	if runDir == "" {
 		runDir = "/run/wpa_supplicant"
 	}
 	log.Printf("Iniciando wpa_supplicant para %s con config %s (runDir: %s)", interfaceName, configPath, runDir)
 
-	// Asegurar que el directorio de socket exista con permisos correctos (usar sudo)
 	executeCommand(fmt.Sprintf("sudo mkdir -p %s 2>/dev/null || true", runDir))
 	executeCommand(fmt.Sprintf("sudo chmod 775 %s 2>/dev/null || true", runDir))
 	executeCommand(fmt.Sprintf("sudo chown root:netdev %s 2>/dev/null || true", runDir))
-	// Limpiar socket stale si existe
 	executeCommand(fmt.Sprintf("sudo rm -f %s/%s 2>/dev/null || true", runDir, interfaceName))
 
-	// Verificar que el archivo de configuración existe
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return fmt.Errorf("archivo de configuración no existe: %s", configPath)
 	}
 
-	// Buscar la ruta completa de wpa_supplicant
 	wpaSupplicantPath := ""
 	possiblePaths := []string{
 		"/usr/sbin/wpa_supplicant",
@@ -190,7 +156,6 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 		}
 	}
 	
-	// Si no se encontró en las rutas estándar, intentar con which
 	if wpaSupplicantPath == "" {
 		whichCmd := exec.Command("sh", "-c", "which wpa_supplicant 2>/dev/null")
 		if whichOut, err := whichCmd.Output(); err == nil {
@@ -204,16 +169,10 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 	
 	log.Printf("Usando wpa_supplicant en: %s", wpaSupplicantPath)
 	
-	// Verificar que el ejecutable existe y es ejecutable
 	if fi, err := os.Stat(wpaSupplicantPath); err != nil || fi.Mode()&0111 == 0 {
 		return fmt.Errorf("wpa_supplicant no es ejecutable en %s", wpaSupplicantPath)
 	}
 	
-	// Iniciar wpa_supplicant usando exec.Command directamente para mejor control
-	// -B: background
-	// -i: interfaz
-	// -c: archivo de configuración
-	// -D: driver (nl80211 primero, luego wext como fallback)
 	args := []string{wpaSupplicantPath, "-B", "-i", interfaceName, "-c", configPath, "-D", "nl80211,wext"}
 	if runDir != "" {
 		args = append(args, "-C", runDir)
@@ -224,11 +183,9 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 	if startErr != nil {
 		outStr := string(startOut)
 		log.Printf("Error iniciando wpa_supplicant: %v, output: %s", startErr, outStr)
-		// Verificar si el error es por permisos o por el ejecutable
 		if strings.Contains(outStr, "not found") || strings.Contains(outStr, "No such file") {
 			return fmt.Errorf("wpa_supplicant no se encontró en %s. Verifica la instalación", wpaSupplicantPath)
 		}
-		// Si el socket ya existe, limpiar y reintentar una vez
 		if strings.Contains(outStr, "ctrl_iface exists") || strings.Contains(outStr, "cannot override it") {
 			log.Printf("Socket de control en uso, limpiando y reintentando...")
 			executeCommand(fmt.Sprintf("sudo rm -f %s/%s 2>/dev/null || true", runDir, interfaceName))
@@ -245,14 +202,11 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 
 	log.Printf("Comando wpa_supplicant ejecutado, output: %s", strings.TrimSpace(string(startOut)))
 
-	// Esperar a que el proceso esté corriendo
 	time.Sleep(2 * time.Second)
 
-	// Verificar que está corriendo usando múltiples métodos
 	pidFound := false
 	var pid string
 	
-	// Método 1: pgrep por nombre de proceso
 	pidCmd := exec.Command("sh", "-c", fmt.Sprintf("pgrep -f 'wpa_supplicant.*%s'", interfaceName))
 	if pidOut, err := pidCmd.Output(); err == nil {
 		pid = strings.TrimSpace(string(pidOut))
@@ -262,7 +216,6 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 		}
 	}
 	
-	// Método 2: pgrep por nombre de archivo
 	if !pidFound {
 		pidCmd2 := exec.Command("sh", "-c", fmt.Sprintf("pgrep -f '%s.*%s'", wpaSupplicantPath, interfaceName))
 		if pidOut2, err2 := pidCmd2.Output(); err2 == nil {
@@ -274,7 +227,6 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 		}
 	}
 	
-	// Método 3: ps aux | grep
 	if !pidFound {
 		psCmd := exec.Command("sh", "-c", fmt.Sprintf("ps aux | grep '[w]pa_supplicant.*%s' | awk '{print $2}' | head -1", interfaceName))
 		if psOut, err := psCmd.Output(); err == nil {
@@ -289,7 +241,6 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 	if !pidFound {
 		log.Printf("Warning: wpa_supplicant no se encontró corriendo después de iniciarlo")
 		log.Printf("Verificando si hay errores en los logs del sistema...")
-		// Intentar ver los últimos logs de wpa_supplicant
 		dmesgCmd := exec.Command("sh", "-c", "dmesg | tail -20 | grep -i wpa || echo 'No hay mensajes de wpa en dmesg'")
 		if dmesgOut, err := dmesgCmd.Output(); err == nil {
 			log.Printf("Últimos mensajes de dmesg relacionados con wpa: %s", string(dmesgOut))
@@ -301,17 +252,14 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 	return nil
 }
 
-// waitForWpaCliConnection espera a que wpa_cli pueda comunicarse con wpa_supplicant
 func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, error) {
 	log.Printf("Esperando conexión con wpa_cli para %s...", interfaceName)
 
-	// Intentar encontrar el socket en todos los posibles directorios
 	socketDirs := []string{}
 	if activeRunDir != "" {
 		socketDirs = append(socketDirs, activeRunDir)
 	}
 	socketDirs = append(socketDirs, "/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant")
-	// Dedupe simple
 	seen := map[string]bool{}
 	uniqueDirs := []string{}
 	for _, dir := range socketDirs {
@@ -340,12 +288,10 @@ func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, err
 			if _, err := os.Stat(socketPath); err == nil {
 				log.Printf("Socket encontrado en: %s", socketPath)
 				workingSocketDir = dir
-				// Ajustar permisos del socket
 				executeCommand(fmt.Sprintf("sudo chmod 660 %s 2>/dev/null || true", socketPath))
 				executeCommand(fmt.Sprintf("sudo chown root:netdev %s 2>/dev/null || true", socketPath))
 			}
 
-			// Intentar ping aunque el socket no se haya detectado aún
 			pingOut, pingErr := runWpaCli("wpa_cli", "-i", interfaceName, "-p", dir, "ping")
 			lastPingOutput = pingOut
 			lastPingErr = pingErr
@@ -360,7 +306,6 @@ func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, err
 				return dir, nil
 			}
 
-			// Fallback: intentar status (algunas builds responden aquí aunque ping falle)
 			statusOut, statusErr := runWpaCli("wpa_cli", "-i", interfaceName, "-p", dir, "status")
 			lastStatusOutput = statusOut
 			lastStatusErr = statusErr
@@ -375,7 +320,6 @@ func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, err
 				return dir, nil
 			}
 
-			// Fallback 2: intentar interfaz global si existe
 			globalSocket := fmt.Sprintf("%s/global", dir)
 			if _, err := os.Stat(globalSocket); err == nil {
 				globalPingOut, globalPingErr := runWpaCli("wpa_cli", "-g", dir, "-i", interfaceName, "ping")
@@ -412,7 +356,6 @@ func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, err
 	return "", fmt.Errorf("wpa_cli no pudo comunicarse con wpa_supplicant después de %d intentos", maxAttempts)
 }
 
-// scanWiFiNetworks escanea redes WiFi disponibles (reemplaza wifi_scan.lua)
 func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 	result := make(map[string]interface{})
 	networks := []map[string]interface{}{}
@@ -421,11 +364,9 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 		interfaceName = DefaultWiFiInterface
 	}
 
-	// Asegurar que la interfaz esté activa
 	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null || true", interfaceName))
 	time.Sleep(1 * time.Second)
 
-	// Escanear redes usando iw (obtener salida completa sin filtrar)
 	scanCmd := exec.Command("sh", "-c", fmt.Sprintf("sudo iw dev %s scan 2>/dev/null", interfaceName))
 	scanOut, err := scanCmd.Output()
 	if err != nil {
@@ -436,7 +377,6 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 		return result
 	}
 
-	// Parsear salida completa de iw scan
 	lines := strings.Split(string(scanOut), "\n")
 	currentNetwork := make(map[string]interface{})
 	seenNetworks := make(map[string]bool) // Para evitar duplicados
@@ -444,17 +384,13 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 
-		// Detectar inicio de nuevo BSS (nueva red)
 		if strings.HasPrefix(line, "BSS ") {
-			// Guardar red anterior si existe y tiene SSID
 			if len(currentNetwork) > 0 {
 				if ssid, ok := currentNetwork["ssid"].(string); ok && ssid != "" {
-					// Evitar duplicados basándose en SSID
 					if !seenNetworks[ssid] {
 						seenNetworks[ssid] = true
 						networks = append(networks, currentNetwork)
 					} else {
-						// Si ya existe, mantener el que tiene mejor señal
 						for i, net := range networks {
 							if existingSSID, ok := net["ssid"].(string); ok && existingSSID == ssid {
 								currentSignal := 0
@@ -465,7 +401,6 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 								if s, ok := net["signal"].(int); ok {
 									existingSignal = s
 								}
-								// Si la señal actual es mejor (más alta, menos negativa), reemplazar
 								if currentSignal > existingSignal {
 									networks[i] = currentNetwork
 								}
@@ -475,28 +410,23 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 					}
 				}
 			}
-			// Iniciar nueva red
 			currentNetwork = make(map[string]interface{})
 			currentNetwork["security"] = "Open" // Por defecto
 			currentNetwork["signal"] = 0
 		} else if strings.HasPrefix(line, "SSID:") {
-			// Extraer SSID
 			ssid := strings.TrimPrefix(line, "SSID:")
 			ssid = strings.TrimSpace(ssid)
 			if ssid != "" {
 				currentNetwork["ssid"] = ssid
 			}
 		} else if strings.Contains(line, "signal:") {
-			// Extraer señal - formato: "signal: -45.00 dBm" o "signal: -45 dBm"
 			re := regexp.MustCompile(`signal:\s*(-?\d+\.?\d*)\s*dBm?`)
 			matches := re.FindStringSubmatch(line)
 			if len(matches) > 1 {
 				if signalNum, err := strconv.ParseFloat(matches[1], 64); err == nil {
-					// Asegurar que sea negativo
 					if signalNum > 0 {
 						signalNum = -signalNum
 					}
-					// Validar rango razonable
 					if signalNum >= -100 && signalNum <= -30 {
 						currentNetwork["signal"] = int(signalNum)
 					} else {
@@ -504,7 +434,6 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 					}
 				}
 			} else {
-				// Intentar parseo alternativo sin "dBm"
 				re2 := regexp.MustCompile(`signal:\s*(-?\d+\.?\d*)`)
 				matches2 := re2.FindStringSubmatch(line)
 				if len(matches2) > 1 {
@@ -519,20 +448,16 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 				}
 			}
 		} else if strings.Contains(line, "freq:") {
-			// Extraer frecuencia y convertir a canal
 			re := regexp.MustCompile(`freq:\s*(\d+)`)
 			matches := re.FindStringSubmatch(line)
 			if len(matches) > 1 {
 				if freq, err := strconv.Atoi(matches[1]); err == nil {
 					var channel int
 					if freq >= 2412 && freq <= 2484 {
-						// 2.4 GHz
 						channel = (freq-2412)/5 + 1
 					} else if freq >= 5000 && freq <= 5825 {
-						// 5 GHz
 						channel = (freq - 5000) / 5
 					} else if freq >= 5955 && freq <= 7115 {
-						// 6 GHz
 						channel = (freq - 5955) / 5
 					}
 					if channel > 0 {
@@ -541,19 +466,15 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 				}
 			}
 		} else if strings.Contains(line, "RSN:") {
-			// RSN (Robust Security Network) indica WPA2 o WPA3
 			if strings.Contains(line, "WPA3") || strings.Contains(line, "SAE") || strings.Contains(line, "suite-B") {
 				currentNetwork["security"] = "WPA3"
 			} else {
 				currentNetwork["security"] = "WPA2"
 			}
 		} else if strings.Contains(line, "WPA:") {
-			// WPA indica WPA2 (WPA1 es raro)
 			currentNetwork["security"] = "WPA2"
 		} else if strings.Contains(line, "capability:") {
-			// Detectar si tiene Privacy (WEP o protegida)
 			if strings.Contains(line, "Privacy") {
-				// Solo establecer WEP si no se ha detectado otra seguridad
 				if sec, ok := currentNetwork["security"].(string); !ok || sec == "Open" || sec == "" {
 					currentNetwork["security"] = "WEP"
 				}
@@ -561,7 +482,6 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 		}
 	}
 
-	// Agregar última red si existe
 	if len(currentNetwork) > 0 {
 		if ssid, ok := currentNetwork["ssid"].(string); ok && ssid != "" {
 			if !seenNetworks[ssid] {
@@ -578,7 +498,6 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 	return result
 }
 
-// connectWiFi conecta a una red WiFi (reemplaza wifi_connect.lua)
 func connectWiFi(ssid, password, interfaceName, country, user string) map[string]interface{} {
 	result := make(map[string]interface{})
 	result["success"] = false
@@ -604,7 +523,6 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	log.Printf("Interfaz: %s, País: %s", interfaceName, country)
 	log.Printf("========================================")
 
-	// Paso 1: Asegurar que los directorios necesarios existan
 	log.Printf("Paso 1: Verificando directorios...")
 	if err := ensureWpaSupplicantDirs(); err != nil {
 		log.Printf("ERROR: No se pudieron crear los directorios: %v", err)
@@ -612,44 +530,35 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 		return result
 	}
 
-	// Paso 2: Verificar conflictos con otros servicios
 	log.Printf("Paso 2: Verificando conflictos...")
 
-	// En modo AP+STA según TheWalrus (Raspberry Pi 3 B+), NO desactivamos hostapd ni eliminamos ap0
-	// Ambos pueden funcionar simultáneamente: ap0 como AP y wlan0 como STA
-	// Solo verificamos que wlan0 esté en modo managed (no AP)
 	hostapdRunning, _ := exec.Command("sh", "-c", "pgrep hostapd 2>/dev/null").Output()
 	if strings.TrimSpace(string(hostapdRunning)) != "" {
 		log.Printf("hostapd está corriendo (modo AP+STA); manteniéndolo activo...")
 		log.Printf("En modo AP+STA, ap0 funciona como AP y wlan0 como STA simultáneamente")
 	}
 
-	// Detener wpa_supplicant administrado por systemd si está activo (evita conflictos con nuestra instancia)
 	log.Printf("Verificando wpa_supplicant gestionado por systemd...")
 	executeCommand("sudo systemctl stop wpa_supplicant 2>/dev/null || true")
 	executeCommand(fmt.Sprintf("sudo systemctl stop wpa_supplicant@%s 2>/dev/null || true", interfaceName))
 	executeCommand("sudo systemctl disable wpa_supplicant 2>/dev/null || true")
 	executeCommand(fmt.Sprintf("sudo systemctl disable wpa_supplicant@%s 2>/dev/null || true", interfaceName))
 
-	// Verificar modo de la interfaz
 	iwInfoCmd := exec.Command("sh", "-c", fmt.Sprintf("iw dev %s info 2>/dev/null", interfaceName))
 	if iwInfoOut, err := iwInfoCmd.Output(); err == nil {
 		if strings.Contains(string(iwInfoOut), "type AP") {
 			log.Printf("La interfaz %s está en modo AP; cambiándola a modo managed...", interfaceName)
-			// Cambiar la interfaz de modo AP a modo managed
 			executeCommand(fmt.Sprintf("sudo iw dev %s set type managed 2>/dev/null || true", interfaceName))
 			time.Sleep(1 * time.Second)
 			log.Printf("Interfaz %s cambiada a modo managed", interfaceName)
 		}
 	}
 
-	// Verificar NetworkManager
 	nmActiveCmd := exec.Command("sh", "-c", "nmcli -t -f STATE general status 2>/dev/null | head -1")
 	nmActiveOut, _ := nmActiveCmd.Output()
 	nmState := strings.TrimSpace(string(nmActiveOut))
 	if nmState == "connected" || nmState == "connecting" {
 		log.Printf("NetworkManager está gestionando una conexión activa; intentando liberar %s...", interfaceName)
-		// Forzar a NM a dejar de gestionar la interfaz WiFi para evitar conflictos con DHCP
 		executeCommand(fmt.Sprintf("sudo nmcli dev disconnect %s 2>/dev/null || true", interfaceName))
 		executeCommand(fmt.Sprintf("sudo nmcli dev set %s managed no 2>/dev/null || true", interfaceName))
 	} else {
@@ -657,7 +566,6 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 		executeCommand("sudo systemctl stop NetworkManager 2>/dev/null || true")
 	}
 
-	// Paso 3: Preparar la interfaz
 	log.Printf("Paso 3: Preparando interfaz %s...", interfaceName)
 	executeCommand("sudo rfkill unblock wifi 2>/dev/null || true")
 	executeCommand(fmt.Sprintf("sudo ip link set %s down 2>/dev/null || true", interfaceName))
@@ -665,34 +573,25 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null || true", interfaceName))
 	time.Sleep(1 * time.Second)
 
-	// Paso 4: Detener wpa_supplicant existente y limpiar sockets antiguos
 	log.Printf("Paso 4: Deteniendo wpa_supplicant existente...")
 	stopWpaSupplicant(interfaceName)
 	
-	// Limpiar sockets antiguos que puedan estar bloqueando (redundante pero seguro)
 	socketDirs := []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"}
 	for _, socketDir := range socketDirs {
 		socketFile := fmt.Sprintf("%s/%s", socketDir, interfaceName)
-		// Ejecutar rm ciegamente sin verificar os.Stat para evitar problemas de permisos
 		executeCommand(fmt.Sprintf("sudo rm -f %s 2>/dev/null || true", socketFile))
-		// También limpiar cualquier archivo en el directorio
 		executeCommand(fmt.Sprintf("sudo rm -f %s/* 2>/dev/null || true", socketDir))
 	}
 	
-	// Resetear el directorio activo para forzar una nueva verificación
 	activeRunDir = ""
 
-	// Paso 5: Crear archivo de configuración
 	log.Printf("Paso 5: Creando archivo de configuración...")
 
-	// Sanitizar SSID para nombre de archivo
 	safeSSID := regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(ssid, "_")
 	wpaConfigPath := fmt.Sprintf("%s/wpa_supplicant-%s.conf", WpaSupplicantConfigDir, safeSSID)
 
-	// Generar bloque de red
 	var networkBlock string
 	if password != "" {
-		// Verificar que wpa_passphrase esté disponible
 		checkCmd := exec.Command("sh", "-c", "which wpa_passphrase 2>/dev/null")
 		checkOut, _ := checkCmd.Output()
 		if strings.TrimSpace(string(checkOut)) == "" {
@@ -700,7 +599,6 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 			return result
 		}
 
-		// Generar PSK
 		cmd := exec.Command("wpa_passphrase", ssid, password)
 		passphraseOut, err := cmd.Output()
 		if err != nil || !strings.Contains(string(passphraseOut), "network=") {
@@ -710,21 +608,15 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 		}
 		networkBlock = strings.TrimSpace(string(passphraseOut))
 	} else {
-		// Red abierta
 		networkBlock = fmt.Sprintf("network={\n\tssid=\"%s\"\n\tkey_mgmt=NONE\n}", ssid)
 	}
 
-	// Crear contenido del archivo de configuración
-	// ctrl_interface apunta al directorio de socket (debe ser escribible)
-	// Resetear el directorio activo para forzar una nueva verificación después de limpiar sockets
 	activeRunDir = ""
 	runDir := getRunDir()
 	log.Printf("Usando directorio de socket escribible: %s", runDir)
 	
-	// Asegurar que el directorio de socket existe y es escribible
 	if err := os.MkdirAll(runDir, 0755); err != nil {
 		log.Printf("Warning: No se pudo crear directorio de socket %s: %v", runDir, err)
-		// Intentar usar /tmp como último recurso
 		runDir = "/tmp/wpa_supplicant"
 		if err := os.MkdirAll(runDir, 0755); err != nil {
 			log.Printf("ERROR: No se pudo crear directorio de socket en /tmp: %v", err)
@@ -735,11 +627,9 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 		log.Printf("Usando directorio de socket alternativo: %s", runDir)
 	}
 	
-	// Verificar que el directorio es realmente escribible
 	testFile := fmt.Sprintf("%s/.test_write", runDir)
 	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
 		log.Printf("ERROR: Directorio de socket %s no es escribible: %v", runDir, err)
-		// Intentar usar /tmp como último recurso
 		runDir = "/tmp/wpa_supplicant"
 		os.MkdirAll(runDir, 0755)
 		activeRunDir = runDir
@@ -749,7 +639,6 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 		log.Printf("Directorio de socket verificado como escribible: %s", runDir)
 	}
 
-	// Asegurar permisos del directorio de socket (para wpa_supplicant y wpa_cli)
 	executeCommand(fmt.Sprintf("sudo mkdir -p %s 2>/dev/null || true", runDir))
 	executeCommand(fmt.Sprintf("sudo chmod 775 %s 2>/dev/null || true", runDir))
 	executeCommand(fmt.Sprintf("sudo chown root:netdev %s 2>/dev/null || true", runDir))
@@ -764,10 +653,8 @@ country=%s
 
 	log.Printf("Contenido de configuración:\n%s", configContent)
 
-	// Eliminar archivo existente
 	executeCommand(fmt.Sprintf("sudo rm -f %s", wpaConfigPath))
 
-	// Escribir archivo de configuración usando un archivo temporal y cp (más confiable)
 	tmpConfigFile := fmt.Sprintf("/tmp/wpa_supplicant_%s_%d.conf", safeSSID, time.Now().Unix())
 	if err := os.WriteFile(tmpConfigFile, []byte(configContent), 0644); err != nil {
 		log.Printf("ERROR: No se pudo crear archivo temporal: %v", err)
@@ -775,7 +662,6 @@ country=%s
 		return result
 	}
 	
-	// Asegurar que el directorio existe
 	if _, err := os.Stat(WpaSupplicantConfigDir); os.IsNotExist(err) {
 		log.Printf("Creando directorio de configuración: %s", WpaSupplicantConfigDir)
 		mkdirCmd := exec.Command("sudo", "mkdir", "-p", WpaSupplicantConfigDir)
@@ -787,7 +673,6 @@ country=%s
 		exec.Command("sudo", "chown", "root:netdev", WpaSupplicantConfigDir).Run()
 	}
 	
-	// Copiar archivo temporal a la ubicación final usando cp (tiene permisos en sudoers)
 	cpPath := "/bin/cp"
 	if _, err := os.Stat(cpPath); os.IsNotExist(err) {
 		cpPath = "/usr/bin/cp"
@@ -797,7 +682,6 @@ country=%s
 	cpOut, cpErr := cpCmd.CombinedOutput()
 	cpOutStr := string(cpOut)
 	
-	// Si falla por sistema de solo lectura, intentar remontar o usar directorio alternativo
 	if cpErr != nil {
 		cpOutLower := strings.ToLower(cpOutStr)
 		if strings.Contains(cpOutLower, "read-only") || strings.Contains(cpOutLower, "readonly") {
@@ -808,19 +692,15 @@ country=%s
 			remountOut, remountErr := remountCmd.CombinedOutput()
 			if remountErr != nil {
 				log.Printf("No se pudo remontar como lectura-escritura: %v, output: %s", remountErr, string(remountOut))
-				// Intentar usar directorio alternativo persistente (no se borra al reiniciar)
 				log.Printf("Usando directorio alternativo persistente: %s", WpaSupplicantAltConfigDir)
-				// Crear directorio padre primero si no existe
 				parentDir := "/var/lib/hostberry"
 				mkdirParentCmd := exec.Command("sudo", "mkdir", "-p", parentDir)
 				mkdirParentCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 				if mkdirParentOut, mkdirParentErr := mkdirParentCmd.CombinedOutput(); mkdirParentErr != nil {
 					log.Printf("Warning: No se pudo crear directorio padre %s: %v, output: %s", parentDir, mkdirParentErr, string(mkdirParentOut))
-					// Intentar remontar /var primero
 					remountVarCmd := exec.Command("sudo", "mount", "-o", "remount,rw", "/var")
 					remountVarCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 					remountVarCmd.Run() // Intentar remontar
-					// Intentar crear de nuevo
 					if mkdirParentOut2, mkdirParentErr2 := mkdirParentCmd.CombinedOutput(); mkdirParentErr2 != nil {
 						log.Printf("ERROR: No se pudo crear directorio padre incluso después de remontar: %v, output: %s", mkdirParentErr2, string(mkdirParentOut2))
 						os.Remove(tmpConfigFile)
@@ -828,7 +708,6 @@ country=%s
 						return result
 					}
 				}
-				// Crear directorio alternativo con sudo
 				mkdirAltCmd := exec.Command("sudo", "mkdir", "-p", WpaSupplicantAltConfigDir)
 				mkdirAltCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 				if mkdirOut, mkdirErr := mkdirAltCmd.CombinedOutput(); mkdirErr != nil {
@@ -837,20 +716,15 @@ country=%s
 					result["error"] = fmt.Sprintf("Error al guardar configuración: no se pudo crear directorio alternativo")
 					return result
 				}
-				// Establecer permisos del directorio alternativo
 				exec.Command("sudo", "chmod", "755", WpaSupplicantAltConfigDir).Run()
 				exec.Command("sudo", "chown", "root:netdev", WpaSupplicantAltConfigDir).Run()
 				
-				// Actualizar ruta de configuración al directorio alternativo
 				wpaConfigPath = fmt.Sprintf("%s/wpa_supplicant-%s.conf", WpaSupplicantAltConfigDir, safeSSID)
 				
-				// Intentar copiar de nuevo
 				cpCmd2 := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
 				cpCmd2.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 				cpOut2, cpErr2 := cpCmd2.CombinedOutput()
 				if cpErr2 != nil {
-					// Si también falla en /var/lib, puede que también esté en solo lectura
-					// Intentar remontar /var también
 					if strings.Contains(string(cpOut2), "Read-only file system") {
 						log.Printf("ERROR: /var/lib también está en solo lectura, intentando remontar /var...")
 						remountVarCmd := exec.Command("sudo", "mount", "-o", "remount,rw", "/var")
@@ -884,7 +758,6 @@ country=%s
 				}
 			} else {
 				log.Printf("Sistema remontado como lectura-escritura, intentando copiar de nuevo...")
-				// Intentar copiar de nuevo después del remontaje
 				cpCmd2 := exec.Command("sudo", cpPath, tmpConfigFile, wpaConfigPath)
 				cpCmd2.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 				if cpOut2, cpErr2 := cpCmd2.CombinedOutput(); cpErr2 != nil {
@@ -903,16 +776,13 @@ country=%s
 		}
 	}
 	
-	// Limpiar archivo temporal
 	os.Remove(tmpConfigFile)
 
-	// Establecer permisos correctos
 	executeCommand(fmt.Sprintf("sudo chmod 600 %s", wpaConfigPath))
 	executeCommand(fmt.Sprintf("sudo chown root:root %s", wpaConfigPath))
 
 	log.Printf("Archivo de configuración creado: %s", wpaConfigPath)
 
-	// Paso 6: Iniciar wpa_supplicant
 	log.Printf("Paso 6: Iniciando wpa_supplicant...")
 	if err := startWpaSupplicant(interfaceName, wpaConfigPath, runDir); err != nil {
 		log.Printf("ERROR: %v", err)
@@ -920,13 +790,11 @@ country=%s
 		return result
 	}
 
-	// Verificar que el socket de control exista
 	existsOut, _ := executeCommand(fmt.Sprintf("sudo ls -l %s/%s 2>/dev/null || true", runDir, interfaceName))
 	if strings.TrimSpace(existsOut) == "" {
 		log.Printf("Advertencia: no se encontró socket en %s/%s tras iniciar wpa_supplicant", runDir, interfaceName)
 	}
 
-	// Paso 7: Esperar conexión con wpa_cli
 	log.Printf("Paso 7: Estableciendo comunicación con wpa_cli...")
 	socketDir, err := waitForWpaCliConnection(interfaceName, 10)
 	if err != nil {
@@ -943,10 +811,8 @@ country=%s
 		return strings.TrimSpace(string(out)), err
 	}
 
-	// Paso 8: Configurar y conectar a la red
 	log.Printf("Paso 8: Conectando a la red...")
 
-	// Listar redes configuradas
 	listOut, listErr := runWpaCli("list_networks")
 	if listErr != nil {
 		log.Printf("Error listando redes: %v, output: %s", listErr, listOut)
@@ -954,7 +820,6 @@ country=%s
 		log.Printf("Redes configuradas: %s", strings.TrimSpace(listOut))
 	}
 
-	// Si no hay redes, agregarlas manualmente vía wpa_cli
 	lines := []string{}
 	if listOut != "" {
 		lines = strings.Split(listOut, "\n")
@@ -993,14 +858,12 @@ country=%s
 		runWpaCli("enable_network", netID)
 		runWpaCli("select_network", netID)
 	} else {
-		// Habilitar la red 0 (la que acabamos de configurar)
 		runWpaCli("select_network", "0")
 		runWpaCli("enable_network", "0")
 	}
 
 	runWpaCli("reconnect")
 
-	// Paso 9: Esperar conexión
 	log.Printf("Paso 9: Esperando conexión...")
 	connected := false
 	statusOutput := ""
@@ -1018,7 +881,6 @@ country=%s
 			log.Printf("Estado (intento %d/%d): %s", attempt+1, maxAttempts, strings.TrimSpace(statusOutput))
 		}
 
-		// Extraer wpa_state
 		stateRe := regexp.MustCompile(`wpa_state=([^\r\n]+)`)
 		stateMatches := stateRe.FindStringSubmatch(statusOutput)
 		currentState := ""
@@ -1026,7 +888,6 @@ country=%s
 			currentState = strings.TrimSpace(stateMatches[1])
 		}
 
-		// Detectar errores de autenticación
 		if strings.Contains(statusOutput, "WRONG_KEY") ||
 			strings.Contains(statusOutput, "AUTH_FAIL") ||
 			strings.Contains(statusOutput, "4WAY_HANDSHAKE_TIMEOUT") {
@@ -1038,20 +899,17 @@ country=%s
 			}
 		}
 
-		// Verificar si está conectado
 		if strings.Contains(statusOutput, "wpa_state=COMPLETED") {
 			connected = true
 			log.Printf("✅ WiFi conectado exitosamente a %s", ssid)
 			break
 		}
 
-		// Log de cambio de estado
 		if currentState != "" && currentState != lastState {
 			log.Printf("Estado cambiado: %s -> %s", lastState, currentState)
 			lastState = currentState
 		}
 
-		// Reintentar si está desconectado
 		if currentState == "DISCONNECTED" || currentState == "INACTIVE" {
 			if attempt > 3 && attempt%3 == 0 {
 				log.Printf("Reintentando conexión...")
@@ -1062,13 +920,11 @@ country=%s
 		}
 	}
 
-	// Paso 10: Obtener IP
 	if connected {
 		log.Printf("Paso 10: Obteniendo dirección IP...")
 		ipObtained := false
 		var ip string
 
-		// Ejecutar DHCP inmediatamente después de conectar
 		log.Printf("Solicitando IP con DHCP...")
 		executeCommand(fmt.Sprintf("sudo pkill -f 'dhclient.*%s|udhcpc.*%s' 2>/dev/null || true", interfaceName, interfaceName))
 		time.Sleep(500 * time.Millisecond)
@@ -1089,7 +945,6 @@ country=%s
 				log.Printf("IP obtenida: %s", ip)
 			} else {
 				log.Printf("Esperando IP... (intento %d/15)", ipAttempt+1)
-				// Reintentar DHCP si no hay IP después de varios intentos
 				if ipAttempt > 2 && ipAttempt%3 == 0 {
 					log.Printf("Reintentando DHCP...")
 					executeCommand(fmt.Sprintf("sudo dhclient -r %s 2>/dev/null || true", interfaceName))
@@ -1114,7 +969,6 @@ country=%s
 		}
 		log.Printf("✅ Conexión exitosa: %s", result["message"])
 	} else {
-		// Extraer información de error
 		errorMsg := fmt.Sprintf("No se pudo conectar después de %d intentos", maxAttempts)
 
 		stateRe := regexp.MustCompile(`wpa_state=([^\r\n]+)`)
@@ -1148,7 +1002,6 @@ country=%s
 	return result
 }
 
-// toggleWiFi habilita o deshabilita WiFi (reemplaza wifi_toggle.lua)
 func toggleWiFi(interfaceName string, enable bool) map[string]interface{} {
 	result := make(map[string]interface{})
 
@@ -1157,14 +1010,12 @@ func toggleWiFi(interfaceName string, enable bool) map[string]interface{} {
 	}
 
 	if enable {
-		// Habilitar WiFi
 		executeCommand("sudo rfkill unblock wifi 2>/dev/null || true")
 		executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null || true", interfaceName))
 		result["success"] = true
 		result["message"] = "WiFi habilitado"
 		result["enabled"] = true
 	} else {
-		// Deshabilitar WiFi
 		executeCommand("sudo rfkill block wifi 2>/dev/null || true")
 		executeCommand(fmt.Sprintf("sudo ip link set %s down 2>/dev/null || true", interfaceName))
 		result["success"] = true

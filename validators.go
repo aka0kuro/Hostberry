@@ -8,9 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// Validators para requests
 
-// ValidateUsername valida un nombre de usuario
 func ValidateUsername(username string) error {
 	if len(username) < 3 {
 		return fiber.NewError(400, "El nombre de usuario debe tener al menos 3 caracteres")
@@ -25,7 +23,6 @@ func ValidateUsername(username string) error {
 	return nil
 }
 
-// ValidatePassword valida una contraseña
 func ValidatePassword(password string) error {
 	if len(password) < 8 {
 		return fiber.NewError(400, "La contraseña debe tener al menos 8 caracteres")
@@ -64,7 +61,6 @@ func ValidatePassword(password string) error {
 	return nil
 }
 
-// ValidateEmail valida un email
 func ValidateEmail(email string) error {
 	if email == "" {
 		return nil // Email opcional
@@ -76,7 +72,6 @@ func ValidateEmail(email string) error {
 	return nil
 }
 
-// ValidateIP valida una dirección IP
 func ValidateIP(ip string) error {
 	ipRegex := regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}$`)
 	if !ipRegex.MatchString(ip) {
@@ -91,7 +86,6 @@ func ValidateIP(ip string) error {
 	return nil
 }
 
-// ValidateSSID valida un SSID de WiFi
 func ValidateSSID(ssid string) error {
 	if len(ssid) == 0 {
 		return fiber.NewError(400, "El SSID no puede estar vacío")

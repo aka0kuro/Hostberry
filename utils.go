@@ -132,14 +132,8 @@ func executeCommandWithTimeout(cmd string, timeout time.Duration) (string, error
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	
-	cmdObj := execCommand(cmd)
-	cmdObj.Env = append(os.Environ(),
-		"SUDO_ASKPASS=/bin/false",
-		"SUDO_LOG_FILE=",
-		"HOSTNAME="+getHostname(),
-	)
-	
-	cmdObj = exec.CommandContext(ctx, cmdObj.Path, cmdObj.Args[1:]...)
+	baseCmd := execCommand(cmd)
+	cmdObj := exec.CommandContext(ctx, baseCmd.Path, baseCmd.Args[1:]...)
 	cmdObj.Env = append(os.Environ(),
 		"SUDO_ASKPASS=/bin/false",
 		"SUDO_LOG_FILE=",

@@ -7,11 +7,9 @@ import (
 	"strings"
 )
 
-// getAdBlockStatus obtiene el estado de AdBlock (reemplaza adblock_status.lua)
 func getAdBlockStatus() map[string]interface{} {
 	result := make(map[string]interface{})
 
-	// Verificar dnsmasq
 	dnsmasqCmd := exec.Command("sh", "-c", "systemctl is-active dnsmasq 2>/dev/null || echo inactive")
 	dnsmasqOut, _ := dnsmasqCmd.Output()
 	dnsmasqStatus := strings.TrimSpace(string(dnsmasqOut))
@@ -19,7 +17,6 @@ func getAdBlockStatus() map[string]interface{} {
 		dnsmasqStatus = "inactive"
 	}
 
-	// Verificar pihole
 	piholeCmd := exec.Command("sh", "-c", "systemctl is-active pihole-FTL 2>/dev/null || echo inactive")
 	piholeOut, _ := piholeCmd.Output()
 	piholeStatus := strings.TrimSpace(string(piholeOut))
@@ -36,7 +33,6 @@ func getAdBlockStatus() map[string]interface{} {
 		result["type"] = "pihole"
 	}
 
-	// Verificar si hay listas de bloqueo configuradas
 	if result["active"] == true {
 		if hostsContent, err := os.ReadFile("/etc/hosts"); err == nil {
 			blockedCount := strings.Count(string(hostsContent), "0.0.0.0")
@@ -52,7 +48,6 @@ func getAdBlockStatus() map[string]interface{} {
 	return result
 }
 
-// enableAdBlock habilita AdBlock (reemplaza adblock_enable.lua)
 func enableAdBlock(user string) map[string]interface{} {
 	result := make(map[string]interface{})
 
@@ -62,10 +57,8 @@ func enableAdBlock(user string) map[string]interface{} {
 
 	log.Printf("Habilitando AdBlock (usuario: %s)", user)
 
-	// Intentar iniciar dnsmasq
 	dnsmasqCmd := "sudo systemctl start dnsmasq"
 	if _, err := executeCommand(dnsmasqCmd); err != nil {
-		// Intentar con pihole
 		piholeCmd := "sudo systemctl start pihole-FTL"
 		if out2, err2 := executeCommand(piholeCmd); err2 != nil {
 			result["success"] = false
@@ -85,7 +78,6 @@ func enableAdBlock(user string) map[string]interface{} {
 	return result
 }
 
-// disableAdBlock deshabilita AdBlock (reemplaza adblock_disable.lua)
 func disableAdBlock(user string) map[string]interface{} {
 	result := make(map[string]interface{})
 
@@ -95,10 +87,8 @@ func disableAdBlock(user string) map[string]interface{} {
 
 	log.Printf("Deshabilitando AdBlock (usuario: %s)", user)
 
-	// Detener dnsmasq
 	executeCommand("sudo systemctl stop dnsmasq")
 
-	// Detener pihole si está activo
 	executeCommand("sudo systemctl stop pihole-FTL")
 
 	result["success"] = true

@@ -16,14 +16,12 @@ import (
 
 var db *gorm.DB
 
-// initDatabase inicializa la conexión a la base de datos
 func initDatabase() error {
 	var err error
 	var dialector gorm.Dialector
 
 	switch appConfig.Database.Type {
 	case "sqlite":
-		// Crear directorio si no existe
 		dbDir := filepath.Dir(appConfig.Database.Path)
 		if err := os.MkdirAll(dbDir, 0755); err != nil {
 			return fmt.Errorf("error creando directorio de BD: %v", err)
@@ -52,7 +50,6 @@ func initDatabase() error {
 		return fmt.Errorf("tipo de base de datos no soportado: %s", appConfig.Database.Type)
 	}
 
-	// Configurar logger de GORM
 	gormLogger := logger.Default
 	if !appConfig.Server.Debug {
 		gormLogger = logger.Default.LogMode(logger.Silent)
@@ -65,7 +62,6 @@ func initDatabase() error {
 		return fmt.Errorf("error conectando a la base de datos: %v", err)
 	}
 
-	// Auto-migrar modelos
 	if err := autoMigrate(); err != nil {
 		return fmt.Errorf("error en auto-migración: %v", err)
 	}
@@ -75,7 +71,6 @@ func initDatabase() error {
 	return nil
 }
 
-// autoMigrate ejecuta las migraciones automáticas
 func autoMigrate() error {
 	return db.AutoMigrate(
 		&User{},
@@ -89,7 +84,6 @@ func autoMigrate() error {
 	)
 }
 
-// SystemLog modelo para logs del sistema
 type SystemLog struct {
 	ID        uint      `gorm:"primaryKey"`
 	Level     string    `gorm:"not null;index"`
@@ -99,13 +93,11 @@ type SystemLog struct {
 	CreatedAt time.Time `gorm:"index"`
 }
 
-// SystemConfig modelo para configuraciones clave-valor
 type SystemConfig struct {
 	Key   string `gorm:"primaryKey"`
 	Value string `gorm:"type:text"`
 }
 
-// SystemStatistic modelo para estadísticas
 type SystemStatistic struct {
 	ID        uint      `gorm:"primaryKey"`
 	Type      string    `gorm:"not null;index"` // cpu_usage, memory_usage, disk_usage
@@ -113,7 +105,6 @@ type SystemStatistic struct {
 	Timestamp time.Time `gorm:"index"`
 }
 
-// NetworkConfig configuración de red
 type NetworkConfig struct {
 	ID            uint   `gorm:"primaryKey"`
 	Interface     string `gorm:"not null"`
@@ -126,7 +117,6 @@ type NetworkConfig struct {
 	UpdatedAt      time.Time
 }
 
-// VPNConfig configuración de VPN
 type VPNConfig struct {
 	ID        uint   `gorm:"primaryKey"`
 	Type      string `gorm:"not null"` // openvpn, wireguard
@@ -135,7 +125,6 @@ type VPNConfig struct {
 	UpdatedAt time.Time
 }
 
-// WireGuardConfig configuración de WireGuard
 type WireGuardConfig struct {
 	ID          uint   `gorm:"primaryKey"`
 	Interface   string `gorm:"not null"`
@@ -147,7 +136,6 @@ type WireGuardConfig struct {
 	UpdatedAt   time.Time
 }
 
-// AdBlockConfig configuración de AdBlock
 type AdBlockConfig struct {
 	ID        uint   `gorm:"primaryKey"`
 	Enabled   bool   `gorm:"default:false"`
@@ -155,7 +143,6 @@ type AdBlockConfig struct {
 	UpdatedAt time.Time
 }
 
-// InsertLog inserta un log en la base de datos
 func InsertLog(level, message, source string, userID *int) error {
 	log := SystemLog{
 		Level:   level,
@@ -166,7 +153,6 @@ func InsertLog(level, message, source string, userID *int) error {
 	return db.Create(&log).Error
 }
 
-// GetLogs obtiene logs con paginación
 func GetLogs(level string, limit, offset int) ([]SystemLog, int64, error) {
 	var logs []SystemLog
 	var total int64
@@ -176,12 +162,10 @@ func GetLogs(level string, limit, offset int) ([]SystemLog, int64, error) {
 		query = query.Where("level = ?", level)
 	}
 
-	// Contar total
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
-	// Obtener logs
 	if err := query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&logs).Error; err != nil {
 		return nil, 0, err
 	}
@@ -189,7 +173,6 @@ func GetLogs(level string, limit, offset int) ([]SystemLog, int64, error) {
 	return logs, total, nil
 }
 
-// InsertStatistic inserta una estadística
 func InsertStatistic(statType string, value float64) error {
 	stat := SystemStatistic{
 		Type:      statType,
@@ -199,13 +182,11 @@ func InsertStatistic(statType string, value float64) error {
 	return db.Create(&stat).Error
 }
 
-// SetConfig guarda o actualiza una configuración
 func SetConfig(key, value string) error {
 	config := SystemConfig{Key: key, Value: value}
 	return db.Save(&config).Error
 }
 
-// GetConfig obtiene el valor de una configuración
 func GetConfig(key string) (string, error) {
 	var config SystemConfig
 	if err := db.First(&config, "key = ?", key).Error; err != nil {
@@ -214,7 +195,6 @@ func GetConfig(key string) (string, error) {
 	return config.Value, nil
 }
 
-// GetAllConfigs obtiene todas las configuraciones como un mapa
 func GetAllConfigs() (map[string]string, error) {
 	var configs []SystemConfig
 	if err := db.Find(&configs).Error; err != nil {

@@ -10,32 +10,27 @@ import (
 	"time"
 )
 
-// getSystemInfo obtiene información del sistema (reemplaza system_info.lua)
 func getSystemInfo() map[string]interface{} {
 	result := make(map[string]interface{})
 
-	// Hostname
 	if hostname, err := exec.Command("hostname").Output(); err == nil {
 		result["hostname"] = strings.TrimSpace(string(hostname))
 	} else {
 		result["hostname"] = "unknown"
 	}
 
-	// Kernel version
 	if kernel, err := exec.Command("uname", "-r").Output(); err == nil {
 		result["kernel_version"] = strings.TrimSpace(string(kernel))
 	} else {
 		result["kernel_version"] = "unknown"
 	}
 
-	// Architecture
 	if arch, err := exec.Command("uname", "-m").Output(); err == nil {
 		result["architecture"] = strings.TrimSpace(string(arch))
 	} else {
 		result["architecture"] = "unknown"
 	}
 
-	// Processor
 	processorCmd := exec.Command("sh", "-c", "cat /proc/cpuinfo | grep -m1 'model name\\|Processor\\|Hardware' | cut -d ':' -f 2 | sed 's/^[[:space:]]*//'")
 	if processor, err := processorCmd.Output(); err == nil {
 		result["processor"] = strings.TrimSpace(string(processor))
@@ -43,7 +38,6 @@ func getSystemInfo() map[string]interface{} {
 		result["processor"] = "ARM Processor"
 	}
 
-	// OS Version
 	osVersion := "Unknown"
 	if osRelease, err := os.ReadFile("/etc/os-release"); err == nil {
 		lines := strings.Split(string(osRelease), "\n")
@@ -56,7 +50,6 @@ func getSystemInfo() map[string]interface{} {
 	}
 	result["os_version"] = osVersion
 
-	// Uptime
 	uptimeCmd := exec.Command("sh", "-c", "cat /proc/uptime | awk '{print int($1)}'")
 	if uptimeOut, err := uptimeCmd.Output(); err == nil {
 		if uptimeSeconds, err := strconv.Atoi(strings.TrimSpace(string(uptimeOut))); err == nil {
@@ -71,7 +64,6 @@ func getSystemInfo() map[string]interface{} {
 		result["boot_time"] = time.Now().Unix()
 	}
 
-	// Load average
 	loadavgCmd := exec.Command("sh", "-c", "cat /proc/loadavg | awk '{print $1 \", \" $2 \", \" $3}'")
 	if loadavg, err := loadavgCmd.Output(); err == nil {
 		result["load_average"] = strings.TrimSpace(string(loadavg))
@@ -82,11 +74,9 @@ func getSystemInfo() map[string]interface{} {
 	return result
 }
 
-// getSystemStats obtiene estadísticas del sistema (reemplaza system_stats.lua)
 func getSystemStats() map[string]interface{} {
 	result := make(map[string]interface{})
 
-	// CPU usage - método 1: /proc/stat
 	cpuCmd := exec.Command("sh", "-c", "grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$3+$4+$5)} END {print usage}'")
 	if cpuOut, err := cpuCmd.Output(); err == nil {
 		cpuStr := strings.TrimSpace(string(cpuOut))
@@ -94,7 +84,6 @@ func getSystemStats() map[string]interface{} {
 		if cpuUsage, err := strconv.ParseFloat(cpuStr, 64); err == nil && cpuUsage >= 0 && cpuUsage <= 100 {
 			result["cpu_usage"] = cpuUsage
 		} else {
-			// Fallback: usar top
 			cpuCmd2 := exec.Command("sh", "-c", "top -bn1 | grep 'Cpu(s)' | awk -F'id,' '{split($1,a,\"%\"); for(i in a){if(a[i] ~ /^[0-9]/){print 100-a[i];break}}}'")
 			if cpuOut2, err2 := cpuCmd2.Output(); err2 == nil {
 				cpuStr2 := strings.TrimSpace(string(cpuOut2))
@@ -112,7 +101,6 @@ func getSystemStats() map[string]interface{} {
 		result["cpu_usage"] = 0.0
 	}
 
-	// Memory
 	memCmd := exec.Command("sh", "-c", "free | grep Mem | awk '{printf \"%.2f\", $3/$2 * 100.0}'")
 	if memOut, err := memCmd.Output(); err == nil {
 		memStr := strings.TrimSpace(string(memOut))
@@ -126,7 +114,6 @@ func getSystemStats() map[string]interface{} {
 		result["memory_usage"] = 0.0
 	}
 
-	// Disk
 	diskCmd := exec.Command("sh", "-c", "df / | tail -1 | awk '{print $5}' | sed 's/%//'")
 	if diskOut, err := diskCmd.Output(); err == nil {
 		if diskUsage, err := strconv.ParseFloat(strings.TrimSpace(string(diskOut)), 64); err == nil && diskUsage >= 0 && diskUsage <= 100 {
@@ -138,7 +125,6 @@ func getSystemStats() map[string]interface{} {
 		result["disk_usage"] = 0.0
 	}
 
-	// Uptime
 	uptimeCmd := exec.Command("sh", "-c", "cat /proc/uptime | awk '{print int($1)}'")
 	if uptimeOut, err := uptimeCmd.Output(); err == nil {
 		if uptimeSeconds, err := strconv.Atoi(strings.TrimSpace(string(uptimeOut))); err == nil {
@@ -150,7 +136,6 @@ func getSystemStats() map[string]interface{} {
 		result["uptime"] = 0
 	}
 
-	// CPU Temperature (Raspberry Pi)
 	tempCmd := exec.Command("sh", "-c", "cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null | awk '{print $1/1000}'")
 	if tempOut, err := tempCmd.Output(); err == nil {
 		if temp, err := strconv.ParseFloat(strings.TrimSpace(string(tempOut)), 64); err == nil {
@@ -162,7 +147,6 @@ func getSystemStats() map[string]interface{} {
 		result["cpu_temperature"] = 0.0
 	}
 
-	// CPU Cores
 	coresCmd := exec.Command("nproc")
 	if coresOut, err := coresCmd.Output(); err == nil {
 		if cores, err := strconv.Atoi(strings.TrimSpace(string(coresOut))); err == nil {
@@ -174,28 +158,24 @@ func getSystemStats() map[string]interface{} {
 		result["cpu_cores"] = 1
 	}
 
-	// Hostname
 	if hostname, err := exec.Command("hostname").Output(); err == nil {
 		result["hostname"] = strings.TrimSpace(string(hostname))
 	} else {
 		result["hostname"] = "unknown"
 	}
 
-	// Kernel version
 	if kernel, err := exec.Command("uname", "-r").Output(); err == nil {
 		result["kernel_version"] = strings.TrimSpace(string(kernel))
 	} else {
 		result["kernel_version"] = "unknown"
 	}
 
-	// Architecture
 	if arch, err := exec.Command("uname", "-m").Output(); err == nil {
 		result["architecture"] = strings.TrimSpace(string(arch))
 	} else {
 		result["architecture"] = "unknown"
 	}
 
-	// Processor
 	processorCmd := exec.Command("sh", "-c", "cat /proc/cpuinfo | grep -m1 'model name\\|Processor\\|Hardware' | cut -d ':' -f 2 | sed 's/^[[:space:]]*//'")
 	if processor, err := processorCmd.Output(); err == nil {
 		processorStr := strings.TrimSpace(string(processor))
@@ -208,7 +188,6 @@ func getSystemStats() map[string]interface{} {
 		result["processor"] = "ARM Processor"
 	}
 
-	// OS Version
 	osVersion := "Unknown"
 	if osRelease, err := os.ReadFile("/etc/os-release"); err == nil {
 		lines := strings.Split(string(osRelease), "\n")
@@ -221,7 +200,6 @@ func getSystemStats() map[string]interface{} {
 	}
 	result["os_version"] = osVersion
 
-	// Load average
 	loadavgCmd := exec.Command("sh", "-c", "cat /proc/loadavg | awk '{print $1 \", \" $2 \", \" $3}'")
 	if loadavg, err := loadavgCmd.Output(); err == nil {
 		result["load_average"] = strings.TrimSpace(string(loadavg))
@@ -232,7 +210,6 @@ func getSystemStats() map[string]interface{} {
 	return result
 }
 
-// systemRestart reinicia el sistema (reemplaza system_restart.lua)
 func systemRestart(user string) map[string]interface{} {
 	result := make(map[string]interface{})
 
@@ -242,11 +219,9 @@ func systemRestart(user string) map[string]interface{} {
 
 	log.Printf("INFO: Reinicio del sistema solicitado por: %s", user)
 
-	// Intentar con systemctl primero
 	restartCmd := "systemctl reboot"
 	if _, err := executeCommand(restartCmd); err != nil {
 		log.Printf("WARN: systemctl reboot falló, intentando con shutdown: %v", err)
-		// Intentar con shutdown
 		shutdownPaths := []string{"/usr/sbin/shutdown", "/sbin/shutdown", "shutdown"}
 		found := false
 		for _, path := range shutdownPaths {
@@ -265,7 +240,6 @@ func systemRestart(user string) map[string]interface{} {
 			}
 		}
 		if !found {
-			// Último recurso: reboot directo
 			restartCmd = "reboot"
 			if _, err3 := executeCommand(restartCmd); err3 != nil {
 				result["success"] = false
@@ -293,7 +267,6 @@ func systemRestart(user string) map[string]interface{} {
 	return result
 }
 
-// systemShutdown apaga el sistema (reemplaza system_shutdown.lua)
 func systemShutdown(user string) map[string]interface{} {
 	result := make(map[string]interface{})
 
@@ -303,11 +276,9 @@ func systemShutdown(user string) map[string]interface{} {
 
 	log.Printf("INFO: Apagado del sistema solicitado por: %s", user)
 
-	// Intentar con systemctl primero
 	shutdownCmd := "systemctl poweroff"
 	if _, err := executeCommand(shutdownCmd); err != nil {
 		log.Printf("WARN: systemctl poweroff falló, intentando con shutdown: %v", err)
-		// Intentar con shutdown
 		shutdownPaths := []string{"/usr/sbin/shutdown", "/sbin/shutdown", "shutdown"}
 		found := false
 		for _, path := range shutdownPaths {
@@ -326,7 +297,6 @@ func systemShutdown(user string) map[string]interface{} {
 			}
 		}
 		if !found {
-			// Último recurso: poweroff directo
 			shutdownCmd = "poweroff"
 			if _, err3 := executeCommand(shutdownCmd); err3 != nil {
 				result["success"] = false

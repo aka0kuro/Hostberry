@@ -7,7 +7,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// RateLimiter estructura para rate limiting en memoria
 type RateLimiter struct {
 	requests map[string][]time.Time
 	mu       sync.RWMutex
@@ -17,7 +16,6 @@ type RateLimiter struct {
 
 var globalRateLimiter *RateLimiter
 
-// NewRateLimiter crea un nuevo rate limiter
 func NewRateLimiter(maxReqs int, window time.Duration) *RateLimiter {
 	rl := &RateLimiter{
 		requests: make(map[string][]time.Time),
@@ -25,20 +23,17 @@ func NewRateLimiter(maxReqs int, window time.Duration) *RateLimiter {
 		window:   window,
 	}
 
-	// Limpiar requests antiguos periódicamente
 	go rl.cleanup()
 
 	return rl
 }
 
-// Allow verifica si se permite una request
 func (rl *RateLimiter) Allow(key string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
 	now := time.Now()
 	
-	// Limpiar requests fuera de la ventana
 	cutoff := now.Add(-rl.window)
 	validReqs := []time.Time{}
 	for _, reqTime := range rl.requests[key] {
@@ -48,17 +43,14 @@ func (rl *RateLimiter) Allow(key string) bool {
 	}
 	rl.requests[key] = validReqs
 
-	// Verificar límite
 	if len(rl.requests[key]) >= rl.maxReqs {
 		return false
 	}
 
-	// Agregar nueva request
 	rl.requests[key] = append(rl.requests[key], now)
 	return true
 }
 
-// cleanup limpia requests antiguos periódicamente
 func (rl *RateLimiter) cleanup() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
@@ -85,17 +77,14 @@ func (rl *RateLimiter) cleanup() {
 	}
 }
 
-// rateLimitMiddleware implementa rate limiting real
 func rateLimitMiddleware(c *fiber.Ctx) error {
 	if globalRateLimiter == nil {
-		// Inicializar con valores por defecto
 		globalRateLimiter = NewRateLimiter(
 			appConfig.Security.RateLimitRPS,
 			time.Second,
 		)
 	}
 
-	// Usar IP como clave (o user ID si está autenticado)
 	key := c.IP()
 	if userID := c.Locals("user_id"); userID != nil {
 		key = "user_" + string(rune(userID.(int)))

@@ -6,7 +6,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// HealthCheckResponse estructura de respuesta del health check
 type HealthCheckResponse struct {
 	Status    string            `json:"status"`
 	Timestamp time.Time         `json:"timestamp"`
@@ -14,7 +13,6 @@ type HealthCheckResponse struct {
 	Services  map[string]string `json:"services"`
 }
 
-// healthCheckHandler maneja el endpoint de health check
 func healthCheckHandler(c *fiber.Ctx) error {
 	response := HealthCheckResponse{
 		Status:    "healthy",
@@ -23,7 +21,6 @@ func healthCheckHandler(c *fiber.Ctx) error {
 		Services:  make(map[string]string),
 	}
 
-	// Verificar base de datos
 	if db != nil {
 		sqlDB, err := db.DB()
 		if err == nil {
@@ -42,9 +39,7 @@ func healthCheckHandler(c *fiber.Ctx) error {
 		response.Status = "degraded"
 	}
 
-	// Lua ya no se usa - todo está en Go ahora
 
-	// Verificar i18n
 	if i18nManager != nil {
 		response.Services["i18n"] = "healthy"
 	} else {
@@ -60,7 +55,6 @@ func healthCheckHandler(c *fiber.Ctx) error {
 	return c.Status(statusCode).JSON(response)
 }
 
-// readinessCheckHandler verifica si la aplicación está lista para recibir tráfico
 func readinessCheckHandler(c *fiber.Ctx) error {
 	if db == nil {
 		return c.Status(503).JSON(fiber.Map{
@@ -69,7 +63,6 @@ func readinessCheckHandler(c *fiber.Ctx) error {
 		})
 	}
 
-	// Verificar conexión a BD
 	sqlDB, err := db.DB()
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{
@@ -91,7 +84,6 @@ func readinessCheckHandler(c *fiber.Ctx) error {
 	})
 }
 
-// livenessCheckHandler verifica si la aplicación está viva
 func livenessCheckHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"status":  "alive",

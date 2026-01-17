@@ -10,14 +10,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Claims estructura para JWT
 type Claims struct {
 	Username string `json:"username"`
 	UserID   int    `json:"user_id"`
 	jwt.RegisteredClaims
 }
 
-// User estructura de usuario
 type User struct {
 	ID       int    `gorm:"primaryKey"`
 	Username string `gorm:"unique;not null"`
@@ -28,11 +26,9 @@ type User struct {
 	Role      string `gorm:"default:admin"`
 	Timezone  string `gorm:"default:UTC"`
 
-	// Estadísticas / seguridad
 	LastLogin      *time.Time
 	LoginCount     int  `gorm:"default:0"`
 	FailedAttempts int  `gorm:"default:0"`
-	// Preferencias
 	EmailNotifications bool `gorm:"default:false"`
 	SystemAlerts       bool `gorm:"default:false"`
 	SecurityAlerts     bool `gorm:"default:false"`
@@ -45,7 +41,6 @@ type User struct {
 	UpdatedAt time.Time
 }
 
-// GenerateToken genera un token JWT para el usuario
 func GenerateToken(user *User) (string, error) {
 	expirationTime := time.Now().Add(time.Duration(appConfig.Security.TokenExpiry) * time.Minute)
 	
@@ -64,7 +59,6 @@ func GenerateToken(user *User) (string, error) {
 	return token.SignedString([]byte(appConfig.Security.JWTSecret))
 }
 
-// ValidateToken valida un token JWT
 func ValidateToken(tokenString string) (*Claims, error) {
 	if tokenString == "" {
 		return nil, errors.New("token vacío")
@@ -80,7 +74,6 @@ func ValidateToken(tokenString string) (*Claims, error) {
 	})
 
 	if err != nil {
-		// En jwt/v5, los errores son diferentes - verificar el mensaje de error
 		errMsg := strings.ToLower(err.Error())
 		if strings.Contains(errMsg, "expired") || strings.Contains(errMsg, "token is expired") {
 			return nil, errors.New("token expirado")
@@ -98,7 +91,6 @@ func ValidateToken(tokenString string) (*Claims, error) {
 		return nil, errors.New("token inválido")
 	}
 
-	// Verificar que el token no esté expirado (doble verificación)
 	if claims.ExpiresAt != nil && claims.ExpiresAt.Time.Before(time.Now()) {
 		return nil, errors.New("token expirado")
 	}
@@ -106,7 +98,6 @@ func ValidateToken(tokenString string) (*Claims, error) {
 	return claims, nil
 }
 
-// HashPassword hashea una contraseña usando bcrypt
 func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), appConfig.Security.BcryptCost)
 	return string(bytes), err
@@ -116,11 +107,7 @@ func isBcryptHash(hash string) bool {
 	return strings.HasPrefix(hash, "$2a$") || strings.HasPrefix(hash, "$2b$") || strings.HasPrefix(hash, "$2y$")
 }
 
-// CheckPassword verifica una contraseña contra un hash
 func CheckPassword(password, hash string) bool {
-	// Compat legacy:
-	// - password en texto plano (versiones antiguas / migraciones)
-	// - hashes bcrypt con prefijo $2y$ (común en otros stacks)
 	if !isBcryptHash(hash) {
 		return password == hash
 	}
@@ -131,7 +118,6 @@ func CheckPassword(password, hash string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(normalized), []byte(password)) == nil
 }
 
-// Login autentica un usuario
 func Login(username, password string) (*User, string, error) {
 	var user User
 	if err := db.Where("username = ? AND is_active = ?", username, true).First(&user).Error; err != nil {
@@ -139,13 +125,11 @@ func Login(username, password string) (*User, string, error) {
 	}
 
 	if !CheckPassword(password, user.Password) {
-		// Registrar intento fallido sin filtrar si el usuario existe/no existe
 		user.FailedAttempts++
 		_ = db.Save(&user).Error
 		return nil, "", errors.New("usuario o contraseña incorrectos")
 	}
 
-	// Si venía de legacy (texto plano o $2y$), re-hashear a bcrypt estándar
 	if !strings.HasPrefix(user.Password, "$2a$") && !strings.HasPrefix(user.Password, "$2b$") {
 		if hashed, err := HashPassword(password); err == nil {
 			user.Password = hashed
@@ -153,7 +137,6 @@ func Login(username, password string) (*User, string, error) {
 		}
 	}
 
-	// Login exitoso: reset intentos, actualizar last_login/login_count
 	now := time.Now()
 	user.FailedAttempts = 0
 	user.LastLogin = &now
@@ -168,25 +151,20 @@ func Login(username, password string) (*User, string, error) {
 	return &user, token, nil
 }
 
-// Register crea un nuevo usuario
 func Register(username, password, email string) (*User, error) {
-	// Validar username
 	if username == "" {
 		return nil, errors.New("el nombre de usuario no puede estar vacío")
 	}
 	
-	// Validar password
 	if password == "" {
 		return nil, errors.New("la contraseña no puede estar vacía")
 	}
 	
-	// Verificar si el usuario ya existe
 	var existingUser User
 	if err := db.Where("username = ?", username).First(&existingUser).Error; err == nil {
 		return nil, errors.New("el usuario ya existe")
 	}
 
-	// Hashear contraseña
 	hashedPassword, err := HashPassword(password)
 	if err != nil {
 		return nil, fmt.Errorf("error hasheando contraseña: %v", err)
