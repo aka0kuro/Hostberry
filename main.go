@@ -824,18 +824,6 @@ func securityMiddleware(c *fiber.Ctx) error {
 	return c.Next()
 }
 
-	stats := fiber.Map{
-		"cpu_usage":      0.0,
-		"memory_usage":   0.0,
-		"disk_usage":     0.0,
-		"uptime":         0,
-		"cpu_cores":      1,
-		"hostname":       "unknown",
-		"kernel_version": "unknown",
-		"architecture":   "unknown",
-		"os_version":     "Linux",
-	}
-
 	cpuOut, cpuErr := executeCommand("grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$3+$4+$5)} END {print usage}'")
 	if cpuErr == nil && strings.TrimSpace(cpuOut) != "" {
 		cpuOut = strings.ReplaceAll(strings.TrimSpace(cpuOut), ",", ".")
