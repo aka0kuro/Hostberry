@@ -353,17 +353,21 @@ body.light-theme .wifi-interface-select-icon {
 }
 
 .wifi-buttons-row {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
     gap: 0.5rem;
     align-items: center;
 }
 
 .wifi-buttons-row .btn {
+    flex: 1 1 0;
     width: 100%;
     padding: 0.35rem 0.5rem;
     font-size: 0.8rem;
     white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
 }
 
 /* Info Grid */
