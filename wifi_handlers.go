@@ -166,6 +166,8 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 	executeCommand(fmt.Sprintf("sudo mkdir -p %s 2>/dev/null || true", runDir))
 	executeCommand(fmt.Sprintf("sudo chmod 775 %s 2>/dev/null || true", runDir))
 	executeCommand(fmt.Sprintf("sudo chown root:netdev %s 2>/dev/null || true", runDir))
+	// Limpiar socket stale si existe
+	executeCommand(fmt.Sprintf("sudo rm -f %s/%s 2>/dev/null || true", runDir, interfaceName))
 
 	// Verificar que el archivo de configuración existe
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
@@ -220,12 +222,25 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 	startCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 	startOut, startErr := startCmd.CombinedOutput()
 	if startErr != nil {
-		log.Printf("Error iniciando wpa_supplicant: %v, output: %s", startErr, string(startOut))
+		outStr := string(startOut)
+		log.Printf("Error iniciando wpa_supplicant: %v, output: %s", startErr, outStr)
 		// Verificar si el error es por permisos o por el ejecutable
-		if strings.Contains(string(startOut), "not found") || strings.Contains(string(startOut), "No such file") {
+		if strings.Contains(outStr, "not found") || strings.Contains(outStr, "No such file") {
 			return fmt.Errorf("wpa_supplicant no se encontró en %s. Verifica la instalación", wpaSupplicantPath)
 		}
-		return fmt.Errorf("error iniciando wpa_supplicant: %v, output: %s", startErr, string(startOut))
+		// Si el socket ya existe, limpiar y reintentar una vez
+		if strings.Contains(outStr, "ctrl_iface exists") || strings.Contains(outStr, "cannot override it") {
+			log.Printf("Socket de control en uso, limpiando y reintentando...")
+			executeCommand(fmt.Sprintf("sudo rm -f %s/%s 2>/dev/null || true", runDir, interfaceName))
+			retryCmd := exec.Command("sudo", args...)
+			retryCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+			retryOut, retryErr := retryCmd.CombinedOutput()
+			if retryErr != nil {
+				return fmt.Errorf("error iniciando wpa_supplicant tras limpiar socket: %v, output: %s", retryErr, string(retryOut))
+			}
+		} else {
+			return fmt.Errorf("error iniciando wpa_supplicant: %v, output: %s", startErr, outStr)
+		}
 	}
 
 	log.Printf("Comando wpa_supplicant ejecutado, output: %s", strings.TrimSpace(string(startOut)))
