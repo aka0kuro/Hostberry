@@ -1567,19 +1567,52 @@ EOF
         if command -v iw &> /dev/null; then
             if ! ip link show ap0 > /dev/null 2>&1; then
                 print_info "Creando interfaz virtual ap0 para modo AP+STA..."
-                if iw phy "$PHY_NAME" interface add ap0 type __ap 2>/dev/null || \
-                   iw dev "$HOSTAPD_INTERFACE" interface add ap0 type __ap 2>/dev/null; then
-                    print_success "Interfaz virtual ap0 creada exitosamente"
+                
+                # Asegurar que la interfaz física esté activa
+                ip link set "$HOSTAPD_INTERFACE" up 2>/dev/null || true
+                sleep 1
+                
+                # Intentar crear ap0 con múltiples métodos
+                AP_CREATED=false
+                
+                # Método 1: Usando phy directamente
+                if [ -n "$PHY_NAME" ] && iw phy "$PHY_NAME" interface add ap0 type __ap 2>/dev/null; then
+                    AP_CREATED=true
+                    print_success "Interfaz virtual ap0 creada usando phy $PHY_NAME"
+                # Método 2: Usando la interfaz directamente
+                elif iw dev "$HOSTAPD_INTERFACE" interface add ap0 type __ap 2>/dev/null; then
+                    AP_CREATED=true
+                    print_success "Interfaz virtual ap0 creada usando interfaz $HOSTAPD_INTERFACE"
+                fi
+                
+                if [ "$AP_CREATED" = true ]; then
                     # Configurar MAC address de ap0 igual a wlan0
                     if [ -n "$MAC_ADDRESS" ]; then
                         ip link set ap0 address "$MAC_ADDRESS" 2>/dev/null || true
+                    fi
+                    # Activar la interfaz
+                    ip link set ap0 up 2>/dev/null || true
+                    sleep 1
+                    
+                    # Verificar que se creó correctamente
+                    if ip link show ap0 > /dev/null 2>&1; then
+                        print_success "Interfaz virtual ap0 verificada y activa"
+                    else
+                        print_warning "ap0 se creó pero no está disponible"
                     fi
                 else
                     print_warning "No se pudo crear interfaz virtual ap0, usando interfaz física directamente"
                     print_info "Sugerencia: tu driver puede no soportar AP+STA. Verifica con: iw list | grep -A5 -i 'valid interface combinations'"
                     AP_INTERFACE="$HOSTAPD_INTERFACE"
                 fi
+            else
+                print_success "Interfaz virtual ap0 ya existe"
+                # Asegurar que esté activa
+                ip link set ap0 up 2>/dev/null || true
             fi
+        else
+            print_warning "iw no está disponible, no se puede crear ap0"
+            AP_INTERFACE="$HOSTAPD_INTERFACE"
         fi
 
         # Usar ap0 si existe, sino usar la interfaz física
