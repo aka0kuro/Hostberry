@@ -124,29 +124,7 @@ func executeCommand(cmd string) (string, error) {
 	outputStr := string(out)
 	
 	// Filtrar mensajes de error de sudo relacionados con read-only file system y hostname
-	lines := strings.Split(outputStr, "\n")
-	filteredLines := make([]string, 0, len(lines))
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		// Ignorar líneas de error de sudo sobre logs, read-only file system y hostname
-		if strings.Contains(line, "sudo: unable to open log file") ||
-			strings.Contains(line, "Read-only file system") ||
-			strings.Contains(line, "sudo: unable to stat") ||
-			strings.Contains(line, "sudo: unable to resolve host") ||
-			strings.Contains(line, "Name or service not known") ||
-			strings.HasPrefix(line, "sudo: unable to resolve host") {
-			continue
-		}
-		// Filtrar líneas que empiecen con "sudo:" y contengan "unable to resolve"
-		if strings.HasPrefix(line, "sudo:") && strings.Contains(line, "unable to resolve") {
-			continue
-		}
-		if line != "" {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	
-	outputStr = strings.Join(filteredLines, "\n")
+	outputStr = filterSudoErrorString(outputStr)
 	
 	// Si hay error pero la salida filtrada tiene contenido válido, usar la salida
 	if err != nil && outputStr != "" {
@@ -167,8 +145,14 @@ func executeCommand(cmd string) (string, error) {
 }
 
 // filterSudoErrors filtra mensajes de error de sudo relacionados con read-only file system y hostname
+// Esta función está duplicada en executeCommand, pero se mantiene para compatibilidad
 func filterSudoErrors(output []byte) string {
-	lines := strings.Split(string(output), "\n")
+	return filterSudoErrorString(string(output))
+}
+
+// filterSudoErrorString es la versión reutilizable del filtro
+func filterSudoErrorString(output string) string {
+	lines := strings.Split(output, "\n")
 	var cleanLines []string
 	for _, line := range lines {
 		line = strings.TrimSpace(line)

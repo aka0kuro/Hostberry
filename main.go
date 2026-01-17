@@ -62,6 +62,17 @@ type SecurityConfig struct {
 
 
 var appConfig Config
+
+// generateRandomSecret genera un secreto aleatorio de 32 bytes
+func generateRandomSecret() string {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		// Fallback si rand falla
+		return fmt.Sprintf("%d-%d", time.Now().UnixNano(), os.Getpid())
+	}
+	return hex.EncodeToString(bytes)
+}
+
 func main() {
 	// Cargar configuración
 	if err := loadConfig(); err != nil {
