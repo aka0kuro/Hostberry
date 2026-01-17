@@ -190,10 +190,9 @@ install_dependencies() {
         fi
         
         if [ "$is_installed" = true ]; then
-            print_info "  ✓ ${package} ya está instalado"
             installed_packages+=("${package}")
         else
-            print_info "  Instalando ${package}..."
+            print_info "Instalando ${package}..."
             
             # Intentar instalar con salida visible para diagnóstico
             local install_output
