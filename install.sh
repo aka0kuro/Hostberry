@@ -684,23 +684,17 @@ try_go_mod_download() {
     tmp_log="$(mktemp)"
 
     if [ -n "$env_kv" ]; then
-        print_info "go mod download ($env_kv) intento ${attempt}/${max}..."
         if env $env_kv go mod download >"$tmp_log" 2>&1; then
             rm -f "$tmp_log"
             return 0
         fi
     else
-        print_info "go mod download (env por defecto) intento ${attempt}/${max}..."
         if go mod download >"$tmp_log" 2>&1; then
             rm -f "$tmp_log"
             return 0
         fi
     fi
 
-    print_warning "Falló la descarga de dependencias Go (intento ${attempt}/${max}). Últimas líneas del error:"
-    tail -n 10 "$tmp_log" 2>/dev/null | while read -r line; do
-        [ -n "$line" ] && print_warning "  $line"
-    done
     rm -f "$tmp_log"
     return 1
 }
