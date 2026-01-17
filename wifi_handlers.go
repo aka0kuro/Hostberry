@@ -1068,7 +1068,16 @@ country=%s
 		ipObtained := false
 		var ip string
 
-		for ipAttempt := 0; ipAttempt < 10 && !ipObtained; ipAttempt++ {
+		// Ejecutar DHCP inmediatamente después de conectar
+		log.Printf("Solicitando IP con DHCP...")
+		executeCommand(fmt.Sprintf("sudo pkill -f 'dhclient.*%s|udhcpc.*%s' 2>/dev/null || true", interfaceName, interfaceName))
+		time.Sleep(500 * time.Millisecond)
+		dhcpOut, dhcpErr := executeCommand(fmt.Sprintf("sudo dhclient -v %s 2>&1 || sudo udhcpc -i %s -q -n 2>&1 || true", interfaceName, interfaceName))
+		if dhcpErr == nil && dhcpOut != "" {
+			log.Printf("DHCP output: %s", dhcpOut)
+		}
+
+		for ipAttempt := 0; ipAttempt < 15 && !ipObtained; ipAttempt++ {
 			time.Sleep(2 * time.Second)
 
 			ipCmd := exec.Command("sh", "-c", fmt.Sprintf("ip addr show %s 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1", interfaceName))
@@ -1079,11 +1088,19 @@ country=%s
 				ipObtained = true
 				log.Printf("IP obtenida: %s", ip)
 			} else {
-				log.Printf("Esperando IP... (intento %d/10)", ipAttempt+1)
-				// Intentar DHCP de forma agresiva (limpiar y solicitar)
-				executeCommand(fmt.Sprintf("sudo dhclient -r %s 2>/dev/null || true", interfaceName))
-				executeCommand(fmt.Sprintf("sudo pkill -f 'dhclient.*%s|udhcpc.*%s' 2>/dev/null || true", interfaceName, interfaceName))
-				executeCommand(fmt.Sprintf("sudo dhclient -v %s 2>/dev/null || sudo udhcpc -i %s -q -n 2>/dev/null || true", interfaceName, interfaceName))
+				log.Printf("Esperando IP... (intento %d/15)", ipAttempt+1)
+				// Reintentar DHCP si no hay IP después de varios intentos
+				if ipAttempt > 2 && ipAttempt%3 == 0 {
+					log.Printf("Reintentando DHCP...")
+					executeCommand(fmt.Sprintf("sudo dhclient -r %s 2>/dev/null || true", interfaceName))
+					time.Sleep(500 * time.Millisecond)
+					executeCommand(fmt.Sprintf("sudo pkill -f 'dhclient.*%s|udhcpc.*%s' 2>/dev/null || true", interfaceName, interfaceName))
+					time.Sleep(500 * time.Millisecond)
+					dhcpOut2, _ := executeCommand(fmt.Sprintf("sudo dhclient -v %s 2>&1 || sudo udhcpc -i %s -q -n 2>&1 || true", interfaceName, interfaceName))
+					if dhcpOut2 != "" {
+						log.Printf("DHCP retry output: %s", dhcpOut2)
+					}
+				}
 			}
 		}
 
