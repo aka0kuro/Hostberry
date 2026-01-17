@@ -653,10 +653,8 @@ server:
 
 database:
   type: "sqlite"
-  path: "${DATA_DIR}/hostberry.db"
 
 security:
-  jwt_secret: "$(openssl rand -hex 32)"
   token_expiry: 60
   bcrypt_cost: 10
   rate_limit_rps: 10
@@ -1025,14 +1023,12 @@ EOF
     for wpa_path in "/usr/sbin/wpa_supplicant" "/sbin/wpa_supplicant" "/usr/bin/wpa_supplicant" "/bin/wpa_supplicant"; do
         if [ -f "$wpa_path" ]; then
             echo "$USER_NAME ALL=(ALL) NOPASSWD: $wpa_path" >> "/etc/sudoers.d/hostberry"
- wpa_supplicant: $wpa_path"
         fi
     done
     
     if command -v wpa_cli &> /dev/null; then
         WPA_CLI_PATH=$(command -v wpa_cli)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $WPA_CLI_PATH" >> "/etc/sudoers.d/hostberry"
- wpa_cli: $WPA_CLI_PATH"
     elif [ -f "/usr/sbin/wpa_cli" ]; then
         echo "$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/wpa_cli" >> "/etc/sudoers.d/hostberry"
  wpa_cli: /usr/sbin/wpa_cli"
