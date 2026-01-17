@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"regexp"
 	"strings"
 	"strconv"
 	"time"
@@ -662,11 +663,22 @@ func wifiConnectHandler(c *fiber.Ctx) error {
 		SSID     string `json:"ssid"`
 		Password string `json:"password"`
 		Country  string `json:"country"`
+		Interface string `json:"interface"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{
 			"error": "Datos inválidos",
+		})
+	}
+
+	if err := ValidateSSID(req.SSID); err != nil {
+		return err
+	}
+
+	if len(req.Password) > 128 {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "La contraseña no puede tener más de 128 caracteres",
 		})
 	}
 
@@ -681,7 +693,16 @@ func wifiConnectHandler(c *fiber.Ctx) error {
 		country = DefaultCountryCode
 	}
 	
-	interfaceName := DefaultWiFiInterface
+	interfaceName := req.Interface
+	if interfaceName == "" {
+		interfaceName = DefaultWiFiInterface
+	}
+
+	if len(interfaceName) > 16 || !regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString(interfaceName) {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Nombre de interfaz inválido",
+		})
+	}
 
 	result := connectWiFi(req.SSID, req.Password, interfaceName, country, user.Username)
 
