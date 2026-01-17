@@ -518,19 +518,19 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 		user = "unknown"
 	}
 
-	log.Printf("========================================")
+	if appConfig.Server.Debug { log.Printf("========================================") }
 	log.Printf("Conectando a WiFi: %s (usuario: %s)", ssid, user)
 	log.Printf("Interfaz: %s, País: %s", interfaceName, country)
-	log.Printf("========================================")
+	if appConfig.Server.Debug { log.Printf("========================================") }
 
-	log.Printf("Paso 1: Verificando directorios...")
+	if appConfig.Server.Debug { log.Printf("Paso 1: Verificando directorios...") }
 	if err := ensureWpaSupplicantDirs(); err != nil {
 		log.Printf("ERROR: No se pudieron crear los directorios: %v", err)
 		result["error"] = fmt.Sprintf("Error preparando sistema: %v", err)
 		return result
 	}
 
-	log.Printf("Paso 2: Verificando conflictos...")
+	if appConfig.Server.Debug { log.Printf("Paso 2: Verificando conflictos...") }
 
 	hostapdRunning, _ := exec.Command("sh", "-c", "pgrep hostapd 2>/dev/null").Output()
 	if strings.TrimSpace(string(hostapdRunning)) != "" {
@@ -573,7 +573,7 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null || true", interfaceName))
 	time.Sleep(1 * time.Second)
 
-	log.Printf("Paso 4: Deteniendo wpa_supplicant existente...")
+	if appConfig.Server.Debug { log.Printf("Paso 4: Deteniendo wpa_supplicant existente...") }
 	stopWpaSupplicant(interfaceName)
 	
 	socketDirs := []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"}
@@ -585,7 +585,7 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	
 	activeRunDir = ""
 
-	log.Printf("Paso 5: Creando archivo de configuración...")
+	if appConfig.Server.Debug { log.Printf("Paso 5: Creando archivo de configuración...") }
 
 	safeSSID := regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(ssid, "_")
 	wpaConfigPath := fmt.Sprintf("%s/wpa_supplicant-%s.conf", WpaSupplicantConfigDir, safeSSID)
@@ -783,7 +783,7 @@ country=%s
 
 	log.Printf("Archivo de configuración creado: %s", wpaConfigPath)
 
-	log.Printf("Paso 6: Iniciando wpa_supplicant...")
+	if appConfig.Server.Debug { log.Printf("Paso 6: Iniciando wpa_supplicant...") }
 	if err := startWpaSupplicant(interfaceName, wpaConfigPath, runDir); err != nil {
 		log.Printf("ERROR: %v", err)
 		result["error"] = "No se pudo iniciar wpa_supplicant. Verifica la instalación."
@@ -795,7 +795,7 @@ country=%s
 		log.Printf("Advertencia: no se encontró socket en %s/%s tras iniciar wpa_supplicant", runDir, interfaceName)
 	}
 
-	log.Printf("Paso 7: Estableciendo comunicación con wpa_cli...")
+	if appConfig.Server.Debug { log.Printf("Paso 7: Estableciendo comunicación con wpa_cli...") }
 	socketDir, err := waitForWpaCliConnection(interfaceName, 10)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
@@ -811,7 +811,7 @@ country=%s
 		return strings.TrimSpace(string(out)), err
 	}
 
-	log.Printf("Paso 8: Conectando a la red...")
+	if appConfig.Server.Debug { log.Printf("Paso 8: Conectando a la red...") }
 
 	listOut, listErr := runWpaCli("list_networks")
 	if listErr != nil {
@@ -864,7 +864,7 @@ country=%s
 
 	runWpaCli("reconnect")
 
-	log.Printf("Paso 9: Esperando conexión...")
+	if appConfig.Server.Debug { log.Printf("Paso 9: Esperando conexión...") }
 	connected := false
 	statusOutput := ""
 	maxAttempts := 20
@@ -921,7 +921,7 @@ country=%s
 	}
 
 	if connected {
-		log.Printf("Paso 10: Obteniendo dirección IP...")
+		if appConfig.Server.Debug { log.Printf("Paso 10: Obteniendo dirección IP...") }
 		ipObtained := false
 		var ip string
 

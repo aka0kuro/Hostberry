@@ -315,7 +315,9 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 	if result != nil {
 		if interfaces, ok := result["interfaces"]; ok {
 			if interfacesArray, ok := interfaces.([]map[string]interface{}); ok && len(interfacesArray) > 0 {
-				log.Printf("✅ Función Go devolvió %d interfaces", len(interfacesArray))
+				if appConfig.Server.Debug {
+					log.Printf("Función Go devolvió %d interfaces", len(interfacesArray))
+				}
 				return c.JSON(result)
 			}
 		}
