@@ -566,6 +566,13 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 		log.Printf("En modo AP+STA, ap0 funciona como AP y wlan0 como STA simultáneamente")
 	}
 
+	// Detener wpa_supplicant administrado por systemd si está activo (evita conflictos con nuestra instancia)
+	log.Printf("Verificando wpa_supplicant gestionado por systemd...")
+	executeCommand("sudo systemctl stop wpa_supplicant 2>/dev/null || true")
+	executeCommand(fmt.Sprintf("sudo systemctl stop wpa_supplicant@%s 2>/dev/null || true", interfaceName))
+	executeCommand("sudo systemctl disable wpa_supplicant 2>/dev/null || true")
+	executeCommand(fmt.Sprintf("sudo systemctl disable wpa_supplicant@%s 2>/dev/null || true", interfaceName))
+
 	// Verificar modo de la interfaz
 	iwInfoCmd := exec.Command("sh", "-c", fmt.Sprintf("iw dev %s info 2>/dev/null", interfaceName))
 	if iwInfoOut, err := iwInfoCmd.Output(); err == nil {
