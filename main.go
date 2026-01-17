@@ -135,7 +135,7 @@ func loadConfig() error {
 				Path: "data/hostberry.db",
 			},
 			Security: SecurityConfig{
-				JWTSecret:    "change-me-in-production",
+				JWTSecret:    generateRandomSecret(),
 				TokenExpiry:  60, // 1 hora
 				BcryptCost:   10,
 				RateLimitRPS: 10,
@@ -200,11 +200,17 @@ func createApp() *fiber.App {
 		},
 	}))
 	app.Use(compress.New())
+	// CORS más restrictivo: solo permitir orígenes específicos en producción
+	corsOrigins := "*"
+	if !appConfig.Server.Debug {
+		// En producción, solo permitir localhost y la IP del servidor
+		corsOrigins = "http://localhost:" + fmt.Sprintf("%d", appConfig.Server.Port) + ",http://127.0.0.1:" + fmt.Sprintf("%d", appConfig.Server.Port)
+	}
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*",
+		AllowOrigins:     corsOrigins,
 		AllowCredentials: true,
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
-		AllowHeaders:     "*",
+		AllowHeaders:     "Content-Type,Authorization",
 		MaxAge:           3600,
 	}))
 
