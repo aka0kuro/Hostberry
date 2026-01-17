@@ -1013,14 +1013,12 @@ EOF
     if command -v hostapd_cli &> /dev/null; then
         HOSTAPD_CLI_PATH=$(command -v hostapd_cli)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $HOSTAPD_CLI_PATH" >> "/etc/sudoers.d/hostberry"
- hostapd_cli: $HOSTAPD_CLI_PATH"
     fi
     
     # Agregar permisos para wpa_supplicant y wpa_cli (para modo STA)
     if command -v wpa_supplicant &> /dev/null; then
         WPA_SUPPLICANT_PATH=$(command -v wpa_supplicant)
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $WPA_SUPPLICANT_PATH" >> "/etc/sudoers.d/hostberry"
- wpa_supplicant: $WPA_SUPPLICANT_PATH"
     fi
     
     # Agregar permisos para rutas estándar de wpa_supplicant (por si no está en PATH)
