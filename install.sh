@@ -642,9 +642,7 @@ install_files() {
     if [ ! -f "$CONFIG_FILE" ]; then
         if [ -f "${SCRIPT_DIR}/config.yaml.example" ]; then
             cp "${SCRIPT_DIR}/config.yaml.example" "$CONFIG_FILE"
-            print_info "Archivo de configuración creado desde ejemplo"
         else
-            # Crear config básico
             cat > "$CONFIG_FILE" <<EOF
 server:
   host: "0.0.0.0"
@@ -663,10 +661,7 @@ security:
   bcrypt_cost: 10
   rate_limit_rps: 10
 EOF
-            print_info "Archivo de configuración creado con valores por defecto"
         fi
-    else
-        print_info "Archivo de configuración ya existe, no se sobrescribe"
     fi
     
     # Permisos
@@ -675,8 +670,6 @@ EOF
     chown -R "$USER_NAME:$GROUP_NAME" "$DATA_DIR"
     chmod 755 "$INSTALL_DIR"
     chmod 644 "$CONFIG_FILE"
-    
-    print_success "Archivos instalados"
 }
 
 # Compilar el proyecto
