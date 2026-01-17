@@ -157,7 +157,15 @@ func stopWpaSupplicant(interfaceName string) {
 
 // startWpaSupplicant inicia wpa_supplicant con la configuración dada
 func startWpaSupplicant(interfaceName, configPath, runDir string) error {
+	if runDir == "" {
+		runDir = "/run/wpa_supplicant"
+	}
 	log.Printf("Iniciando wpa_supplicant para %s con config %s (runDir: %s)", interfaceName, configPath, runDir)
+
+	// Asegurar que el directorio de socket exista con permisos correctos (usar sudo)
+	executeCommand(fmt.Sprintf("sudo mkdir -p %s 2>/dev/null || true", runDir))
+	executeCommand(fmt.Sprintf("sudo chmod 775 %s 2>/dev/null || true", runDir))
+	executeCommand(fmt.Sprintf("sudo chown root:netdev %s 2>/dev/null || true", runDir))
 
 	// Verificar que el archivo de configuración existe
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
@@ -857,6 +865,12 @@ country=%s
 		log.Printf("ERROR: %v", err)
 		result["error"] = "No se pudo iniciar wpa_supplicant. Verifica la instalación."
 		return result
+	}
+
+	// Verificar que el socket de control exista
+	existsOut, _ := executeCommand(fmt.Sprintf("sudo ls -l %s/%s 2>/dev/null || true", runDir, interfaceName))
+	if strings.TrimSpace(existsOut) == "" {
+		log.Printf("Advertencia: no se encontró socket en %s/%s tras iniciar wpa_supplicant", runDir, interfaceName)
 	}
 
 	// Paso 7: Esperar conexión con wpa_cli
