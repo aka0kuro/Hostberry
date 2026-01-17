@@ -918,18 +918,69 @@ country=%s
 	}
 
 	wpaCliCmd := fmt.Sprintf("sudo wpa_cli -i %s -p %s", interfaceName, socketDir)
+	runWpaCli := func(args ...string) (string, error) {
+		base := []string{"wpa_cli", "-i", interfaceName, "-p", socketDir}
+		cmd := exec.Command("sudo", append(base, args...)...)
+		out, err := cmd.CombinedOutput()
+		return strings.TrimSpace(string(out)), err
+	}
 
 	// Paso 8: Configurar y conectar a la red
 	log.Printf("Paso 8: Conectando a la red...")
 
 	// Listar redes configuradas
-	listOut, _ := executeCommand(fmt.Sprintf("%s list_networks", wpaCliCmd))
-	log.Printf("Redes configuradas: %s", strings.TrimSpace(listOut))
+	listOut, listErr := runWpaCli("list_networks")
+	if listErr != nil {
+		log.Printf("Error listando redes: %v, output: %s", listErr, listOut)
+	} else {
+		log.Printf("Redes configuradas: %s", strings.TrimSpace(listOut))
+	}
 
-	// Habilitar la red 0 (la que acabamos de configurar)
-	executeCommand(fmt.Sprintf("%s select_network 0", wpaCliCmd))
-	executeCommand(fmt.Sprintf("%s enable_network 0", wpaCliCmd))
-	executeCommand(fmt.Sprintf("%s reconnect", wpaCliCmd))
+	// Si no hay redes, agregarlas manualmente vía wpa_cli
+	lines := []string{}
+	if listOut != "" {
+		lines = strings.Split(listOut, "\n")
+	}
+	needsAdd := len(lines) <= 1
+	if needsAdd {
+		log.Printf("No se encontraron redes en wpa_supplicant, agregando vía wpa_cli...")
+		netIDOut, netIDErr := runWpaCli("add_network")
+		if netIDErr != nil || netIDOut == "" {
+			result["error"] = fmt.Sprintf("Error agregando red en wpa_supplicant: %v", netIDErr)
+			return result
+		}
+		netID := strings.TrimSpace(netIDOut)
+		escape := func(v string) string {
+			v = strings.ReplaceAll(v, "\\", "\\\\")
+			v = strings.ReplaceAll(v, "\"", "\\\"")
+			return v
+		}
+		ssidArg := fmt.Sprintf("\"%s\"", escape(ssid))
+		if _, err := runWpaCli("set_network", netID, "ssid", ssidArg); err != nil {
+			result["error"] = "Error configurando SSID en wpa_supplicant"
+			return result
+		}
+		if password != "" {
+			pskArg := fmt.Sprintf("\"%s\"", escape(password))
+			if _, err := runWpaCli("set_network", netID, "psk", pskArg); err != nil {
+				result["error"] = "Error configurando PSK en wpa_supplicant"
+				return result
+			}
+		} else {
+			if _, err := runWpaCli("set_network", netID, "key_mgmt", "NONE"); err != nil {
+				result["error"] = "Error configurando red abierta en wpa_supplicant"
+				return result
+			}
+		}
+		runWpaCli("enable_network", netID)
+		runWpaCli("select_network", netID)
+	} else {
+		// Habilitar la red 0 (la que acabamos de configurar)
+		runWpaCli("select_network", "0")
+		runWpaCli("enable_network", "0")
+	}
+
+	runWpaCli("reconnect")
 
 	// Paso 9: Esperar conexión
 	log.Printf("Paso 9: Esperando conexión...")
@@ -942,8 +993,12 @@ country=%s
 	for attempt := 0; attempt < maxAttempts && !connected; attempt++ {
 		time.Sleep(2 * time.Second)
 
-		statusOutput, _ = executeCommand(fmt.Sprintf("%s status", wpaCliCmd))
-		log.Printf("Estado (intento %d/%d): %s", attempt+1, maxAttempts, strings.TrimSpace(statusOutput))
+		statusOutput, err = runWpaCli("status")
+		if err != nil && statusOutput == "" {
+			log.Printf("Estado (intento %d/%d): error %v", attempt+1, maxAttempts, err)
+		} else {
+			log.Printf("Estado (intento %d/%d): %s", attempt+1, maxAttempts, strings.TrimSpace(statusOutput))
+		}
 
 		// Extraer wpa_state
 		stateRe := regexp.MustCompile(`wpa_state=([^\r\n]+)`)
