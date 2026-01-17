@@ -216,46 +216,26 @@ install_dependencies() {
                 fi
                 
                 if [ "$verify_installed" = true ]; then
-                    print_success "  ✓ ${package} instalado correctamente"
                     installed_packages+=("${package}")
                 else
-                    print_warning "  ✗ ${package} no se instaló correctamente"
                     failed_packages+=("${package}")
                 fi
             else
-                # Mostrar información del error
-                print_warning "  ✗ No se pudo instalar ${package}"
-                
                 # Verificar si el paquete está disponible en los repositorios
                 if ! apt-cache search "${package}" 2>/dev/null | grep -q "^${package} "; then
-                    print_warning "    El paquete ${package} no está disponible en los repositorios configurados"
-                    print_info "    Intenta ejecutar: sudo apt-get update && sudo apt-get install -y ${package}"
-                    
                     # Intentar actualizar repositorios y reinstalar
-                    print_info "    Intentando actualizar repositorios y reinstalar..."
                     if apt-get update -qq && apt-get install -y "${package}" > /dev/null 2>&1; then
                         if dpkg -l | grep -q "^ii.*${package} " || command -v "${package}" &> /dev/null; then
-                            print_success "  ✓ ${package} instalado correctamente después de actualizar repositorios"
                             installed_packages+=("${package}")
                             continue
                         fi
                     fi
                 else
-                    # Mostrar el error específico
-                    echo "$install_output" | tail -5 | while read line; do
-                        if [ -n "$line" ]; then
-                            print_warning "    $line"
-                        fi
-                    done
-                    
                     # Intentar con --fix-broken si hay problemas de dependencias
                     if echo "$install_output" | grep -q "broken\|dependenc"; then
-                        print_info "    Intentando reparar dependencias rotas..."
                         if apt-get install -f -y > /dev/null 2>&1; then
-                            print_info "    Reintentando instalación de ${package}..."
                             if apt-get install -y "${package}" > /dev/null 2>&1; then
                                 if dpkg -l | grep -q "^ii.*${package} " || command -v "${package}" &> /dev/null; then
-                                    print_success "  ✓ ${package} instalado correctamente después de reparar dependencias"
                                     installed_packages+=("${package}")
                                     continue
                                 fi
