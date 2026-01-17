@@ -1237,6 +1237,136 @@ func hostapdClientsHandler(c *fiber.Ctx) error {
 	return c.JSON(clients)
 }
 
+func hostapdCreateAp0Handler(c *fiber.Ctx) error {
+	phyInterface := "wlan0"
+	
+	interfacesResp, _ := executeCommand("ip link show | grep -E '^[0-9]+: wlan' | awk -F: '{print $2}' | awk '{print $1}' | head -1")
+	if strings.TrimSpace(interfacesResp) != "" {
+		phyInterface = strings.TrimSpace(interfacesResp)
+	}
+	
+	log.Printf("Creating ap0 interface from %s", phyInterface)
+	
+	ap0CheckCmd := "ip link show ap0 2>/dev/null"
+	ap0Exists := false
+	if out, err := executeCommand(ap0CheckCmd); err == nil && strings.TrimSpace(out) != "" {
+		ap0Exists = true
+		log.Printf("Interface ap0 already exists")
+		return c.JSON(fiber.Map{
+			"success": true,
+			"message": "Interface ap0 already exists",
+			"exists":  true,
+		})
+	}
+	
+	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null || true", phyInterface))
+	time.Sleep(500 * time.Millisecond)
+	
+	phyName := ""
+	phyCmd2 := fmt.Sprintf("cat /sys/class/net/%s/phy80211/name 2>/dev/null", phyInterface)
+	phyOut2, _ := executeCommand(phyCmd2)
+	phyName = strings.TrimSpace(phyOut2)
+	
+	if phyName == "" {
+		phyCmd := fmt.Sprintf("iw dev %s info 2>/dev/null | grep 'wiphy' | awk '{print $2}'", phyInterface)
+		phyOut, _ := executeCommand(phyCmd)
+		phyName = strings.TrimSpace(phyOut)
+	}
+	
+	if phyName == "" {
+		phyCmd3 := "iw list 2>/dev/null | grep 'Wiphy' | head -1 | awk '{print $2}'"
+		phyOut3, _ := executeCommand(phyCmd3)
+		phyName = strings.TrimSpace(phyOut3)
+	}
+	
+	if phyName == "" {
+		phyName = "phy0"
+		log.Printf("Warning: Could not detect phy name, using default: %s", phyName)
+	}
+	
+	log.Printf("Detected phy name: %s for interface %s", phyName, phyInterface)
+	
+	delOut, _ := executeCommand("sudo iw dev ap0 del 2>/dev/null || true")
+	if delOut != "" {
+		log.Printf("Removed existing ap0 interface (if it existed): %s", strings.TrimSpace(delOut))
+	}
+	time.Sleep(1 * time.Second)
+	
+	createApCmd := fmt.Sprintf("sudo iw phy %s interface add ap0 type __ap 2>&1", phyName)
+	log.Printf("Executing: %s", createApCmd)
+	createOut, createErr := executeCommand(createApCmd)
+	if createOut != "" {
+		log.Printf("Command output: %s", strings.TrimSpace(createOut))
+	}
+	
+	if createErr != nil {
+		log.Printf("Error creating ap0 with phy %s: %s", phyName, strings.TrimSpace(createOut))
+		log.Printf("Trying alternative method: using interface %s directly...", phyInterface)
+		
+		createApCmd2 := fmt.Sprintf("sudo iw dev %s interface add ap0 type __ap 2>&1", phyInterface)
+		log.Printf("Executing: %s", createApCmd2)
+		createOut2, createErr2 := executeCommand(createApCmd2)
+		if createOut2 != "" {
+			log.Printf("Method 1 output: %s", strings.TrimSpace(createOut2))
+		}
+		
+		if createErr2 != nil {
+			log.Printf("Error with alternative method: %s", strings.TrimSpace(createOut2))
+			return c.Status(500).JSON(fiber.Map{
+				"success": false,
+				"error":   fmt.Sprintf("Failed to create ap0 interface: %s", strings.TrimSpace(createOut2)),
+			})
+		} else {
+			log.Printf("Successfully created ap0 interface using alternative method (from %s)", phyInterface)
+			ap0Exists = true
+		}
+	} else {
+		log.Printf("Successfully created ap0 interface using phy %s", phyName)
+		ap0Exists = true
+	}
+	
+	if ap0Exists {
+		time.Sleep(2 * time.Second)
+		
+		verified := false
+		for i := 0; i < 5; i++ {
+			verifyCmd := "ip link show ap0 2>/dev/null"
+			verifyOut, verifyErr := executeCommand(verifyCmd)
+			if verifyErr == nil && strings.TrimSpace(verifyOut) != "" {
+				log.Printf("Interface ap0 verified successfully (attempt %d)", i+1)
+				verified = true
+				break
+			}
+			
+			if i < 4 {
+				log.Printf("Verification attempt %d failed, retrying...", i+1)
+				time.Sleep(1 * time.Second)
+			}
+		}
+		
+		if !verified {
+			log.Printf("ERROR: Interface ap0 was NOT created successfully after all attempts")
+			return c.Status(500).JSON(fiber.Map{
+				"success": false,
+				"error":   "Failed to verify ap0 interface creation. Please check WiFi hardware and drivers.",
+			})
+		} else {
+			log.Printf("SUCCESS: Interface ap0 created and verified")
+			executeCommand("sudo ip link set ap0 up 2>/dev/null || true")
+			return c.JSON(fiber.Map{
+				"success": true,
+				"message": "Interface ap0 created successfully",
+				"exists":  true,
+			})
+		}
+	}
+	
+	return c.Status(500).JSON(fiber.Map{
+		"success": false,
+		"error":   "Failed to create ap0 interface",
+	})
+}
+
 func hostapdToggleHandler(c *fiber.Ctx) error {
 	log.Printf("HostAPD toggle request received")
 	
