@@ -258,23 +258,9 @@ install_dependencies() {
     done
     
     if [ ${#failed_packages[@]} -gt 0 ]; then
-        print_warning "Los siguientes paquetes no se pudieron instalar: ${failed_packages[*]}"
         if [ ${#missing_critical[@]} -gt 0 ]; then
-            print_warning "Paquetes críticos faltantes: ${missing_critical[*]}"
-            print_info ""
-            print_info "Para instalar manualmente, ejecuta:"
-            print_info "  sudo apt-get update"
-            print_info "  sudo apt-get install -y ${missing_critical[*]}"
-            print_info ""
-            print_info "Si algunos paquetes siguen fallando, verifica:"
-            print_info "  1. Que los repositorios estén actualizados: sudo apt-get update"
-            print_info "  2. Que no haya conflictos de paquetes: sudo apt-get check"
-            print_info "  3. Que haya espacio en disco: df -h"
-            print_info ""
-            print_warning "La instalación continuará, pero algunas funciones WiFi pueden no estar disponibles."
+            print_warning "Paquetes faltantes: ${missing_critical[*]} (algunas funciones WiFi pueden no estar disponibles)"
         fi
-    else
-        print_success "Todos los paquetes WiFi instalados correctamente"
     fi
     
     # Verificar si Go está instalado
