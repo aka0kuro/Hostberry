@@ -613,30 +613,30 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 
 	activeRunDir = ""
 	runDir := getRunDir()
-	log.Printf("Usando directorio de socket escribible: %s", runDir)
+	LogTf("logs.wifi_socket_dir_writable", runDir)
 	
 	if err := os.MkdirAll(runDir, 0755); err != nil {
-		log.Printf("Warning: No se pudo crear directorio de socket %s: %v", runDir, err)
+		LogTf("logs.wifi_socket_dir_create_warning", runDir, err)
 		runDir = "/tmp/wpa_supplicant"
 		if err := os.MkdirAll(runDir, 0755); err != nil {
-			log.Printf("ERROR: No se pudo crear directorio de socket en /tmp: %v", err)
+			LogTf("logs.wifi_socket_dir_tmp_error", err)
 			result["error"] = "No se pudo crear directorio de socket para wpa_supplicant"
 			return result
 		}
 		activeRunDir = runDir
-		log.Printf("Usando directorio de socket alternativo: %s", runDir)
+		LogTf("logs.wifi_socket_dir_alt", runDir)
 	}
 	
 	testFile := fmt.Sprintf("%s/.test_write", runDir)
 	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
-		log.Printf("ERROR: Directorio de socket %s no es escribible: %v", runDir, err)
+		LogTf("logs.wifi_socket_dir_not_writable", runDir, err)
 		runDir = "/tmp/wpa_supplicant"
 		os.MkdirAll(runDir, 0755)
 		activeRunDir = runDir
-		log.Printf("Cambiando a directorio de socket alternativo: %s", runDir)
+		LogTf("logs.wifi_socket_dir_switching", runDir)
 	} else {
 		os.Remove(testFile)
-		log.Printf("Directorio de socket verificado como escribible: %s", runDir)
+		LogTf("logs.wifi_socket_dir_verified", runDir)
 	}
 
 	executeCommand(fmt.Sprintf("sudo mkdir -p %s 2>/dev/null || true", runDir))
