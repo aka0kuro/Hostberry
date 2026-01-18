@@ -4,7 +4,7 @@
     try{ const resp = await fetch('/api/v1/vpn/connections', { headers:{ 'Authorization': `Bearer ${localStorage.getItem('access_token')}` } });
       if(resp.ok){ const connections = await resp.json(); const tbody = document.getElementById('connectionsTable'); if(!tbody) return; tbody.innerHTML='';
         connections.forEach(function(conn){ const tr = document.createElement('tr'); tr.innerHTML = '<td>'+conn.name+'</td><td>'+conn.type+'</td>'+
-        '<td><span class="badge bg-'+(conn.status==='connected'?'success':'danger')+'">'+conn.status+'</span></td><td>'+conn.bandwidth+'</td>'+
+        '<td><span class="badge bg-'+(conn.status==='connected'?'success':'danger')+'">'+(conn.status==='connected'?(HostBerry.t?HostBerry.t('vpn.connected','Connected'):'Connected'):(HostBerry.t?HostBerry.t('vpn.disconnected','Disconnected'):'Disconnected'))+'</span></td><td>'+conn.bandwidth+'</td>'+
         '<td><button class="btn btn-sm btn-outline-primary" onclick="toggleConnection(\''+conn.name+'\')"><i class="bi bi-'+(conn.status==='connected'?'pause':'play')+'"></i></button></td>'; tbody.appendChild(tr); }); }
     }catch(e){ console.error('Error loading connections:', e); }
   }
@@ -19,7 +19,7 @@
     try{ const resp = await fetch('/api/v1/vpn/clients', { headers:{ 'Authorization': `Bearer ${localStorage.getItem('access_token')}` } });
       if(resp.ok){ const clients = await resp.json(); const tbody = document.getElementById('clientsTable'); if(!tbody) return; tbody.innerHTML='';
         clients.forEach(function(client){ const tr = document.createElement('tr'); tr.innerHTML = '<td>'+client.name+'</td><td>'+client.address+'</td>'+
-        '<td><span class="badge bg-'+(client.connected?'success':'danger')+'">'+(client.connected?'Connected':'Disconnected')+'</span></td><td>'+client.bandwidth+'</td>'; tbody.appendChild(tr); }); }
+        '<td><span class="badge bg-'+(client.connected?'success':'danger')+'">'+(client.connected?(HostBerry.t?HostBerry.t('vpn.connected','Connected'):'Connected'):(HostBerry.t?HostBerry.t('vpn.disconnected','Disconnected'):'Disconnected'))+'</span></td><td>'+client.bandwidth+'</td>'; tbody.appendChild(tr); }); }
     }catch(e){ console.error('Error loading clients:', e); }
   }
   async function toggleVPN(){ try{ const resp = await fetch('/api/v1/vpn/toggle', { method:'POST', headers:{ 'Authorization': `Bearer ${localStorage.getItem('access_token')}` } }); if(resp.ok){ HostBerry.showAlert('success', HostBerry.t('messages.operation_successful')); setTimeout(()=>window.location.reload(), 1000); } else { HostBerry.showAlert('danger', HostBerry.t('errors.operation_failed')); } }catch(_e){ HostBerry.showAlert('danger', HostBerry.t('errors.network_error')); } }
