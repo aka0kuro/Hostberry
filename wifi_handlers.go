@@ -781,24 +781,24 @@ country=%s
 	executeCommand(fmt.Sprintf("sudo chmod 600 %s", wpaConfigPath))
 	executeCommand(fmt.Sprintf("sudo chown root:root %s", wpaConfigPath))
 
-	log.Printf("Archivo de configuración creado: %s", wpaConfigPath)
+	LogTf("logs.wifi_config_created", wpaConfigPath)
 
 	if appConfig.Server.Debug { log.Printf("Paso 6: Iniciando wpa_supplicant...") }
 	if err := startWpaSupplicant(interfaceName, wpaConfigPath, runDir); err != nil {
-		log.Printf("ERROR: %v", err)
+		LogTf("logs.wifi_wpa_start_error2", err)
 		result["error"] = "No se pudo iniciar wpa_supplicant. Verifica la instalación."
 		return result
 	}
 
 	existsOut, _ := executeCommand(fmt.Sprintf("sudo ls -l %s/%s 2>/dev/null || true", runDir, interfaceName))
 	if strings.TrimSpace(existsOut) == "" {
-		log.Printf("Advertencia: no se encontró socket en %s/%s tras iniciar wpa_supplicant", runDir, interfaceName)
+		LogTf("logs.wifi_socket_not_found", runDir, interfaceName)
 	}
 
 	if appConfig.Server.Debug { log.Printf("Paso 7: Estableciendo comunicación con wpa_cli...") }
 	socketDir, err := waitForWpaCliConnection(interfaceName, 10)
 	if err != nil {
-		log.Printf("ERROR: %v", err)
+		LogTf("logs.wifi_wpa_cli_error", err)
 		result["error"] = "wpa_cli no puede comunicarse con wpa_supplicant. Verifica permisos del socket."
 		return result
 	}
