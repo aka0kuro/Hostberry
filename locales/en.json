@@ -2031,6 +2031,14 @@
     "wireguard.default_interface": "wg0",
     "wireguard.default_address": "10.0.0.1/24",
     "wireguard.default_active_peers": "3",
-    "wireguard.default_peak_bandwidth": "50 Mbps"
+    "wireguard.default_peak_bandwidth": "50 Mbps",
+    "common.hide_password": "Hide password",
+    "common.close": "Close",
+    "vpn.connected": "Connected",
+    "vpn.disconnected": "Disconnected",
+    "wireguard.connected": "Connected",
+    "wireguard.disconnected": "Disconnected",
+    "monitoring.download_kb_s": "Download KB/s",
+    "monitoring.upload_kb_s": "Upload KB/s"
   }
 }

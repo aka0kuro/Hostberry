@@ -90,7 +90,7 @@
         labels: netHistory.labels,
         datasets: [
           {
-            label: 'Download KB/s',
+            label: (window.HostBerry && window.HostBerry.t ? window.HostBerry.t('monitoring.download_kb_s', 'Download KB/s') : 'Download KB/s'),
             data: netHistory.download,
             borderColor: '#6366f1',
             backgroundColor: 'rgba(99, 102, 241, 0.25)',
