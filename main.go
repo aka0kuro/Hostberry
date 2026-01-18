@@ -89,14 +89,33 @@ func main() {
 
 	// Iniciar autoconexión WiFi en segundo plano
 	go func() {
-		// Esperar un poco para que el sistema esté listo (aumentado a 5 segundos)
-		time.Sleep(5 * time.Second)
-		interfaceName := detectWiFiInterface()
+		// Esperar más tiempo para que el sistema esté completamente listo
+		log.Printf("⏳ Esperando 10 segundos antes de iniciar autoconexión WiFi...")
+		time.Sleep(10 * time.Second)
+		
+		// Intentar detectar interfaz varias veces (puede tardar en aparecer)
+		var interfaceName string
+		for attempt := 0; attempt < 5; attempt++ {
+			interfaceName = detectWiFiInterface()
+			if interfaceName != "" {
+				// Verificar que la interfaz realmente existe
+				cmd := exec.Command("sh", "-c", fmt.Sprintf("ip link show %s 2>/dev/null", interfaceName))
+				if err := cmd.Run(); err == nil {
+					log.Printf("🔌 Interfaz WiFi detectada: %s", interfaceName)
+					break
+				}
+			}
+			if attempt < 4 {
+				log.Printf("⏳ Esperando interfaz WiFi... (intento %d/5)", attempt+1)
+				time.Sleep(3 * time.Second)
+			}
+		}
+		
 		if interfaceName != "" {
-			log.Printf("🔌 Detectada interfaz WiFi: %s", interfaceName)
+			log.Printf("🔄 Iniciando autoconexión WiFi en interfaz: %s", interfaceName)
 			autoConnectToLastNetwork(interfaceName)
 		} else {
-			log.Printf("⚠️  No se detectó interfaz WiFi, omitiendo autoconexión")
+			log.Printf("⚠️  No se detectó interfaz WiFi después de 5 intentos, omitiendo autoconexión")
 		}
 	}()
 
