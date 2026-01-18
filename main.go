@@ -131,8 +131,8 @@ func main() {
 	setupRoutes(app)
 
 	addr := fmt.Sprintf("%s:%d", appConfig.Server.Host, appConfig.Server.Port)
-	log.Printf("🚀 HostBerry iniciando en %s", addr)
-	log.Printf("📋 Configuración: Debug=%v, Timeout=%ds/%ds",
+	LogTf("logs.server_starting", addr)
+	LogTf("logs.server_config",
 		appConfig.Server.Debug,
 		appConfig.Server.ReadTimeout,
 		appConfig.Server.WriteTimeout)
@@ -141,18 +141,18 @@ func main() {
 		sigint := make(chan os.Signal, 1)
 		signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
 		<-sigint
-		log.Println("🛑 Deteniendo servidor...")
+		LogTln("logs.server_stopping")
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := app.ShutdownWithContext(ctx); err != nil {
-			log.Printf("Error en shutdown: %v", err)
+			LogTf("logs.server_shutdown_error", err)
 		}
 		os.Exit(0)
 	}()
 
-	log.Println("✅ Servidor listo, escuchando en", addr)
+	LogTf("logs.server_ready", addr)
 	if err := app.Listen(addr); err != nil {
-		log.Fatalf("❌ Error iniciando servidor: %v", err)
+		LogTfatal("logs.server_start_error", err)
 	}
 }
 
@@ -187,10 +187,10 @@ func loadConfig() error {
 func createApp() *fiber.App {
 	engine := createTemplateEngine()
 	if engine == nil {
-		log.Fatal("❌ Error crítico: No se pudo crear el engine de templates")
+		LogTfatal("logs.template_engine_error")
 	}
 
-	log.Printf("✅ Engine de templates creado, asignando a Fiber app...")
+	LogT("logs.template_engine_created")
 
 	app := fiber.New(fiber.Config{
 		Views:        engine,
@@ -200,9 +200,9 @@ func createApp() *fiber.App {
 	})
 
 	if app.Config().Views == nil {
-		log.Fatal("❌ Error crítico: Views no se asignó correctamente a la app")
+		LogTfatal("logs.template_views_error")
 	}
-	log.Println("✅ Engine de templates asignado correctamente a Fiber app")
+	LogTln("logs.template_views_ok")
 
 	setupStaticFiles(app)
 
