@@ -1416,7 +1416,7 @@ func autoConnectToLastNetwork(interfaceName string) {
 						cmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 						if err := cmd.Run(); err == nil {
 							found = true
-							log.Printf("📁 Archivo de configuración encontrado: %s", wpaConfigPath)
+							LogTf("logs.wifi_config_file_found", wpaConfigPath)
 							break
 						}
 					}
@@ -1502,7 +1502,7 @@ func autoConnectToLastNetwork(interfaceName string) {
 			break
 		}
 		if attempt%3 == 0 && attempt > 0 {
-			log.Printf("⏳ Estado: %s (intento %d/8)", statusOut, attempt+1)
+			LogTf("logs.wifi_status_attempt3", statusOut, attempt+1)
 		}
 	}
 	
