@@ -663,11 +663,11 @@ country=%s
 	}
 	
 	if _, err := os.Stat(WpaSupplicantConfigDir); os.IsNotExist(err) {
-		log.Printf("Creando directorio de configuración: %s", WpaSupplicantConfigDir)
+		LogTf("logs.wifi_config_dir_creating_alt", WpaSupplicantConfigDir)
 		mkdirCmd := exec.Command("sudo", "mkdir", "-p", WpaSupplicantConfigDir)
 		mkdirCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 		if out, err := mkdirCmd.CombinedOutput(); err != nil {
-			log.Printf("Warning: no se pudo crear %s: %v (output: %s)", WpaSupplicantConfigDir, err, string(out))
+			LogTf("logs.wifi_config_dir_error_alt", WpaSupplicantConfigDir, err, string(out))
 		}
 		exec.Command("sudo", "chmod", "755", WpaSupplicantConfigDir).Run()
 		exec.Command("sudo", "chown", "root:netdev", WpaSupplicantConfigDir).Run()
