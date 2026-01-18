@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -31,25 +30,25 @@ func createDefaultAdmin() {
 	var count int64
 	if err := db.Model(&User{}).Count(&count).Error; err != nil {
 		if appConfig.Server.Debug {
-			log.Printf("Error contando usuarios: %v", err)
+			LogTf("logs.utils_count_error", err)
 		}
 		return
 	}
 	
 	if appConfig.Server.Debug {
-		log.Printf("Usuarios en BD: %d", count)
+		LogTf("logs.utils_users_count", count)
 	}
 	
 	if count == 0 {
 		if appConfig.Server.Debug {
-			log.Println("Creando usuario admin por defecto...")
+			LogTln("logs.utils_creating_admin")
 		}
 		admin, err := Register("admin", "admin", "admin@hostberry.local")
 		if err != nil {
-			log.Printf("Error creando usuario admin: %v", err)
+			LogTf("logs.utils_admin_error", err)
 		} else {
 			if appConfig.Server.Debug {
-				log.Printf("Usuario admin creado exitosamente")
+				LogT("logs.utils_admin_success")
 			}
 			_ = admin
 		}
