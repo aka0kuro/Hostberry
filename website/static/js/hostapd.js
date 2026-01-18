@@ -74,6 +74,9 @@
     // Usar 'running' como el estado real del servicio (más confiable que 'enabled')
     const isActuallyActive = running || enabled;
     
+    // Recargar interfaces cuando el estado cambie (para mostrar ap0 si se activa)
+    loadInterfaces();
+    
     if (statusValue) {
       statusValue.textContent = isActuallyActive ? t('hostapd.enabled', 'Enabled') : t('hostapd.disabled', 'Disabled');
       statusValue.className = 'stat-value' + (isActuallyActive ? ' text-success' : ' text-danger');
