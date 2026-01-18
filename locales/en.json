@@ -2073,6 +2073,7 @@
     "dnscrypt.server_quad9": "Quad9 (filters malware)",
     "dnscrypt.server_cloudflare": "Cloudflare (fast)",
     "dnscrypt.status": "DNSCrypt Status",
-    "dnscrypt.configuration": "DNSCrypt Configuration"
+    "dnscrypt.configuration": "DNSCrypt Configuration",
+    "dnscrypt.configured": "DNSCrypt configured successfully"
   }
 }
