@@ -901,7 +901,7 @@ country=%s
 
 		if strings.Contains(statusOutput, "wpa_state=COMPLETED") {
 			connected = true
-			log.Printf("✅ WiFi conectado exitosamente a %s", ssid)
+			// WiFi conectado exitosamente - no traducir, es debug interno
 			break
 		}
 
