@@ -232,6 +232,75 @@
             </div>
         </div>
     </div>
+
+    <!-- DNSCrypt Configuration -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-shield-lock"></i>
+                    {{ call .t "dnscrypt.title" "DNSCrypt" }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">{{ call .t "dnscrypt.description" "DNSCrypt encrypts DNS queries and blocks ads and trackers" }}</p>
+                
+                <div id="dnscrypt-status" class="mb-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="status-indicator status-offline" id="dnscrypt-status-indicator"></span>
+                        <span id="dnscrypt-status-text">{{ call .t "dnscrypt.not_installed" "Not installed" }}</span>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 mb-3">
+                    <button class="btn btn-outline-primary" id="dnscrypt-install-btn" onclick="installDNSCrypt()">
+                        <i class="bi bi-download"></i>
+                        {{ call .t "dnscrypt.install" "Install DNSCrypt" }}
+                    </button>
+                    <button class="btn btn-outline-success" id="dnscrypt-configure-btn" onclick="showDNSCryptConfig()" style="display: none;">
+                        <i class="bi bi-gear"></i>
+                        {{ call .t "dnscrypt.configure" "Configure" }}
+                    </button>
+                    <button class="btn btn-outline-success" id="dnscrypt-enable-btn" onclick="enableDNSCrypt()" style="display: none;">
+                        <i class="bi bi-play-circle"></i>
+                        {{ call .t "dnscrypt.enable" "Enable" }}
+                    </button>
+                    <button class="btn btn-outline-danger" id="dnscrypt-disable-btn" onclick="disableDNSCrypt()" style="display: none;">
+                        <i class="bi bi-stop-circle"></i>
+                        {{ call .t "dnscrypt.disable" "Disable" }}
+                    </button>
+                </div>
+
+                <!-- Configuración de DNSCrypt (oculta por defecto) -->
+                <div id="dnscrypt-config-form" style="display: none;">
+                    <form id="dnscryptConfigForm">
+                        <div class="mb-3">
+                            <label for="dnscrypt-server" class="form-label">{{ call .t "dnscrypt.server_name" "Server" }}</label>
+                            <select class="form-select" id="dnscrypt-server" name="server_name">
+                                <option value="adguard-dns">{{ call .t "dnscrypt.server_adguard" "AdGuard DNS (recommended - filters ads)" }}</option>
+                                <option value="quad9-dnscrypt">{{ call .t "dnscrypt.server_quad9" "Quad9 (filters malware)" }}</option>
+                                <option value="cloudflare">{{ call .t "dnscrypt.server_cloudflare" "Cloudflare (fast)" }}</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="dnscrypt-block-ads" name="block_ads" checked>
+                                <label class="form-check-label" for="dnscrypt-block-ads">
+                                    {{ call .t "dnscrypt.block_ads" "Block ads" }}
+                                </label>
+                            </div>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i>
+                                {{ call .t "common.save" "Save" }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
