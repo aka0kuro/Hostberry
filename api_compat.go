@@ -332,7 +332,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 					hostsFile := "/etc/hosts"
 					tmpFile := "/tmp/hosts_hostberry_" + fmt.Sprintf("%d", time.Now().Unix())
 					
-					log.Printf("Creating new /etc/hosts file with hostname: %s", req.Hostname)
+					LogTf("logs.api_hosts_creating", req.Hostname)
 					
 					newContent := "# See `man hosts` for details.\n"
 					newContent += "#\n"
@@ -348,7 +348,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 					newContent += "::1\t\tlocalhost\n"
 					
 					if err := os.WriteFile(tmpFile, []byte(newContent), 0644); err != nil {
-						log.Printf("Error: Could not create temp hosts file: %v", err)
+						LogTf("logs.api_hosts_temp_error", err)
 					} else {
 						log.Printf("Created new hosts file in /tmp: %s", tmpFile)
 						log.Printf("File content:\n%s", newContent)
