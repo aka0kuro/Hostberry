@@ -66,8 +66,8 @@ func initDatabase() error {
 		return fmt.Errorf("error en auto-migración: %v", err)
 	}
 
-	log.Println("✅ Base de datos inicializada correctamente")
-	log.Printf("📁 Ubicación BD: %s", appConfig.Database.Path)
+	LogTln("logs.db_initialized")
+	LogTf("logs.db_location", appConfig.Database.Path)
 	return nil
 }
 

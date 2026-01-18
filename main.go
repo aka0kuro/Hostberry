@@ -259,12 +259,12 @@ func setupStaticFiles(app *fiber.App) {
 			Compress:  true,
 			ByteRange: true,
 		})
-		log.Println("✅ Archivos estáticos cargados desde sistema de archivos")
+		LogTln("logs.static_files_loaded")
 	} else {
 		staticSubFS, err := fs.Sub(staticFS, "website/static")
 		if err != nil {
-			log.Printf("⚠️  Error preparando archivos estáticos embebidos: %v", err)
-			log.Printf("⚠️  No se encontraron archivos estáticos ni en filesystem ni embebidos")
+			LogTf("logs.static_files_embed_error", err)
+			LogT("logs.static_files_not_found")
 		} else {
 			app.Get("/static/*", func(c *fiber.Ctx) error {
 				path := c.Params("*")
@@ -282,7 +282,7 @@ func setupStaticFiles(app *fiber.App) {
 				c.Type(filepath.Ext(path))
 				return c.SendStream(file, int(stat.Size()))
 			})
-			log.Println("✅ Archivos estáticos cargados desde archivos embebidos")
+			LogTln("logs.static_files_embedded")
 		}
 	}
 }
