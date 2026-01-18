@@ -87,6 +87,14 @@ func main() {
 	log.Println("🔐 Verificando usuario admin por defecto...")
 	createDefaultAdmin()
 
+	// Iniciar autoconexión WiFi en segundo plano
+	go func() {
+		// Esperar un poco para que el sistema esté listo
+		time.Sleep(3 * time.Second)
+		interfaceName := detectWiFiInterface()
+		autoConnectToLastNetwork(interfaceName)
+	}()
+
 	app := createApp()
 
 	setupRoutes(app)
