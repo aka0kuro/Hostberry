@@ -35,7 +35,7 @@
                         <div class="text-center">
                             <i class="bi bi-speedometer2 text-info" style="font-size: 2rem;"></i>
                             <h6 class="mt-2">{{ call .t "vpn.bandwidth" "Bandwidth" }}</h6>
-                            <h4 class="text-info">{{ if .vpn_stats.total_bandwidth }}{{ .vpn_stats.total_bandwidth }}{{ else }}50 Mbps{{ end }}</h4>
+                            <h4 class="text-info">{{ if .vpn_stats.total_bandwidth }}{{ .vpn_stats.total_bandwidth }}{{ else }}{{ call .t "vpn.default_bandwidth" "50 Mbps" }}{{ end }}</h4>
                         </div>
                     </div>
                 </div>
