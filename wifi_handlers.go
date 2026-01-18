@@ -1284,7 +1284,6 @@ func autoConnectToLastNetwork(interfaceName string) {
 				if len(lines) > 1 {
 					// Buscar red CURRENT o primera habilitada
 					var netID string
-					foundCurrent := false
 					for i, line := range lines {
 						if i == 0 {
 							continue
@@ -1293,7 +1292,6 @@ func autoConnectToLastNetwork(interfaceName string) {
 						if len(fields) >= 1 {
 							if len(fields) >= 4 && fields[3] == "[CURRENT]" {
 								netID = fields[0]
-								foundCurrent = true
 								break
 							} else if netID == "" && len(fields) >= 2 {
 								netID = fields[0]
