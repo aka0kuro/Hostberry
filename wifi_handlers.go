@@ -534,11 +534,11 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 
 	hostapdRunning, _ := exec.Command("sh", "-c", "pgrep hostapd 2>/dev/null").Output()
 	if strings.TrimSpace(string(hostapdRunning)) != "" {
-		log.Printf("hostapd está corriendo (modo AP+STA); manteniéndolo activo...")
-		log.Printf("En modo AP+STA, ap0 funciona como AP y wlan0 como STA simultáneamente")
+		LogT("logs.wifi_hostapd_running")
+		LogT("logs.wifi_hostapd_apsta_mode")
 	}
 
-	log.Printf("Verificando wpa_supplicant gestionado por systemd...")
+	LogT("logs.wifi_checking_systemd")
 	executeCommand("sudo systemctl stop wpa_supplicant 2>/dev/null || true")
 	executeCommand(fmt.Sprintf("sudo systemctl stop wpa_supplicant@%s 2>/dev/null || true", interfaceName))
 	executeCommand("sudo systemctl disable wpa_supplicant 2>/dev/null || true")
