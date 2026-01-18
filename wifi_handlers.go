@@ -1163,10 +1163,15 @@ func getLastConnectedNetwork(interfaceName string) (string, string, error) {
 	}
 
 	configPath := fmt.Sprintf("%s/%s", foundConfigDir, lastConfigFile.Name())
-	configContent, err := os.ReadFile(configPath)
+	
+	// Leer archivo usando sudo cat (los archivos tienen permisos 600 y pertenecen a root)
+	cmd := exec.Command("sudo", "cat", configPath)
+	cmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+	configContentBytes, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", "", fmt.Errorf("error leyendo archivo de configuración: %v", err)
 	}
+	configContent := string(configContentBytes)
 
 	// Extraer SSID del archivo de configuración
 	ssid := ""
@@ -1359,8 +1364,14 @@ func autoConnectToLastNetwork(interfaceName string) {
 			}
 			if lastFile != nil {
 				configPath := fmt.Sprintf("%s/%s", configDir, lastFile.Name())
-				content, _ := os.ReadFile(configPath)
-				lines := strings.Split(string(content), "\n")
+				// Leer archivo usando sudo cat
+				cmd := exec.Command("sudo", "cat", configPath)
+				cmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+				contentBytes, err := cmd.CombinedOutput()
+				if err != nil {
+					continue
+				}
+				lines := strings.Split(string(contentBytes), "\n")
 				for _, line := range lines {
 					if strings.HasPrefix(strings.TrimSpace(line), "ssid=") {
 						ssid = strings.Trim(strings.TrimPrefix(strings.TrimSpace(line), "ssid="), "\"")
