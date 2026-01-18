@@ -82,6 +82,7 @@
     "vpn": "VPN",
     "wireguard": "WireGuard",
     "adblock": "AdBlock",
+    "tor": "Tor",
     "hostapd": "HostAPD",
     "services": "Servicios",
     "logs": "Registros",
