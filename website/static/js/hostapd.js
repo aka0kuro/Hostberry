@@ -776,6 +776,10 @@
       
       // Cargar interfaces primero, luego la configuración
       await loadInterfaces();
+      // Recargar interfaces periódicamente para detectar cuando ap0 se active
+      setInterval(async () => {
+        await loadInterfaces();
+      }, 5000); // Cada 5 segundos
       // Esperar un poco más para que el selector se actualice
       setTimeout(() => {
         loadHostAPDConfig(); // Cargar configuración existente
