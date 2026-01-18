@@ -1032,31 +1032,128 @@ func getLastConnectedNetwork(interfaceName string) (string, string, error) {
 		interfaceName = DefaultWiFiInterface
 	}
 
-	// Buscar en el directorio principal
-	configDir := WpaSupplicantConfigDir
-	configFiles, err := os.ReadDir(configDir)
-	if err != nil {
-		// Intentar directorio alternativo
-		configDir = WpaSupplicantAltConfigDir
-		configFiles, err = os.ReadDir(configDir)
-		if err != nil {
-			return "", "", fmt.Errorf("no se encontraron archivos de configuración: %v", err)
+	// Primero intentar obtener desde wpa_cli si wpa_supplicant está corriendo
+	socketDirs := []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"}
+	for _, dir := range socketDirs {
+		// Intentar socket de interfaz
+		socketPath := fmt.Sprintf("%s/%s", dir, interfaceName)
+		if _, err := os.Stat(socketPath); err == nil {
+			runWpaCli := func(args ...string) (string, error) {
+				base := []string{"wpa_cli", "-i", interfaceName, "-p", dir}
+				cmd := exec.Command("sudo", append(base, args...)...)
+				out, err := cmd.CombinedOutput()
+				return strings.TrimSpace(string(out)), err
+			}
+			
+			listOut, err := runWpaCli("list_networks")
+			if err == nil && listOut != "" {
+				lines := strings.Split(listOut, "\n")
+				if len(lines) > 1 {
+					// Buscar la red activa o la primera habilitada
+					for i, line := range lines {
+						if i == 0 {
+							continue // Saltar encabezado
+						}
+						fields := strings.Fields(line)
+						if len(fields) >= 2 {
+							ssid := strings.Trim(fields[1], "\"")
+							if ssid != "" && ssid != "--" {
+								// Verificar si está habilitada o es CURRENT
+								if len(fields) >= 4 && (fields[3] == "[CURRENT]" || fields[2] == "[ENABLED]") {
+									log.Printf("Red encontrada en wpa_cli: %s", ssid)
+									return ssid, "", nil
+								}
+							}
+						}
+					}
+					// Si no hay red activa, tomar la primera
+					if len(lines) > 1 {
+						firstLine := lines[1]
+						fields := strings.Fields(firstLine)
+						if len(fields) >= 2 {
+							ssid := strings.Trim(fields[1], "\"")
+							if ssid != "" && ssid != "--" {
+								log.Printf("Primera red encontrada en wpa_cli: %s", ssid)
+								return ssid, "", nil
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		// Intentar socket global
+		globalSocket := fmt.Sprintf("%s/global", dir)
+		if _, err := os.Stat(globalSocket); err == nil {
+			runWpaCli := func(args ...string) (string, error) {
+				base := []string{"wpa_cli", "-g", dir, "-i", interfaceName}
+				cmd := exec.Command("sudo", append(base, args...)...)
+				out, err := cmd.CombinedOutput()
+				return strings.TrimSpace(string(out)), err
+			}
+			
+			listOut, err := runWpaCli("list_networks")
+			if err == nil && listOut != "" {
+				lines := strings.Split(listOut, "\n")
+				if len(lines) > 1 {
+					// Buscar la red activa o la primera habilitada
+					for i, line := range lines {
+						if i == 0 {
+							continue
+						}
+						fields := strings.Fields(line)
+						if len(fields) >= 2 {
+							ssid := strings.Trim(fields[1], "\"")
+							if ssid != "" && ssid != "--" {
+								if len(fields) >= 4 && (fields[3] == "[CURRENT]" || fields[2] == "[ENABLED]") {
+									log.Printf("Red encontrada en wpa_cli (global): %s", ssid)
+									return ssid, "", nil
+								}
+							}
+						}
+					}
+					// Si no hay red activa, tomar la primera
+					if len(lines) > 1 {
+						firstLine := lines[1]
+						fields := strings.Fields(firstLine)
+						if len(fields) >= 2 {
+							ssid := strings.Trim(fields[1], "\"")
+							if ssid != "" && ssid != "--" {
+								log.Printf("Primera red encontrada en wpa_cli (global): %s", ssid)
+								return ssid, "", nil
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
+	// Si no se encontró en wpa_cli, buscar en archivos de configuración
+	// Buscar en ambos directorios
+	configDirs := []string{WpaSupplicantConfigDir, WpaSupplicantAltConfigDir}
 	var lastConfigFile os.DirEntry
 	var lastModTime time.Time
+	var foundConfigDir string
 
-	// Buscar el archivo de configuración más reciente
-	for _, file := range configFiles {
-		if strings.HasPrefix(file.Name(), "wpa_supplicant-") && strings.HasSuffix(file.Name(), ".conf") {
-			info, err := file.Info()
-			if err != nil {
-				continue
-			}
-			if info.ModTime().After(lastModTime) {
-				lastModTime = info.ModTime()
-				lastConfigFile = file
+	for _, configDir := range configDirs {
+		configFiles, err := os.ReadDir(configDir)
+		if err != nil {
+			continue
+		}
+
+		// Buscar el archivo de configuración más reciente
+		for _, file := range configFiles {
+			if strings.HasPrefix(file.Name(), "wpa_supplicant-") && strings.HasSuffix(file.Name(), ".conf") {
+				info, err := file.Info()
+				if err != nil {
+					continue
+				}
+				if info.ModTime().After(lastModTime) {
+					lastModTime = info.ModTime()
+					lastConfigFile = file
+					foundConfigDir = configDir
+				}
 			}
 		}
 	}
@@ -1065,7 +1162,7 @@ func getLastConnectedNetwork(interfaceName string) (string, string, error) {
 		return "", "", fmt.Errorf("no se encontró ninguna red guardada")
 	}
 
-	configPath := fmt.Sprintf("%s/%s", configDir, lastConfigFile.Name())
+	configPath := fmt.Sprintf("%s/%s", foundConfigDir, lastConfigFile.Name())
 	configContent, err := os.ReadFile(configPath)
 	if err != nil {
 		return "", "", fmt.Errorf("error leyendo archivo de configuración: %v", err)
@@ -1086,6 +1183,7 @@ func getLastConnectedNetwork(interfaceName string) (string, string, error) {
 		return "", "", fmt.Errorf("no se pudo extraer SSID del archivo de configuración")
 	}
 
+	log.Printf("SSID encontrado en archivo de configuración: %s", ssid)
 	// No retornamos password porque no podemos obtenerla del archivo (está hasheada)
 	// La contraseña ya está en el archivo de configuración, solo necesitamos el SSID
 	return ssid, "", nil
