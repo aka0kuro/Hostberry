@@ -1337,10 +1337,52 @@ func autoConnectToLastNetwork(interfaceName string) {
 	ssid, _, err := getLastConnectedNetwork(interfaceName)
 	if err != nil {
 		log.Printf("⚠️  No se encontró última red guardada: %v", err)
-		return
+		log.Printf("💡 Intentando buscar redes guardadas en wpa_supplicant de otra manera...")
+		
+		// Último intento: buscar cualquier archivo de configuración reciente
+		configDirs := []string{WpaSupplicantConfigDir, WpaSupplicantAltConfigDir}
+		for _, configDir := range configDirs {
+			configFiles, err := os.ReadDir(configDir)
+			if err != nil {
+				continue
+			}
+			var lastFile os.DirEntry
+			var lastTime time.Time
+			for _, file := range configFiles {
+				if strings.HasPrefix(file.Name(), "wpa_supplicant-") && strings.HasSuffix(file.Name(), ".conf") {
+					info, err := file.Info()
+					if err == nil && info.ModTime().After(lastTime) {
+						lastTime = info.ModTime()
+						lastFile = file
+					}
+				}
+			}
+			if lastFile != nil {
+				configPath := fmt.Sprintf("%s/%s", configDir, lastFile.Name())
+				content, _ := os.ReadFile(configPath)
+				lines := strings.Split(string(content), "\n")
+				for _, line := range lines {
+					if strings.HasPrefix(strings.TrimSpace(line), "ssid=") {
+						ssid = strings.Trim(strings.TrimPrefix(strings.TrimSpace(line), "ssid="), "\"")
+						if ssid != "" {
+							log.Printf("📡 Red encontrada en archivo %s: %s", lastFile.Name(), ssid)
+							break
+						}
+					}
+				}
+				if ssid != "" {
+					break
+				}
+			}
+		}
+		
+		if ssid == "" {
+			log.Printf("❌ No se pudo encontrar ninguna red guardada para autoconexión")
+			return
+		}
+	} else {
+		log.Printf("✅ Última red encontrada: %s", ssid)
 	}
-
-	log.Printf("Última red encontrada: %s", ssid)
 
 	// Paso 5: Usar connectWiFi con contraseña vacía (la contraseña está en el archivo de configuración)
 	// Esto es más confiable que iniciar wpa_supplicant manualmente
@@ -1350,15 +1392,20 @@ func autoConnectToLastNetwork(interfaceName string) {
 	country := DefaultCountryCode
 	
 	// Intentar conectar usando la función existente (sin contraseña, ya está guardada)
+	log.Printf("📡 Llamando a connectWiFi para %s...", ssid)
 	result := connectWiFi(ssid, "", interfaceName, country, "system")
 	
 	if success, ok := result["success"].(bool); ok && success {
 		log.Printf("✅ Autoconexión exitosa a %s", ssid)
+		if ip, ok := result["ip"].(string); ok && ip != "" {
+			log.Printf("📡 IP asignada: %s", ip)
+		}
 	} else {
 		errorMsg := "Error desconocido"
 		if err, ok := result["error"].(string); ok && err != "" {
 			errorMsg = err
 		}
-		log.Printf("⚠️  Error en autoconexión a %s: %s", ssid, errorMsg)
+		log.Printf("❌ Error en autoconexión a %s: %s", ssid, errorMsg)
+		log.Printf("💡 Puede que necesites conectar manualmente desde la interfaz web")
 	}
 }
