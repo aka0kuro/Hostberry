@@ -379,9 +379,9 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 		}
 		
 		if ifaceName == "ap0" {
-			log.Printf("📡 Interfaz ap0 encontrada, estado: %s", iface["state"])
+			LogTf("logs.handlers_ap0_found", iface["state"])
 			if iface["state"] == "down" || iface["state"] == "unknown" {
-				log.Printf("⚠️ ap0 está down, intentando activarla...")
+				LogT("logs.handlers_ap0_down")
 				activateCmd := exec.Command("sh", "-c", "sudo ip link set ap0 up 2>/dev/null")
 				if activateErr := activateCmd.Run(); activateErr == nil {
 					time.Sleep(500 * time.Millisecond)
@@ -390,7 +390,7 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 						newState := strings.TrimSpace(string(stateOut2))
 						if newState != "" {
 							iface["state"] = newState
-							log.Printf("✅ ap0 activada, nuevo estado: %s", newState)
+							LogTf("logs.handlers_ap0_activated", newState)
 						}
 					}
 				}
@@ -656,7 +656,7 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 		interfaces = append(interfaces, iface)
 	}
 
-	log.Printf("✅ Fallback devolvió %d interfaces", len(interfaces))
+	LogTf("logs.handlers_fallback_interfaces", len(interfaces))
 	return c.JSON(fiber.Map{"interfaces": interfaces})
 }
 
