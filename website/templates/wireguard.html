@@ -62,7 +62,7 @@
                     <label class="form-label">{{ call .t "wireguard.interface_name" "Interface Name" }}</label>
                     <div class="d-flex align-items-center">
                         <i class="bi bi-ethernet text-primary me-2"></i>
-                        <span class="h6 mb-0">{{ if .wireguard_status.interface_name }}{{ .wireguard_status.interface_name }}{{ else }}wg0{{ end }}</span>
+                        <span class="h6 mb-0">{{ if .wireguard_status.interface_name }}{{ .wireguard_status.interface_name }}{{ else }}{{ call .t "wireguard.default_interface" "wg0" }}{{ end }}</span>
                     </div>
                 </div>
                 
