@@ -981,6 +981,97 @@ func adblockDisableHandler(c *fiber.Ctx) error {
 	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
 }
 
+// Handlers para DNSCrypt
+func dnscryptStatusHandler(c *fiber.Ctx) error {
+	result := getDNSCryptStatus()
+	return c.JSON(result)
+}
+
+func dnscryptInstallHandler(c *fiber.Ctx) error {
+	user := c.Locals("user").(*User)
+	userID := user.ID
+
+	result := installDNSCrypt(user.Username)
+	if success, ok := result["success"].(bool); ok && success {
+		InsertLog("INFO", fmt.Sprintf("DNSCrypt instalado por usuario %s", user.Username), "adblock", &userID)
+		return c.JSON(result)
+	}
+
+	if errorMsg, ok := result["error"].(string); ok {
+		InsertLog("ERROR", fmt.Sprintf("Error instalando DNSCrypt: %s (usuario: %s)", errorMsg, user.Username), "adblock", &userID)
+		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
+	}
+
+	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+}
+
+func dnscryptConfigureHandler(c *fiber.Ctx) error {
+	var req struct {
+		ServerName string `json:"server_name"`
+		BlockAds   bool   `json:"block_ads"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Datos inválidos"})
+	}
+
+	user := c.Locals("user").(*User)
+	userID := user.ID
+
+	if req.ServerName == "" {
+		req.ServerName = "adguard-dns"
+	}
+
+	result := configureDNSCrypt(req.ServerName, req.BlockAds, user.Username)
+	if success, ok := result["success"].(bool); ok && success {
+		InsertLog("INFO", fmt.Sprintf("DNSCrypt configurado por usuario %s", user.Username), "adblock", &userID)
+		return c.JSON(result)
+	}
+
+	if errorMsg, ok := result["error"].(string); ok {
+		InsertLog("ERROR", fmt.Sprintf("Error configurando DNSCrypt: %s (usuario: %s)", errorMsg, user.Username), "adblock", &userID)
+		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
+	}
+
+	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+}
+
+func dnscryptEnableHandler(c *fiber.Ctx) error {
+	user := c.Locals("user").(*User)
+	userID := user.ID
+
+	result := enableDNSCrypt(user.Username)
+	if success, ok := result["success"].(bool); ok && success {
+		InsertLog("INFO", fmt.Sprintf("DNSCrypt habilitado por usuario %s", user.Username), "adblock", &userID)
+		return c.JSON(result)
+	}
+
+	if errorMsg, ok := result["error"].(string); ok {
+		InsertLog("ERROR", fmt.Sprintf("Error habilitando DNSCrypt: %s (usuario: %s)", errorMsg, user.Username), "adblock", &userID)
+		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
+	}
+
+	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+}
+
+func dnscryptDisableHandler(c *fiber.Ctx) error {
+	user := c.Locals("user").(*User)
+	userID := user.ID
+
+	result := disableDNSCrypt(user.Username)
+	if success, ok := result["success"].(bool); ok && success {
+		InsertLog("INFO", fmt.Sprintf("DNSCrypt deshabilitado por usuario %s", user.Username), "adblock", &userID)
+		return c.JSON(result)
+	}
+
+	if errorMsg, ok := result["error"].(string); ok {
+		InsertLog("ERROR", fmt.Sprintf("Error deshabilitando DNSCrypt: %s (usuario: %s)", errorMsg, user.Username), "adblock", &userID)
+		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
+	}
+
+	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+}
+
 func networkPageHandler(c *fiber.Ctx) error {
 	return renderTemplate(c, "network", fiber.Map{
 		"Title": T(c, "network.title", "Network Management"),
