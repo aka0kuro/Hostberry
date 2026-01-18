@@ -2030,6 +2030,7 @@
     "logs.adblock_disabled": "AdBlock disabled",
     "wireguard.default_interface": "wg0",
     "wireguard.default_address": "10.0.0.1/24",
-    "wireguard.default_active_peers": "3"
+    "wireguard.default_active_peers": "3",
+    "wireguard.default_peak_bandwidth": "50 Mbps"
   }
 }
