@@ -195,6 +195,10 @@ func GetConfig(key string) (string, error) {
 }
 
 func GetAllConfigs() (map[string]string, error) {
+	if db == nil {
+		return make(map[string]string), nil
+	}
+	
 	var configs []SystemConfig
 	if err := db.Find(&configs).Error; err != nil {
 		return nil, err
