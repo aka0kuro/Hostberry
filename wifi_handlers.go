@@ -1498,27 +1498,69 @@ func autoConnectToLastNetwork(interfaceName string) {
 	
 	// Esperar y verificar conexión
 	log.Printf("⏳ Esperando conexión...")
+	connected := false
 	for attempt := 0; attempt < 15; attempt++ {
 		time.Sleep(2 * time.Second)
 		statusOut, _ := runWpaCli("status")
 		if strings.Contains(statusOut, "wpa_state=COMPLETED") {
-			log.Printf("✅ Autoconexión exitosa a %s", ssid)
-			// Obtener IP
-			ipCmd := exec.Command("sh", "-c", fmt.Sprintf("ip addr show %s 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1", interfaceName))
-			if ipOut, err := ipCmd.Output(); err == nil {
-				ip := strings.TrimSpace(string(ipOut))
-				if ip != "" && !strings.HasPrefix(ip, "169.254") {
-					log.Printf("📡 IP asignada: %s", ip)
-				}
-			}
-			return
+			connected = true
+			log.Printf("✅ WiFi autenticado exitosamente a %s", ssid)
+			break
 		}
 		if attempt%3 == 0 {
 			log.Printf("⏳ Estado: %s (intento %d/15)", statusOut, attempt+1)
 		}
 	}
 	
-	log.Printf("⚠️  No se pudo conectar después de 30 segundos. Estado final:")
-	statusOut, _ := runWpaCli("status")
-	log.Printf("Estado: %s", statusOut)
+	if !connected {
+		log.Printf("⚠️  No se pudo autenticar después de 30 segundos. Estado final:")
+		statusOut, _ := runWpaCli("status")
+		log.Printf("Estado: %s", statusOut)
+		return
+	}
+	
+	// Solicitar IP con DHCP
+	log.Printf("📡 Solicitando IP con DHCP...")
+	executeCommand(fmt.Sprintf("sudo pkill -f 'dhclient.*%s|udhcpc.*%s' 2>/dev/null || true", interfaceName, interfaceName))
+	time.Sleep(500 * time.Millisecond)
+	dhcpOut, dhcpErr := executeCommand(fmt.Sprintf("sudo dhclient -v %s 2>&1 || sudo udhcpc -i %s -q -n 2>&1 || true", interfaceName, interfaceName))
+	if dhcpErr == nil && dhcpOut != "" {
+		log.Printf("DHCP output: %s", dhcpOut)
+	}
+	
+	// Esperar IP y verificar conexión completa
+	ipObtained := false
+	var ip string
+	for ipAttempt := 0; ipAttempt < 15 && !ipObtained; ipAttempt++ {
+		time.Sleep(2 * time.Second)
+		
+		ipCmd := exec.Command("sh", "-c", fmt.Sprintf("ip addr show %s 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1", interfaceName))
+		ipOut, _ := ipCmd.Output()
+		ip = strings.TrimSpace(string(ipOut))
+		
+		if ip != "" && ip != "N/A" && !strings.HasPrefix(ip, "169.254") {
+			ipObtained = true
+			log.Printf("✅ Autoconexión exitosa a %s - IP asignada: %s", ssid, ip)
+		} else {
+			if ipAttempt%3 == 0 {
+				log.Printf("⏳ Esperando IP... (intento %d/15)", ipAttempt+1)
+				// Reintentar DHCP si no hay IP después de varios intentos
+				if ipAttempt > 2 && ipAttempt%3 == 0 {
+					log.Printf("🔄 Reintentando DHCP...")
+					executeCommand(fmt.Sprintf("sudo dhclient -r %s 2>/dev/null || true", interfaceName))
+					time.Sleep(500 * time.Millisecond)
+					executeCommand(fmt.Sprintf("sudo pkill -f 'dhclient.*%s|udhcpc.*%s' 2>/dev/null || true", interfaceName, interfaceName))
+					time.Sleep(500 * time.Millisecond)
+					executeCommand(fmt.Sprintf("sudo dhclient -v %s 2>&1 || sudo udhcpc -i %s -q -n 2>&1 || true", interfaceName, interfaceName))
+				}
+			}
+		}
+	}
+	
+	if ipObtained {
+		log.Printf("✅✅ Autoconexión completa: %s (IP: %s)", ssid, ip)
+	} else {
+		log.Printf("⚠️  WiFi autenticado pero sin IP asignada aún. Puede tardar unos segundos más.")
+		log.Printf("💡 El estado se actualizará automáticamente cuando se asigne la IP")
+	}
 }
