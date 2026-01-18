@@ -494,7 +494,10 @@ func networkConfigHandler(c *fiber.Ctx) error {
 						errorMsg += ")"
 					}
 					errors = append(errors, errorMsg)
-					log.Printf("All hostname setting methods failed for hostname: %s. Last error: %v, Last output: %s", req.Hostname, lastError, lastOutput)
+					// Log de debug interno - no traducir
+					if appConfig.Server.Debug {
+						log.Printf("All hostname setting methods failed for hostname: %s. Last error: %v, Last output: %s", req.Hostname, lastError, lastOutput)
+					}
 				}
 			}
 		}
