@@ -306,6 +306,7 @@ func setupRoutes(app *fiber.App) {
 		protected.Get("/vpn", vpnPageHandler)
 		protected.Get("/wireguard", wireguardPageHandler)
 		protected.Get("/adblock", adblockPageHandler)
+		protected.Get("/tor", torPageHandler)
 		protected.Get("/hostapd", hostapdPageHandler)
 		protected.Get("/profile", profilePageHandler)
 		protected.Get("/system", systemPageHandler)

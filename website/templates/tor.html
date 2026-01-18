@@ -1,0 +1,440 @@
+{{ template "base.html" . }}
+
+{{ define "content" }}
+<div class="row">
+    <!-- Vista General de Tor -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-shield-lock"></i>
+                    {{ call .t "tor.overview" "Tor Overview" }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">{{ call .t "tor.description" "Tor (The Onion Router) is a free software for enabling anonymous communication. It directs Internet traffic through a free, worldwide, volunteer overlay network consisting of more than seven thousand relays." }}</p>
+                
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center">
+                            <i class="bi bi-router text-primary" style="font-size: 2rem;"></i>
+                            <h6 class="mt-2">{{ call .t "tor.status" "Status" }}</h6>
+                            <h4 class="text-primary" id="tor-status-text">{{ call .t "tor.inactive" "Inactive" }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center">
+                            <i class="bi bi-globe text-success" style="font-size: 2rem;"></i>
+                            <h6 class="mt-2">{{ call .t "tor.tor_ip" "Tor IP" }}</h6>
+                            <h4 class="text-success" id="tor-ip-text">--</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center">
+                            <i class="bi bi-shield-check text-warning" style="font-size: 2rem;"></i>
+                            <h6 class="mt-2">{{ call .t "tor.socks_port" "SOCKS Port" }}</h6>
+                            <h4 class="text-warning" id="tor-socks-port">9050</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center">
+                            <i class="bi bi-clock text-info" style="font-size: 2rem;"></i>
+                            <h6 class="mt-2">{{ call .t "tor.uptime" "Uptime" }}</h6>
+                            <h4 class="text-info" id="tor-uptime">--</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estado de Tor -->
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-heart-pulse"></i>
+                    {{ call .t "tor.status" "Status" }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <span class="status-indicator status-offline" id="tor-status-indicator"></span>
+                    <span id="tor-status-label">{{ call .t "tor.inactive" "Inactive" }}</span>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">{{ call .t "tor.installation" "Installation" }}</label>
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-check-circle text-success me-2" id="tor-installed-icon" style="display: none;"></i>
+                        <i class="bi bi-x-circle text-danger me-2" id="tor-not-installed-icon"></i>
+                        <span id="tor-installation-text">{{ call .t "tor.not_installed" "Not installed" }}</span>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">{{ call .t "tor.service" "Service" }}</label>
+                    <div class="d-flex align-items-center">
+                        <span class="status-indicator status-offline" id="tor-service-indicator"></span>
+                        <span id="tor-service-text">{{ call .t "tor.stopped" "Stopped" }}</span>
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" id="tor-install-btn" onclick="installTor()">
+                        <i class="bi bi-download"></i>
+                        {{ call .t "tor.install" "Install Tor" }}
+                    </button>
+                    <button class="btn btn-outline-success" id="tor-configure-btn" onclick="showTorConfig()" style="display: none;">
+                        <i class="bi bi-gear"></i>
+                        {{ call .t "tor.configure" "Configure" }}
+                    </button>
+                    <button class="btn btn-outline-success" id="tor-enable-btn" onclick="enableTor()" style="display: none;">
+                        <i class="bi bi-play-circle"></i>
+                        {{ call .t "tor.enable" "Enable" }}
+                    </button>
+                    <button class="btn btn-outline-danger" id="tor-disable-btn" onclick="disableTor()" style="display: none;">
+                        <i class="bi bi-stop-circle"></i>
+                        {{ call .t "tor.disable" "Disable" }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuración de Tor -->
+    <div class="col-md-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-gear"></i>
+                    {{ call .t "tor.configuration" "Configuration" }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Configuración de Tor (oculta por defecto) -->
+                <div id="tor-config-form" style="display: none;">
+                    <form id="torConfigForm">
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="tor-enable-socks" name="enable_socks" checked>
+                                <label class="form-check-label" for="tor-enable-socks">
+                                    {{ call .t "tor.enable_socks" "Enable SOCKS Proxy" }}
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="tor-socks-port" class="form-label">{{ call .t "tor.socks_port" "SOCKS Port" }}</label>
+                            <input type="number" class="form-control" id="tor-socks-port" name="socks_port" value="9050" min="1024" max="65535">
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="tor-enable-control" name="enable_control_port" checked>
+                                <label class="form-check-label" for="tor-enable-control">
+                                    {{ call .t "tor.enable_control" "Enable Control Port" }}
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="tor-control-port" class="form-label">{{ call .t "tor.control_port" "Control Port" }}</label>
+                            <input type="number" class="form-control" id="tor-control-port" name="control_port" value="9051" min="1024" max="65535">
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="tor-enable-hidden" name="enable_hidden_service">
+                                <label class="form-check-label" for="tor-enable-hidden">
+                                    {{ call .t "tor.enable_hidden_service" "Enable Hidden Service (Advanced)" }}
+                                </label>
+                            </div>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i>
+                                {{ call .t "common.save" "Save" }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Información del Circuito -->
+                <div id="tor-circuit-info" style="display: none;">
+                    <h6>{{ call .t "tor.circuit_info" "Circuit Information" }}</h6>
+                    <div class="alert alert-info">
+                        <pre id="tor-circuit-text" class="mb-0"></pre>
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm" onclick="loadTorCircuit()">
+                        <i class="bi bi-arrow-clockwise"></i>
+                        {{ call .t "tor.refresh_circuit" "Refresh Circuit" }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Funciones para Tor
+async function loadTorStatus() {
+    try {
+        const response = await fetch('/api/v1/tor/status', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            }
+        });
+        
+        if (response.ok) {
+            const status = await response.json();
+            const statusIndicator = document.getElementById('tor-status-indicator');
+            const statusLabel = document.getElementById('tor-status-label');
+            const statusText = document.getElementById('tor-status-text');
+            const installBtn = document.getElementById('tor-install-btn');
+            const configureBtn = document.getElementById('tor-configure-btn');
+            const enableBtn = document.getElementById('tor-enable-btn');
+            const disableBtn = document.getElementById('tor-disable-btn');
+            const installedIcon = document.getElementById('tor-installed-icon');
+            const notInstalledIcon = document.getElementById('tor-not-installed-icon');
+            const installationText = document.getElementById('tor-installation-text');
+            const serviceIndicator = document.getElementById('tor-service-indicator');
+            const serviceText = document.getElementById('tor-service-text');
+            const torIpText = document.getElementById('tor-ip-text');
+            const circuitInfo = document.getElementById('tor-circuit-info');
+            
+            if (status.installed) {
+                installedIcon.style.display = 'inline';
+                notInstalledIcon.style.display = 'none';
+                installationText.textContent = t('tor.installed', 'Installed');
+                installBtn.style.display = 'none';
+                configureBtn.style.display = 'block';
+                
+                if (status.active) {
+                    statusIndicator.className = 'status-indicator status-online';
+                    statusLabel.textContent = t('tor.active', 'Active');
+                    statusText.textContent = t('tor.active', 'Active');
+                    serviceIndicator.className = 'status-indicator status-online';
+                    serviceText.textContent = t('tor.running', 'Running');
+                    enableBtn.style.display = 'none';
+                    disableBtn.style.display = 'block';
+                    circuitInfo.style.display = 'block';
+                    
+                    if (status.tor_ip) {
+                        torIpText.textContent = status.tor_ip;
+                    }
+                    
+                    if (status.socks_listening) {
+                        document.getElementById('tor-socks-port').textContent = status.socks_port || '9050';
+                    }
+                } else {
+                    statusIndicator.className = 'status-indicator status-offline';
+                    statusLabel.textContent = t('tor.inactive', 'Inactive');
+                    statusText.textContent = t('tor.inactive', 'Inactive');
+                    serviceIndicator.className = 'status-indicator status-offline';
+                    serviceText.textContent = t('tor.stopped', 'Stopped');
+                    enableBtn.style.display = 'block';
+                    disableBtn.style.display = 'none';
+                    circuitInfo.style.display = 'none';
+                    torIpText.textContent = '--';
+                }
+            } else {
+                installedIcon.style.display = 'none';
+                notInstalledIcon.style.display = 'inline';
+                installationText.textContent = t('tor.not_installed', 'Not installed');
+                statusIndicator.className = 'status-indicator status-offline';
+                statusLabel.textContent = t('tor.not_installed', 'Not installed');
+                statusText.textContent = t('tor.not_installed', 'Not installed');
+                installBtn.style.display = 'block';
+                configureBtn.style.display = 'none';
+                enableBtn.style.display = 'none';
+                disableBtn.style.display = 'none';
+                circuitInfo.style.display = 'none';
+                torIpText.textContent = '--';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading Tor status:', error);
+    }
+}
+
+async function installTor() {
+    if (!confirm(t('tor.install', 'Install Tor') + '?')) return;
+    
+    try {
+        const response = await fetch('/api/v1/tor/install', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            }
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showAlert('success', result.message || t('tor.installed', 'Installed'));
+            loadTorStatus();
+        } else {
+            showAlert('danger', result.error || 'Error installing Tor');
+        }
+    } catch (error) {
+        console.error('Error installing Tor:', error);
+        showAlert('danger', 'Error installing Tor');
+    }
+}
+
+function showTorConfig() {
+    const form = document.getElementById('tor-config-form');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+async function enableTor() {
+    try {
+        const response = await fetch('/api/v1/tor/enable', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            }
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showAlert('success', result.message || t('tor.enabled', 'Enabled'));
+            setTimeout(() => {
+                loadTorStatus();
+                loadTorCircuit();
+            }, 3000);
+        } else {
+            showAlert('danger', result.error || 'Error enabling Tor');
+        }
+    } catch (error) {
+        console.error('Error enabling Tor:', error);
+        showAlert('danger', 'Error enabling Tor');
+    }
+}
+
+async function disableTor() {
+    if (!confirm(t('tor.disable', 'Disable') + ' Tor?')) return;
+    
+    try {
+        const response = await fetch('/api/v1/tor/disable', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            }
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showAlert('success', result.message || t('tor.disabled', 'Disabled'));
+            loadTorStatus();
+        } else {
+            showAlert('danger', result.error || 'Error disabling Tor');
+        }
+    } catch (error) {
+        console.error('Error disabling Tor:', error);
+        showAlert('danger', 'Error disabling Tor');
+    }
+}
+
+async function loadTorCircuit() {
+    try {
+        const response = await fetch('/api/v1/tor/circuit', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            }
+        });
+        
+        if (response.ok) {
+            const circuit = await response.json();
+            const circuitText = document.getElementById('tor-circuit-text');
+            if (circuit.tor_ip) {
+                circuitText.textContent = `Tor IP: ${circuit.tor_ip}\n${circuit.circuit_info || 'Circuit information not available'}`;
+            } else {
+                circuitText.textContent = circuit.circuit_info || 'Circuit information not available';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading Tor circuit:', error);
+    }
+}
+
+// Configurar formulario de Tor
+document.getElementById('torConfigForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const data = {
+        enable_socks: formData.get('enable_socks') === 'on',
+        socks_port: parseInt(formData.get('socks_port')) || 9050,
+        enable_control_port: formData.get('enable_control_port') === 'on',
+        control_port: parseInt(formData.get('control_port')) || 9051,
+        enable_hidden_service: formData.get('enable_hidden_service') === 'on'
+    };
+    
+    try {
+        const response = await fetch('/api/v1/tor/configure', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showAlert('success', result.message || t('tor.configured', 'Configured'));
+            document.getElementById('tor-config-form').style.display = 'none';
+        } else {
+            showAlert('danger', result.error || 'Error configuring Tor');
+        }
+    } catch (error) {
+        console.error('Error configuring Tor:', error);
+        showAlert('danger', 'Error configuring Tor');
+    }
+});
+
+// Función para mostrar alertas
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const container = document.querySelector('.container-fluid');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+// Función de traducción para JavaScript
+function t(key, defaultValue = '') {
+    const keys = key.split('.');
+    let value = window.translations;
+    
+    for (const k of keys) {
+        if (value && typeof value === 'object' && k in value) {
+            value = value[k];
+        } else {
+            return defaultValue || key;
+        }
+    }
+    
+    return typeof value === 'string' ? value : (defaultValue || key);
+}
+
+// Cargar datos al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    loadTorStatus();
+    loadTorCircuit();
+    
+    // Auto-refresh cada 30 segundos
+    setInterval(() => {
+        loadTorStatus();
+        loadTorCircuit();
+    }, 30000);
+});
+</script>
+
+{{ end }}
