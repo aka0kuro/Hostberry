@@ -172,7 +172,7 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="gateway" class="form-label">{{ call .t "network.gateway" "Gateway" }}</label>
-                                <input type="text" class="form-control" id="gateway" name="gateway" placeholder="192.168.1.1">
+                                <input type="text" class="form-control" id="gateway" name="gateway" placeholder="{{ call .t "network.gateway_placeholder" "192.168.1.1" }}">
                                 <small class="form-text text-muted">{{ call .t "network.gateway_help" "Default gateway IP address" }}</small>
                             </div>
                         </div>
