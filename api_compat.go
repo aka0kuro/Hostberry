@@ -270,31 +270,31 @@ func networkConfigHandler(c *fiber.Ctx) error {
 										currentHostname := strings.TrimSpace(string(verifyOut))
 										if currentHostname == req.Hostname {
 											hostnameApplied = true
-											log.Printf("Hostname successfully set to %s via /etc/hostname + hostname command", req.Hostname)
+											LogTf("logs.api_hostname_file_set", req.Hostname)
 											_ = applyOut
 										} else {
-											log.Printf("Hostname verification after /etc/hostname failed: expected %s, got %s", req.Hostname, currentHostname)
+											LogTf("logs.api_hostname_file_verify_failed", req.Hostname, currentHostname)
 											lastError = fmt.Errorf("verification failed: got %s", currentHostname)
 											lastOutput = applyOut
 										}
 									}
 								} else {
-									log.Printf("Failed to apply hostname via hostname command: %v, output: %s", err, applyOut)
+									LogTf("logs.api_hostname_apply_failed", err, applyOut)
 									lastError = err
 									lastOutput = applyOut
 								}
 							} else {
-								log.Printf("Written hostname doesn't match: expected %s, got %s", req.Hostname, writtenHostname)
+								LogTf("logs.api_hostname_write_mismatch", req.Hostname, writtenHostname)
 								lastError = fmt.Errorf("written hostname mismatch")
 								lastOutput = out
 							}
 						} else {
-							log.Printf("Failed to read /etc/hostname after write: %v", err)
+							LogTf("logs.api_hostname_read_failed", err)
 							lastError = err
 							lastOutput = out
 						}
 					} else {
-						log.Printf("Failed to write /etc/hostname: %v, output: %s", err, out)
+						LogTf("logs.api_hostname_write_failed", err, out)
 						lastError = err
 						lastOutput = out
 					}
