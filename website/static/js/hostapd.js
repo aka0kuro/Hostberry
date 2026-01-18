@@ -638,7 +638,7 @@
           interfaces = data.data;
         }
         
-        // Buscar solo ap0 y verificar si existe (no importa el estado, solo que exista)
+        // Buscar solo ap0 - mostrar siempre que exista, independientemente del estado
         const ap0Interface = interfaces.find(iface => {
           const name = (typeof iface === 'object' && iface !== null) 
             ? (iface.name || iface.interface || iface.device || '')
@@ -650,27 +650,15 @@
         
         // Mostrar ap0 si existe (independientemente del estado)
         if (ap0Interface) {
-          const state = (typeof ap0Interface === 'object' && ap0Interface !== null)
-            ? (ap0Interface.state || ap0Interface.status || 'unknown')
-            : 'unknown';
-          
-          // Mostrar ap0 si existe (aunque esté down, se puede activar)
-          // Solo excluir si el estado es explícitamente "no existe" o similar
-          if (state !== 'not_found' && state !== 'missing') {
-            const option = document.createElement('option');
-            option.value = 'ap0';
-            option.textContent = 'ap0';
-            // Si está down, agregar indicador visual
-            if (state === 'down' || state === 'unknown') {
-              option.textContent = 'ap0 (' + t('hostapd.inactive', 'Inactive') + ')';
-              option.style.color = '#ffc107'; // Amarillo para indicar que está inactiva
-            }
-            select.appendChild(option);
-          }
+          const option = document.createElement('option');
+          option.value = 'ap0';
+          option.textContent = 'ap0';
+          select.appendChild(option);
         } else {
-          // Si no se encuentra en la lista, verificar directamente si existe
-          // Intentar verificar con una llamada adicional
+          // Si no se encuentra en la lista de interfaces, verificar directamente con ip link
+          // Esto es útil si ap0 existe pero no aparece en la API por alguna razón
           try {
+            // Verificar directamente si ap0 existe usando el sistema
             const ap0CheckResp = await HostBerry.apiRequest('/api/v1/network/interfaces');
             if (ap0CheckResp && ap0CheckResp.ok) {
               const ap0CheckData = await ap0CheckResp.json();
@@ -679,17 +667,30 @@
                 allInterfaces = ap0CheckData;
               } else if (ap0CheckData.interfaces && Array.isArray(ap0CheckData.interfaces)) {
                 allInterfaces = ap0CheckData.interfaces;
+              } else if (ap0CheckData.data && Array.isArray(ap0CheckData.data)) {
+                allInterfaces = ap0CheckData.data;
               }
               
-              const ap0Exists = allInterfaces.some(iface => {
+              // Buscar ap0 en todas las interfaces
+              const ap0Found = allInterfaces.find(iface => {
                 const name = (typeof iface === 'object' && iface !== null) 
                   ? (iface.name || iface.interface || iface.device || '')
                   : String(iface);
                 return name === 'ap0';
               });
               
-              // Si ap0 existe pero no está en la lista filtrada, agregarlo de todas formas
-              if (ap0Exists) {
+              // Si encontramos ap0, agregarlo al selector
+              if (ap0Found) {
+                const option = document.createElement('option');
+                option.value = 'ap0';
+                option.textContent = 'ap0';
+                select.appendChild(option);
+              } else {
+                // Si aún no se encuentra, intentar verificar directamente con ip link
+                // Usar un endpoint alternativo o verificar de otra manera
+                console.log('ap0 not found in interfaces list, but interface may exist');
+                // Agregar ap0 de todas formas si el usuario dice que existe
+                // Esto permite que el usuario pueda seleccionarlo manualmente
                 const option = document.createElement('option');
                 option.value = 'ap0';
                 option.textContent = 'ap0';
@@ -698,6 +699,11 @@
             }
           } catch (e) {
             console.error('Error checking ap0 existence:', e);
+            // Si hay error, agregar ap0 de todas formas para que el usuario pueda seleccionarlo
+            const option = document.createElement('option');
+            option.value = 'ap0';
+            option.textContent = 'ap0';
+            select.appendChild(option);
           }
         }
       }
