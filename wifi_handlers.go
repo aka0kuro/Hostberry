@@ -1417,9 +1417,14 @@ func autoConnectToLastNetwork(interfaceName string) {
 				for _, file := range configFiles {
 					if strings.Contains(file.Name(), safeSSID) && strings.HasSuffix(file.Name(), ".conf") {
 						wpaConfigPath = fmt.Sprintf("%s/%s", configDir, file.Name())
-						found = true
-						log.Printf("📁 Archivo de configuración encontrado: %s", wpaConfigPath)
-						break
+						// Verificar que el archivo existe y es legible
+						cmd := exec.Command("sudo", "test", "-r", wpaConfigPath)
+						cmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
+						if err := cmd.Run(); err == nil {
+							found = true
+							log.Printf("📁 Archivo de configuración encontrado: %s", wpaConfigPath)
+							break
+						}
 					}
 				}
 				if found {
