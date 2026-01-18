@@ -2751,21 +2751,43 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 	
 	reallyConnected := false
 	if connected && ssid != "" {
+		// Verificar si wpa_state es COMPLETED (autenticado)
+		wpaStateCompleted := false
+		if wpaErr == nil && len(wpaStatusOut) > 0 {
+			wpaStatus := string(wpaStatusOut)
+			if strings.Contains(wpaStatus, "wpa_state=COMPLETED") {
+				wpaStateCompleted = true
+			}
+		}
+		
 		ipCheckCmd := exec.Command("sh", "-c", fmt.Sprintf("ip addr show %s 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1", iface))
 		ipOut, ipErr := ipCheckCmd.Output()
 		if ipErr == nil {
 			ip := strings.TrimSpace(string(ipOut))
-			if ip != "" && ip != "N/A" {
+			if ip != "" && ip != "N/A" && !strings.HasPrefix(ip, "169.254") {
 				reallyConnected = true
 				log.Printf("WiFi realmente conectado: SSID=%s, IP=%s", ssid, ip)
 			} else {
-				log.Printf("WiFi tiene SSID pero no IP: SSID=%s, IP=%s", ssid, ip)
-				dhcpCheck := exec.Command("sh", "-c", fmt.Sprintf("ps aux | grep -E '[d]hclient|udhcpc' | grep %s", iface))
-				if dhcpOut, _ := dhcpCheck.Output(); len(dhcpOut) > 0 {
-					log.Printf("WiFi está obteniendo IP (DHCP en proceso)")
-					reallyConnected = false // Aún no está completamente conectado
+				// Si wpa_state es COMPLETED, considerar conectado aunque no tenga IP aún
+				if wpaStateCompleted {
+					reallyConnected = true
+					log.Printf("WiFi autenticado (wpa_state=COMPLETED) pero sin IP aún: SSID=%s", ssid)
+					// Intentar obtener IP si no hay proceso DHCP corriendo
+					dhcpCheck := exec.Command("sh", "-c", fmt.Sprintf("ps aux | grep -E '[d]hclient|udhcpc' | grep %s", iface))
+					if dhcpOut, _ := dhcpCheck.Output(); len(dhcpOut) == 0 {
+						log.Printf("Iniciando DHCP para obtener IP...")
+						executeCommand(fmt.Sprintf("sudo dhclient -v %s 2>&1 || sudo udhcpc -i %s -q -n 2>&1 || true", iface, iface))
+					} else {
+						log.Printf("WiFi está obteniendo IP (DHCP en proceso)")
+					}
+				} else {
+					log.Printf("WiFi tiene SSID pero no está completamente autenticado: SSID=%s, IP=%s", ssid, ip)
 				}
 			}
+		} else if wpaStateCompleted {
+			// Si wpa_state es COMPLETED pero no se pudo verificar IP, considerar conectado
+			reallyConnected = true
+			log.Printf("WiFi autenticado (wpa_state=COMPLETED): SSID=%s", ssid)
 		}
 	}
 	
