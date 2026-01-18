@@ -130,7 +130,7 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 	if runDir == "" {
 		runDir = "/run/wpa_supplicant"
 	}
-	log.Printf("Iniciando wpa_supplicant para %s con config %s (runDir: %s)", interfaceName, configPath, runDir)
+	LogTf("logs.wpa_starting", interfaceName, configPath, runDir)
 
 	executeCommand(fmt.Sprintf("sudo mkdir -p %s 2>/dev/null || true", runDir))
 	executeCommand(fmt.Sprintf("sudo chmod 775 %s 2>/dev/null || true", runDir))
@@ -167,7 +167,7 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 		return fmt.Errorf("wpa_supplicant no se encontró en el sistema. Instala el paquete wpa_supplicant")
 	}
 	
-	log.Printf("Usando wpa_supplicant en: %s", wpaSupplicantPath)
+	LogTf("logs.wpa_path", wpaSupplicantPath)
 	
 	if fi, err := os.Stat(wpaSupplicantPath); err != nil || fi.Mode()&0111 == 0 {
 		return fmt.Errorf("wpa_supplicant no es ejecutable en %s", wpaSupplicantPath)
@@ -182,12 +182,12 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 	startOut, startErr := startCmd.CombinedOutput()
 	if startErr != nil {
 		outStr := string(startOut)
-		log.Printf("Error iniciando wpa_supplicant: %v, output: %s", startErr, outStr)
+		LogTf("logs.wpa_start_error", startErr, outStr)
 		if strings.Contains(outStr, "not found") || strings.Contains(outStr, "No such file") {
 			return fmt.Errorf("wpa_supplicant no se encontró en %s. Verifica la instalación", wpaSupplicantPath)
 		}
 		if strings.Contains(outStr, "ctrl_iface exists") || strings.Contains(outStr, "cannot override it") {
-			log.Printf("Socket de control en uso, limpiando y reintentando...")
+			LogT("logs.wpa_socket_in_use")
 			executeCommand(fmt.Sprintf("sudo rm -f %s/%s 2>/dev/null || true", runDir, interfaceName))
 			retryCmd := exec.Command("sudo", args...)
 			retryCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
