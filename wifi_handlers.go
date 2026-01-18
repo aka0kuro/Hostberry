@@ -1073,7 +1073,7 @@ func getLastConnectedNetwork(interfaceName string) (string, string, error) {
 						if len(fields) >= 2 {
 							ssid := strings.Trim(fields[1], "\"")
 							if ssid != "" && ssid != "--" {
-								log.Printf("Primera red encontrada en wpa_cli: %s", ssid)
+								LogTf("logs.wifi_first_network_cli", ssid)
 								return ssid, "", nil
 							}
 						}
