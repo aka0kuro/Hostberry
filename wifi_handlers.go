@@ -1200,23 +1200,23 @@ func autoConnectToLastNetwork(interfaceName string) {
 		interfaceName = DefaultWiFiInterface
 	}
 
-	log.Printf("🔄 Iniciando autoconexión a última red WiFi en %s...", interfaceName)
+	LogTf("logs.wifi_auto_connect_start", interfaceName)
 
 	// Verificar que la interfaz existe antes de continuar
 	cmd := exec.Command("sh", "-c", fmt.Sprintf("ip link show %s 2>/dev/null", interfaceName))
 	if err := cmd.Run(); err != nil {
-		log.Printf("❌ Error: La interfaz %s no existe", interfaceName)
+		LogTf("logs.wifi_interface_not_exists", interfaceName)
 		return
 	}
 
 	// Paso 1: Activar software switch y WiFi en paralelo (más rápido)
-	log.Printf("Paso 1: Activando software switch y WiFi...")
+	LogT("logs.wifi_activating")
 	executeCommand("sudo rfkill unblock wifi 2>/dev/null || true")
 	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null || true", interfaceName))
 	time.Sleep(1 * time.Second) // Reducido de 3 a 1 segundo
 
 	// Paso 3: Intentar obtener la última red desde wpa_cli (más confiable)
-	log.Printf("Paso 3: Buscando última red conectada...")
+	LogT("logs.wifi_searching_network")
 	
 	// Primero intentar con wpa_cli si wpa_supplicant está corriendo
 	socketDirs := []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"}
@@ -1248,7 +1248,7 @@ func autoConnectToLastNetwork(interfaceName string) {
 
 	if workingSocketDir != "" {
 		// wpa_supplicant está corriendo, intentar reconectar a la red activa (método más rápido)
-		log.Printf("wpa_supplicant está corriendo, intentando reconectar rápidamente...")
+		LogT("logs.wifi_wpa_running")
 		runWpaCli := func(args ...string) (string, error) {
 			var base []string
 			if useGlobalSocket {
