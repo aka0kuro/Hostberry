@@ -1999,6 +1999,8 @@
     "hostapd.dhcp_start_placeholder": "192.168.4.2",
     "hostapd.dhcp_end_placeholder": "192.168.4.254",
     "hostapd.lease_time_placeholder": "12h",
+    "hostapd.will_be_created": "will be created",
+    "hostapd.inactive": "Inactive",
     "adblock.daily": "Daily",
     "adblock.weekly": "Weekly",
     "adblock.monthly": "Monthly",
