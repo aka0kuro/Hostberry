@@ -1228,7 +1228,7 @@ func autoConnectToLastNetwork(interfaceName string) {
 		socketPath := fmt.Sprintf("%s/%s", dir, interfaceName)
 		if _, err := os.Stat(socketPath); err == nil {
 			workingSocketDir = dir
-			log.Printf("Socket de interfaz encontrado en: %s", socketPath)
+			LogTf("logs.wifi_socket_interface_found", socketPath)
 			break
 		}
 	}
