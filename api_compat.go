@@ -309,20 +309,20 @@ func networkConfigHandler(c *fiber.Ctx) error {
 							currentHostname := strings.TrimSpace(string(verifyOut))
 							if currentHostname == req.Hostname {
 								hostnameApplied = true
-								log.Printf("Hostname temporarily set to %s via hostname command (will persist if /etc/hostname is also updated)", req.Hostname)
+								LogTf("logs.api_hostname_temp_set", req.Hostname)
 								_ = out
 							} else {
-								log.Printf("Hostname verification after hostname command failed: expected %s, got %s", req.Hostname, currentHostname)
+								LogTf("logs.api_hostname_temp_verify_failed", req.Hostname, currentHostname)
 								lastError = fmt.Errorf("verification failed: got %s", currentHostname)
 								lastOutput = out
 							}
 						} else {
-							log.Printf("Failed to verify hostname: %v", err)
+							LogTf("logs.api_hostname_verify_error2", err)
 							lastError = err
 							lastOutput = out
 						}
 					} else {
-						log.Printf("hostname command failed: %v, output: %s", err, out)
+						LogTf("logs.api_hostname_cmd_failed", err, out)
 						lastError = err
 						lastOutput = out
 					}
