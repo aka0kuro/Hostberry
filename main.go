@@ -72,25 +72,32 @@ func generateRandomSecret() string {
 
 func main() {
 	if err := loadConfig(); err != nil {
-		log.Fatalf("Error cargando configuración: %v", err)
+		LogTfatal("logs.config_load_error", err)
 	}
 
 
 	if err := InitI18n("locales"); err != nil {
-		log.Printf("⚠️  Advertencia: Error inicializando i18n: %v", err)
+		LogTf("logs.i18n_init_warning", err)
+	}
+
+	// Establecer idioma de logs desde configuración del sistema
+	if configs, err := GetAllConfigs(); err == nil {
+		if lang, ok := configs["log_language"]; ok && lang != "" {
+			SetLogLanguage(lang)
+		}
 	}
 
 	if err := initDatabase(); err != nil {
-		log.Fatalf("❌ Error inicializando base de datos: %v", err)
+		LogTfatal("logs.db_init_error", err)
 	}
 
-	log.Println("🔐 Verificando usuario admin por defecto...")
+	LogTln("logs.checking_admin")
 	createDefaultAdmin()
 
 	// Iniciar autoconexión WiFi en segundo plano
 	go func() {
 		// Esperar menos tiempo (5 segundos es suficiente)
-		log.Printf("⏳ Esperando 5 segundos antes de iniciar autoconexión WiFi...")
+		LogTf("logs.wifi_auto_wait")
 		time.Sleep(5 * time.Second)
 		
 		// Intentar detectar interfaz (menos intentos, más rápido)
@@ -101,21 +108,21 @@ func main() {
 				// Verificar que la interfaz realmente existe
 				cmd := exec.Command("sh", "-c", fmt.Sprintf("ip link show %s 2>/dev/null", interfaceName))
 				if err := cmd.Run(); err == nil {
-					log.Printf("🔌 Interfaz WiFi detectada: %s", interfaceName)
+					LogTf("logs.wifi_interface_detected", interfaceName)
 					break
 				}
 			}
 			if attempt < 2 {
-				log.Printf("⏳ Esperando interfaz WiFi... (intento %d/3)", attempt+1)
+				LogTf("logs.wifi_interface_wait", attempt+1)
 				time.Sleep(2 * time.Second)
 			}
 		}
 		
 		if interfaceName != "" {
-			log.Printf("🔄 Iniciando autoconexión WiFi en interfaz: %s", interfaceName)
+			LogTf("logs.wifi_auto_start", interfaceName)
 			autoConnectToLastNetwork(interfaceName)
 		} else {
-			log.Printf("⚠️  No se detectó interfaz WiFi después de 3 intentos, omitiendo autoconexión")
+			LogT("logs.wifi_interface_not_found")
 		}
 	}()
 
