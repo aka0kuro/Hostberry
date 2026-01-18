@@ -217,11 +217,11 @@ func systemRestart(user string) map[string]interface{} {
 		user = "unknown"
 	}
 
-	log.Printf("INFO: Reinicio del sistema solicitado por: %s", user)
+	LogTf("logs.system_restart_requested", user)
 
 	restartCmd := "systemctl reboot"
 	if _, err := executeCommand(restartCmd); err != nil {
-		log.Printf("WARN: systemctl reboot falló, intentando con shutdown: %v", err)
+		LogTf("logs.system_restart_fallback", err)
 		shutdownPaths := []string{"/usr/sbin/shutdown", "/sbin/shutdown", "shutdown"}
 		found := false
 		for _, path := range shutdownPaths {
