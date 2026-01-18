@@ -519,13 +519,13 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	}
 
 	if appConfig.Server.Debug { log.Printf("========================================") }
-	log.Printf("Conectando a WiFi: %s (usuario: %s)", ssid, user)
-	log.Printf("Interfaz: %s, País: %s", interfaceName, country)
+	LogTf("logs.wifi_connecting_user", ssid, user)
+	LogTf("logs.wifi_interface_country_info", interfaceName, country)
 	if appConfig.Server.Debug { log.Printf("========================================") }
 
 	if appConfig.Server.Debug { log.Printf("Paso 1: Verificando directorios...") }
 	if err := ensureWpaSupplicantDirs(); err != nil {
-		log.Printf("ERROR: No se pudieron crear los directorios: %v", err)
+		LogTf("logs.wifi_dirs_create_error", err)
 		result["error"] = fmt.Sprintf("Error preparando sistema: %v", err)
 		return result
 	}
