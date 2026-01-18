@@ -1218,6 +1218,13 @@ func wireguardPageHandler(c *fiber.Ctx) error {
 	})
 }
 
+func torPageHandler(c *fiber.Ctx) error {
+	return renderTemplate(c, "tor", fiber.Map{
+		"Title": T(c, "tor.title", "Tor Configuration"),
+		"tor_status": getTorStatus(),
+	})
+}
+
 func adblockPageHandler(c *fiber.Ctx) error {
 	return renderTemplate(c, "adblock", fiber.Map{
 		"Title":          T(c, "adblock.overview", "AdBlock Overview"),
