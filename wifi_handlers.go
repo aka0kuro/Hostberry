@@ -1025,3 +1025,198 @@ func toggleWiFi(interfaceName string, enable bool) map[string]interface{} {
 
 	return result
 }
+
+// getLastConnectedNetwork obtiene la última red WiFi conectada desde los archivos de configuración
+func getLastConnectedNetwork(interfaceName string) (string, string, error) {
+	if interfaceName == "" {
+		interfaceName = DefaultWiFiInterface
+	}
+
+	// Buscar en el directorio principal
+	configDir := WpaSupplicantConfigDir
+	configFiles, err := os.ReadDir(configDir)
+	if err != nil {
+		// Intentar directorio alternativo
+		configDir = WpaSupplicantAltConfigDir
+		configFiles, err = os.ReadDir(configDir)
+		if err != nil {
+			return "", "", fmt.Errorf("no se encontraron archivos de configuración: %v", err)
+		}
+	}
+
+	var lastConfigFile os.DirEntry
+	var lastModTime time.Time
+
+	// Buscar el archivo de configuración más reciente
+	for _, file := range configFiles {
+		if strings.HasPrefix(file.Name(), "wpa_supplicant-") && strings.HasSuffix(file.Name(), ".conf") {
+			info, err := file.Info()
+			if err != nil {
+				continue
+			}
+			if info.ModTime().After(lastModTime) {
+				lastModTime = info.ModTime()
+				lastConfigFile = file
+			}
+		}
+	}
+
+	if lastConfigFile == nil {
+		return "", "", fmt.Errorf("no se encontró ninguna red guardada")
+	}
+
+	configPath := fmt.Sprintf("%s/%s", configDir, lastConfigFile.Name())
+	configContent, err := os.ReadFile(configPath)
+	if err != nil {
+		return "", "", fmt.Errorf("error leyendo archivo de configuración: %v", err)
+	}
+
+	// Extraer SSID del archivo de configuración
+	ssid := ""
+	password := ""
+	lines := strings.Split(string(configContent), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "ssid=") {
+			ssid = strings.Trim(strings.TrimPrefix(line, "ssid="), "\"")
+		}
+		// No podemos obtener la contraseña original, pero podemos intentar reconectar
+		// usando wpa_cli si hay una red guardada
+	}
+
+	if ssid == "" {
+		return "", "", fmt.Errorf("no se pudo extraer SSID del archivo de configuración")
+	}
+
+	return ssid, password, nil
+}
+
+// autoConnectToLastNetwork intenta conectarse automáticamente a la última red WiFi conectada
+func autoConnectToLastNetwork(interfaceName string) {
+	if interfaceName == "" {
+		interfaceName = DefaultWiFiInterface
+	}
+
+	log.Printf("🔄 Iniciando autoconexión a última red WiFi...")
+
+	// Paso 1: Activar software switch (rfkill unblock wifi)
+	log.Printf("Paso 1: Activando software switch...")
+	executeCommand("sudo rfkill unblock wifi 2>/dev/null || true")
+	time.Sleep(1 * time.Second)
+
+	// Paso 2: Activar WiFi
+	log.Printf("Paso 2: Activando interfaz WiFi %s...", interfaceName)
+	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null || true", interfaceName))
+	time.Sleep(2 * time.Second)
+
+	// Paso 3: Intentar obtener la última red desde wpa_cli (más confiable)
+	log.Printf("Paso 3: Buscando última red conectada...")
+	
+	// Primero intentar con wpa_cli si wpa_supplicant está corriendo
+	socketDirs := []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"}
+	var workingSocketDir string
+	
+	for _, dir := range socketDirs {
+		socketPath := fmt.Sprintf("%s/%s", dir, interfaceName)
+		if _, err := os.Stat(socketPath); err == nil {
+			workingSocketDir = dir
+			break
+		}
+	}
+
+	if workingSocketDir != "" {
+		// wpa_supplicant está corriendo, intentar reconectar a la red activa
+		log.Printf("wpa_supplicant está corriendo, intentando reconectar...")
+		runWpaCli := func(args ...string) (string, error) {
+			base := []string{"wpa_cli", "-i", interfaceName, "-p", workingSocketDir}
+			cmd := exec.Command("sudo", append(base, args...)...)
+			out, err := cmd.CombinedOutput()
+			return strings.TrimSpace(string(out)), err
+		}
+
+		// Obtener estado actual
+		statusOut, err := runWpaCli("status")
+		if err == nil {
+			// Verificar si ya está conectado
+			if strings.Contains(statusOut, "wpa_state=COMPLETED") {
+				log.Printf("✅ Ya está conectado a una red WiFi")
+				return
+			}
+
+			// Intentar reconectar
+			listOut, _ := runWpaCli("list_networks")
+			if listOut != "" {
+				lines := strings.Split(listOut, "\n")
+				if len(lines) > 1 {
+					// Hay redes guardadas, intentar reconectar
+					log.Printf("Reconectando a red guardada...")
+					runWpaCli("reconnect")
+					time.Sleep(3 * time.Second)
+					
+					// Verificar si se conectó
+					statusOut2, _ := runWpaCli("status")
+					if strings.Contains(statusOut2, "wpa_state=COMPLETED") {
+						log.Printf("✅ Reconectado exitosamente a la red WiFi")
+						return
+					}
+				}
+			}
+		}
+	}
+
+	// Paso 4: Si no hay wpa_supplicant corriendo o no se pudo reconectar,
+	// buscar el último archivo de configuración y conectarse
+	log.Printf("Paso 4: Buscando última red en archivos de configuración...")
+	ssid, password, err := getLastConnectedNetwork(interfaceName)
+	if err != nil {
+		log.Printf("⚠️  No se encontró última red guardada: %v", err)
+		return
+	}
+
+	log.Printf("Última red encontrada: %s", ssid)
+
+	// Paso 5: Conectarse a la última red (sin contraseña, ya está en el archivo)
+	// Usar una conexión automática que lea del archivo de configuración
+	log.Printf("Paso 5: Conectándose a %s...", ssid)
+	
+	// Verificar si existe el archivo de configuración para esta red
+	safeSSID := regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(ssid, "_")
+	wpaConfigPath := fmt.Sprintf("%s/wpa_supplicant-%s.conf", WpaSupplicantConfigDir, safeSSID)
+	
+	if _, err := os.Stat(wpaConfigPath); os.IsNotExist(err) {
+		// Intentar directorio alternativo
+		wpaConfigPath = fmt.Sprintf("%s/wpa_supplicant-%s.conf", WpaSupplicantAltConfigDir, safeSSID)
+		if _, err := os.Stat(wpaConfigPath); os.IsNotExist(err) {
+			log.Printf("⚠️  Archivo de configuración no encontrado para %s", ssid)
+			return
+		}
+	}
+
+	// Iniciar wpa_supplicant con el archivo de configuración existente
+	runDir := getRunDir()
+	if err := startWpaSupplicant(interfaceName, wpaConfigPath, runDir); err != nil {
+		log.Printf("⚠️  Error iniciando wpa_supplicant: %v", err)
+		return
+	}
+
+	// Esperar a que se conecte
+	time.Sleep(5 * time.Second)
+	
+	// Verificar conexión
+	socketDir, err := waitForWpaCliConnection(interfaceName, 5)
+	if err == nil {
+		runWpaCli := func(args ...string) (string, error) {
+			base := []string{"wpa_cli", "-i", interfaceName, "-p", socketDir}
+			cmd := exec.Command("sudo", append(base, args...)...)
+			out, err := cmd.CombinedOutput()
+			return strings.TrimSpace(string(out)), err
+		}
+
+		statusOut, _ := runWpaCli("status")
+		if strings.Contains(statusOut, "wpa_state=COMPLETED") {
+			log.Printf("✅ Conectado exitosamente a %s", ssid)
+		} else {
+			log.Printf("⚠️  Estado de conexión: %s", statusOut)
+		}
+	}
+}
