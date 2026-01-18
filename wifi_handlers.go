@@ -1240,7 +1240,7 @@ func autoConnectToLastNetwork(interfaceName string) {
 			if _, err := os.Stat(globalSocket); err == nil {
 				workingSocketDir = dir
 				useGlobalSocket = true
-				log.Printf("Socket global encontrado en: %s", globalSocket)
+				LogTf("logs.wifi_socket_global_found", globalSocket)
 				break
 			}
 		}
@@ -1370,7 +1370,7 @@ func autoConnectToLastNetwork(interfaceName string) {
 					if strings.HasPrefix(strings.TrimSpace(line), "ssid=") {
 						ssid = strings.Trim(strings.TrimPrefix(strings.TrimSpace(line), "ssid="), "\"")
 						if ssid != "" {
-							log.Printf("📡 Red encontrada en archivo %s: %s", lastFile.Name(), ssid)
+							LogTf("logs.wifi_network_found_file", lastFile.Name(), ssid)
 							break
 						}
 					}
