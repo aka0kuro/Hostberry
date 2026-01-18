@@ -638,7 +638,7 @@
           interfaces = data.data;
         }
         
-        // Buscar solo ap0 y verificar si está activa
+        // Buscar solo ap0 y verificar si existe (no importa el estado, solo que exista)
         const ap0Interface = interfaces.find(iface => {
           const name = (typeof iface === 'object' && iface !== null) 
             ? (iface.name || iface.interface || iface.device || '')
@@ -648,19 +648,56 @@
         
         select.innerHTML = '<option value="">' + t('hostapd.select_interface', 'Select Interface') + '</option>';
         
-        // Solo mostrar ap0 si existe y está activa (state === "up" o similar)
+        // Mostrar ap0 si existe (independientemente del estado)
         if (ap0Interface) {
           const state = (typeof ap0Interface === 'object' && ap0Interface !== null)
-            ? (ap0Interface.state || ap0Interface.status || '')
-            : '';
+            ? (ap0Interface.state || ap0Interface.status || 'unknown')
+            : 'unknown';
           
-          // Mostrar ap0 solo si está activa (up, running, o similar)
-          if (state === 'up' || state === 'running' || state === 'active' || 
-              (ap0Interface.state && ap0Interface.state.toLowerCase().includes('up'))) {
+          // Mostrar ap0 si existe (aunque esté down, se puede activar)
+          // Solo excluir si el estado es explícitamente "no existe" o similar
+          if (state !== 'not_found' && state !== 'missing') {
             const option = document.createElement('option');
             option.value = 'ap0';
             option.textContent = 'ap0';
+            // Si está down, agregar indicador visual
+            if (state === 'down' || state === 'unknown') {
+              option.textContent = 'ap0 (' + t('hostapd.inactive', 'Inactive') + ')';
+              option.style.color = '#ffc107'; // Amarillo para indicar que está inactiva
+            }
             select.appendChild(option);
+          }
+        } else {
+          // Si no se encuentra en la lista, verificar directamente si existe
+          // Intentar verificar con una llamada adicional
+          try {
+            const ap0CheckResp = await HostBerry.apiRequest('/api/v1/network/interfaces');
+            if (ap0CheckResp && ap0CheckResp.ok) {
+              const ap0CheckData = await ap0CheckResp.json();
+              let allInterfaces = [];
+              if (Array.isArray(ap0CheckData)) {
+                allInterfaces = ap0CheckData;
+              } else if (ap0CheckData.interfaces && Array.isArray(ap0CheckData.interfaces)) {
+                allInterfaces = ap0CheckData.interfaces;
+              }
+              
+              const ap0Exists = allInterfaces.some(iface => {
+                const name = (typeof iface === 'object' && iface !== null) 
+                  ? (iface.name || iface.interface || iface.device || '')
+                  : String(iface);
+                return name === 'ap0';
+              });
+              
+              // Si ap0 existe pero no está en la lista filtrada, agregarlo de todas formas
+              if (ap0Exists) {
+                const option = document.createElement('option');
+                option.value = 'ap0';
+                option.textContent = 'ap0';
+                select.appendChild(option);
+              }
+            }
+          } catch (e) {
+            console.error('Error checking ap0 existence:', e);
           }
         }
       }
