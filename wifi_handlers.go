@@ -815,9 +815,9 @@ country=%s
 
 	listOut, listErr := runWpaCli("list_networks")
 	if listErr != nil {
-		log.Printf("Error listando redes: %v, output: %s", listErr, listOut)
+		LogTf("logs.wifi_list_networks_error", listErr, listOut)
 	} else {
-		log.Printf("Redes configuradas: %s", strings.TrimSpace(listOut))
+		LogTf("logs.wifi_networks_configured", strings.TrimSpace(listOut))
 	}
 
 	lines := []string{}
@@ -826,7 +826,7 @@ country=%s
 	}
 	needsAdd := len(lines) <= 1
 	if needsAdd {
-		log.Printf("No se encontraron redes en wpa_supplicant, agregando vía wpa_cli...")
+		LogT("logs.wifi_no_networks_found")
 		netIDOut, netIDErr := runWpaCli("add_network")
 		if netIDErr != nil || netIDOut == "" {
 			result["error"] = fmt.Sprintf("Error agregando red en wpa_supplicant: %v", netIDErr)
