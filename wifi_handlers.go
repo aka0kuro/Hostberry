@@ -1073,22 +1073,22 @@ func getLastConnectedNetwork(interfaceName string) (string, string, error) {
 
 	// Extraer SSID del archivo de configuración
 	ssid := ""
-	password := ""
 	lines := strings.Split(string(configContent), "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "ssid=") {
 			ssid = strings.Trim(strings.TrimPrefix(line, "ssid="), "\"")
+			break
 		}
-		// No podemos obtener la contraseña original, pero podemos intentar reconectar
-		// usando wpa_cli si hay una red guardada
 	}
 
 	if ssid == "" {
 		return "", "", fmt.Errorf("no se pudo extraer SSID del archivo de configuración")
 	}
 
-	return ssid, password, nil
+	// No retornamos password porque no podemos obtenerla del archivo (está hasheada)
+	// La contraseña ya está en el archivo de configuración, solo necesitamos el SSID
+	return ssid, "", nil
 }
 
 // autoConnectToLastNetwork intenta conectarse automáticamente a la última red WiFi conectada
@@ -1167,7 +1167,7 @@ func autoConnectToLastNetwork(interfaceName string) {
 	// Paso 4: Si no hay wpa_supplicant corriendo o no se pudo reconectar,
 	// buscar el último archivo de configuración y conectarse
 	log.Printf("Paso 4: Buscando última red en archivos de configuración...")
-	ssid, password, err := getLastConnectedNetwork(interfaceName)
+	ssid, _, err := getLastConnectedNetwork(interfaceName)
 	if err != nil {
 		log.Printf("⚠️  No se encontró última red guardada: %v", err)
 		return
