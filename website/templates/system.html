@@ -553,76 +553,78 @@
         let formattedMessage = message;
         
         // Mejorar formato de mensajes comunes
-        if (message.includes('inició sesión')) {
-          const parts = message.match(/Usuario (.+?) inició sesión/);
+        // Usar traducciones dinámicas basadas en patrones de mensajes
+        const t = (key, def) => (window.HostBerry && window.HostBerry.t) ? window.HostBerry.t(key, def) : def;
+        
+        if (message.includes('inició sesión') || message.includes('logged in') || message.includes('login')) {
+          const parts = message.match(/(?:Usuario|User) (.+?) (?:inició sesión|logged in|login)/i);
           if (parts) {
-            formattedMessage = `<i class="bi bi-person-check me-1"></i>Usuario <strong>${parts[1]}</strong> inició sesión`;
+            formattedMessage = `<i class="bi bi-person-check me-1"></i>${t('logs.user_logged_in', 'User')} <strong>${parts[1]}</strong> ${t('logs.logged_in', 'logged in')}`;
           }
-        } else if (message.includes('cerró sesión')) {
-          const parts = message.match(/Usuario (.+?) cerró sesión/);
+        } else if (message.includes('cerró sesión') || message.includes('logged out') || message.includes('logout')) {
+          const parts = message.match(/(?:Usuario|User) (.+?) (?:cerró sesión|logged out|logout)/i);
           if (parts) {
-            formattedMessage = `<i class="bi bi-person-x me-1"></i>Usuario <strong>${parts[1]}</strong> cerró sesión`;
+            formattedMessage = `<i class="bi bi-person-x me-1"></i>${t('logs.user_logged_out', 'User')} <strong>${parts[1]}</strong> ${t('logs.logged_out', 'logged out')}`;
           }
-        } else if (message.includes('WiFi conectado a')) {
-          const parts = message.match(/WiFi conectado a (.+?) por usuario (.+?)$/);
+        } else if (message.includes('WiFi conectado') || message.includes('WiFi connected')) {
+          const parts = message.match(/WiFi (?:conectado a|connected to) (.+?) (?:por usuario|by user|user) (.+?)$/i);
           if (parts) {
-            formattedMessage = `<i class="bi bi-wifi me-1"></i>WiFi conectado a <strong>${parts[1]}</strong> por usuario <strong>${parts[2]}</strong>`;
+            formattedMessage = `<i class="bi bi-wifi me-1"></i>${t('logs.wifi_connected', 'WiFi connected to')} <strong>${parts[1]}</strong> ${t('logs.by_user', 'by user')} <strong>${parts[2]}</strong>`;
           }
-        } else if (message.includes('Error conectando WiFi')) {
-          const parts = message.match(/Error conectando WiFi (.+?): (.+?) \(usuario: (.+?)\)/);
+        } else if (message.includes('Error conectando WiFi') || message.includes('Error connecting WiFi')) {
+          const parts = message.match(/Error (?:conectando|connecting) WiFi (?:a |to )?(.+?): (.+?) \((?:usuario|user): (.+?)\)/i);
           if (parts) {
-            formattedMessage = `<i class="bi bi-wifi-off me-1"></i>Error conectando WiFi <strong>${parts[1]}</strong>: ${parts[2]} (usuario: <strong>${parts[3]}</strong>)`;
+            formattedMessage = `<i class="bi bi-wifi-off me-1"></i>${t('logs.wifi_error', 'Error connecting WiFi')} <strong>${parts[1] || ''}</strong>: ${parts[2]} (${t('logs.user', 'user')}: <strong>${parts[3]}</strong>)`;
           } else {
-            // Formato alternativo sin SSID
-            const parts2 = message.match(/Error conectando WiFi: (.+?) \(usuario: (.+?)\)/);
+            const parts2 = message.match(/Error (?:conectando|connecting) WiFi: (.+?) \((?:usuario|user): (.+?)\)/i);
             if (parts2) {
-              formattedMessage = `<i class="bi bi-wifi-off me-1"></i>Error conectando WiFi: <strong>${parts2[1]}</strong> (usuario: <strong>${parts2[2]}</strong>)`;
+              formattedMessage = `<i class="bi bi-wifi-off me-1"></i>${t('logs.wifi_error', 'Error connecting WiFi')}: <strong>${parts2[1]}</strong> (${t('logs.user', 'user')}: <strong>${parts2[2]}</strong>)`;
             }
           }
-        } else if (message.includes('Sistema apagado por usuario')) {
-          const parts = message.match(/Sistema apagado por usuario (.+?)$/);
+        } else if (message.includes('Sistema apagado') || message.includes('System shutdown')) {
+          const parts = message.match(/(?:Sistema apagado|System shutdown) (?:por usuario|by user) (.+?)$/i);
           if (parts) {
-            formattedMessage = `<i class="bi bi-power me-1"></i>Sistema apagado por usuario <strong>${parts[1]}</strong>`;
+            formattedMessage = `<i class="bi bi-power me-1"></i>${t('logs.system_shutdown', 'System shutdown')} ${t('logs.by_user', 'by user')} <strong>${parts[1]}</strong>`;
           }
-        } else if (message.includes('Sistema reiniciado por usuario')) {
-          const parts = message.match(/Sistema reiniciado por usuario (.+?)$/);
+        } else if (message.includes('Sistema reiniciado') || message.includes('System restart')) {
+          const parts = message.match(/(?:Sistema reiniciado|System restart) (?:por usuario|by user) (.+?)$/i);
           if (parts) {
-            formattedMessage = `<i class="bi bi-arrow-clockwise me-1"></i>Sistema reiniciado por usuario <strong>${parts[1]}</strong>`;
+            formattedMessage = `<i class="bi bi-arrow-clockwise me-1"></i>${t('logs.system_restart', 'System restart')} ${t('logs.by_user', 'by user')} <strong>${parts[1]}</strong>`;
           }
-        } else if (message.includes('cambió su contraseña')) {
-          const parts = message.match(/Usuario (.+?) cambió su contraseña/);
+        } else if (message.includes('cambió su contraseña') || message.includes('changed password')) {
+          const parts = message.match(/(?:Usuario|User) (.+?) (?:cambió su contraseña|changed password)/i);
           if (parts) {
-            formattedMessage = `<i class="bi bi-key me-1"></i>Usuario <strong>${parts[1]}</strong> cambió su contraseña`;
+            formattedMessage = `<i class="bi bi-key me-1"></i>${t('logs.user', 'User')} <strong>${parts[1]}</strong> ${t('logs.changed_password', 'changed password')}`;
           }
-        } else if (message.includes('actualizó su perfil')) {
-          const parts = message.match(/Usuario (.+?) actualizó su perfil/);
+        } else if (message.includes('actualizó su perfil') || message.includes('updated profile')) {
+          const parts = message.match(/(?:Usuario|User) (.+?) (?:actualizó su perfil|updated profile)/i);
           if (parts) {
-            formattedMessage = `<i class="bi bi-person-gear me-1"></i>Usuario <strong>${parts[1]}</strong> actualizó su perfil`;
+            formattedMessage = `<i class="bi bi-person-gear me-1"></i>${t('logs.user', 'User')} <strong>${parts[1]}</strong> ${t('logs.updated_profile', 'updated profile')}`;
           }
-        } else if (message.includes('actualizó sus preferencias')) {
-          const parts = message.match(/Usuario (.+?) actualizó sus preferencias/);
+        } else if (message.includes('actualizó sus preferencias') || message.includes('updated preferences')) {
+          const parts = message.match(/(?:Usuario|User) (.+?) (?:actualizó sus preferencias|updated preferences)/i);
           if (parts) {
-            formattedMessage = `<i class="bi bi-sliders me-1"></i>Usuario <strong>${parts[1]}</strong> actualizó sus preferencias`;
+            formattedMessage = `<i class="bi bi-sliders me-1"></i>${t('logs.user', 'User')} <strong>${parts[1]}</strong> ${t('logs.updated_preferences', 'updated preferences')}`;
           }
-        } else if (message.includes('VPN') && message.includes('conectado')) {
-          const parts = message.match(/VPN (.+?) conectado por usuario (.+?)$/);
+        } else if (message.includes('VPN') && (message.includes('conectado') || message.includes('connected'))) {
+          const parts = message.match(/VPN (.+?) (?:conectado|connected) (?:por usuario|by user) (.+?)$/i);
           if (parts) {
-            formattedMessage = `<i class="bi bi-shield-lock me-1"></i>VPN <strong>${parts[1]}</strong> conectado por usuario <strong>${parts[2]}</strong>`;
+            formattedMessage = `<i class="bi bi-shield-lock me-1"></i>VPN <strong>${parts[1]}</strong> ${t('logs.connected', 'connected')} ${t('logs.by_user', 'by user')} <strong>${parts[2]}</strong>`;
           }
-        } else if (message.includes('WireGuard configurado')) {
-          const parts = message.match(/WireGuard configurado por usuario (.+?)$/);
+        } else if (message.includes('WireGuard configurado') || message.includes('WireGuard configured')) {
+          const parts = message.match(/WireGuard (?:configurado|configured) (?:por usuario|by user) (.+?)$/i);
           if (parts) {
-            formattedMessage = `<i class="bi bi-shield-check me-1"></i>WireGuard configurado por usuario <strong>${parts[1]}</strong>`;
+            formattedMessage = `<i class="bi bi-shield-check me-1"></i>${t('logs.wireguard_configured', 'WireGuard configured')} ${t('logs.by_user', 'by user')} <strong>${parts[1]}</strong>`;
           }
-        } else if (message.includes('AdBlock habilitado')) {
-          const parts = message.match(/AdBlock habilitado por usuario (.+?)$/);
+        } else if (message.includes('AdBlock habilitado') || message.includes('AdBlock enabled')) {
+          const parts = message.match(/AdBlock (?:habilitado|enabled) (?:por usuario|by user) (.+?)$/i);
           if (parts) {
-            formattedMessage = `<i class="bi bi-shield-fill-check me-1"></i>AdBlock habilitado por usuario <strong>${parts[1]}</strong>`;
+            formattedMessage = `<i class="bi bi-shield-fill-check me-1"></i>${t('logs.adblock_enabled', 'AdBlock enabled')} ${t('logs.by_user', 'by user')} <strong>${parts[1]}</strong>`;
           }
-        } else if (message.includes('AdBlock deshabilitado')) {
-          const parts = message.match(/AdBlock deshabilitado por usuario (.+?)$/);
+        } else if (message.includes('AdBlock deshabilitado') || message.includes('AdBlock disabled')) {
+          const parts = message.match(/AdBlock (?:deshabilitado|disabled) (?:por usuario|by user) (.+?)$/i);
           if (parts) {
-            formattedMessage = `<i class="bi bi-shield-fill-x me-1"></i>AdBlock deshabilitado por usuario <strong>${parts[1]}</strong>`;
+            formattedMessage = `<i class="bi bi-shield-fill-x me-1"></i>${t('logs.adblock_disabled', 'AdBlock disabled')} ${t('logs.by_user', 'by user')} <strong>${parts[1]}</strong>`;
           }
         }
         
