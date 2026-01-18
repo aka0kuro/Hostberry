@@ -207,13 +207,13 @@
                         
                         <div class="mb-3">
                             <label for="hostapd-ssid" class="form-label">{{ call .t "hostapd.access_point_ssid" "SSID" }}</label>
-                            <input type="text" class="form-control" id="hostapd-ssid" name="ssid" placeholder="HostBerry-AP" required>
+                            <input type="text" class="form-control" id="hostapd-ssid" name="ssid" placeholder="{{ call .t "hostapd.ssid_placeholder" "HostBerry-AP" }}" required>
                         </div>
                         
                         <div class="mb-3">
                             <label for="hostapd-password" class="form-label">{{ call .t "hostapd.access_point_password" "Password" }}</label>
                             <div class="password-input-wrapper">
-                                <input type="password" class="form-control" id="hostapd-password" name="password" placeholder="Enter password">
+                                <input type="password" class="form-control" id="hostapd-password" name="password" placeholder="{{ call .t "hostapd.password_placeholder" "Enter password" }}">
                                 <button type="button" class="btn btn-outline-secondary password-toggle-btn" onclick="toggleHostAPDPassword()">
                                     <i class="bi bi-eye" id="hostapd-password-toggle-icon"></i>
                                 </button>
