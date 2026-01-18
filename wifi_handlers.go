@@ -651,13 +651,13 @@ country=%s
 %s
 `, runDir, country, networkBlock)
 
-	log.Printf("Contenido de configuración:\n%s", configContent)
+	LogTf("logs.wifi_config_content", configContent)
 
 	executeCommand(fmt.Sprintf("sudo rm -f %s", wpaConfigPath))
 
 	tmpConfigFile := fmt.Sprintf("/tmp/wpa_supplicant_%s_%d.conf", safeSSID, time.Now().Unix())
 	if err := os.WriteFile(tmpConfigFile, []byte(configContent), 0644); err != nil {
-		log.Printf("ERROR: No se pudo crear archivo temporal: %v", err)
+		LogTf("logs.wifi_temp_file_error", err)
 		result["error"] = fmt.Sprintf("Error al guardar configuración: %v", err)
 		return result
 	}
