@@ -6,6 +6,7 @@ hostberry-arm
 *.dll
 *.so
 *.dylib
+*_test
 
 # Archivos de prueba
 *.test
