@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HostBerry</title>
+    <title>{{ call .t "common.app_name" "HostBerry" }}</title>
     <meta name="description" content="{{ call .t "common.app_description" "HostBerry - Network Management System for Raspberry Pi" }}">
     <link rel="icon" type="image/png" href="/static/hostberry.png">
     <link rel="shortcut icon" type="image/png" href="/static/hostberry.png">
@@ -47,8 +47,8 @@
     <aside class="sidebar-nav">
         <div class="sidebar-header">
             <a class="sidebar-brand" href="/dashboard">
-                <img src="/static/hostberry.png" alt="HostBerry" style="height: 32px;">
-                <span class="brand-text">HostBerry</span>
+                <img src="/static/hostberry.png" alt="{{ call .t "common.app_name" "HostBerry" }}" style="height: 32px;">
+                <span class="brand-text">{{ call .t "common.app_name" "HostBerry" }}</span>
             </a>
         </div>
         
@@ -149,7 +149,7 @@
     </aside>
     
     <!-- Botón toggle para móviles -->
-    <button class="sidebar-toggle" type="button" aria-label="Toggle sidebar">
+    <button class="sidebar-toggle" type="button" aria-label="{{ call .t "common.toggle_sidebar" "Toggle sidebar" }}">
         <i class="bi bi-list"></i>
     </button>
     {{ end }}
