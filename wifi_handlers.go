@@ -200,7 +200,7 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 		}
 	}
 
-	log.Printf("Comando wpa_supplicant ejecutado, output: %s", strings.TrimSpace(string(startOut)))
+	LogTf("logs.wpa_command_executed", strings.TrimSpace(string(startOut)))
 
 	time.Sleep(2 * time.Second)
 
@@ -212,7 +212,7 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 		pid = strings.TrimSpace(string(pidOut))
 		if pid != "" {
 			pidFound = true
-			log.Printf("wpa_supplicant encontrado con pgrep, PID: %s", pid)
+			LogTf("logs.wpa_found_pgrep", pid)
 		}
 	}
 	
@@ -222,7 +222,7 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 			pid = strings.TrimSpace(string(pidOut2))
 			if pid != "" {
 				pidFound = true
-				log.Printf("wpa_supplicant encontrado con pgrep (método 2), PID: %s", pid)
+				LogTf("logs.wpa_found_pgrep2", pid)
 			}
 		}
 	}
@@ -233,27 +233,27 @@ func startWpaSupplicant(interfaceName, configPath, runDir string) error {
 			pid = strings.TrimSpace(string(psOut))
 			if pid != "" {
 				pidFound = true
-				log.Printf("wpa_supplicant encontrado con ps, PID: %s", pid)
+				LogTf("logs.wpa_found_ps", pid)
 			}
 		}
 	}
 	
 	if !pidFound {
-		log.Printf("Warning: wpa_supplicant no se encontró corriendo después de iniciarlo")
-		log.Printf("Verificando si hay errores en los logs del sistema...")
+		LogT("logs.wpa_not_running")
+		LogT("logs.wpa_checking_logs")
 		dmesgCmd := exec.Command("sh", "-c", "dmesg | tail -20 | grep -i wpa || echo 'No hay mensajes de wpa en dmesg'")
 		if dmesgOut, err := dmesgCmd.Output(); err == nil {
-			log.Printf("Últimos mensajes de dmesg relacionados con wpa: %s", string(dmesgOut))
+			LogTf("logs.wpa_dmesg", string(dmesgOut))
 		}
 		return fmt.Errorf("wpa_supplicant no se inició correctamente o se detuvo inmediatamente")
 	}
 
-	log.Printf("wpa_supplicant corriendo con PID: %s", pid)
+	LogTf("logs.wpa_running", pid)
 	return nil
 }
 
 func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, error) {
-	log.Printf("Esperando conexión con wpa_cli para %s...", interfaceName)
+	LogTf("logs.wpa_cli_waiting", interfaceName)
 
 	socketDirs := []string{}
 	if activeRunDir != "" {
@@ -286,7 +286,7 @@ func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, err
 		for _, dir := range uniqueDirs {
 			socketPath := fmt.Sprintf("%s/%s", dir, interfaceName)
 			if _, err := os.Stat(socketPath); err == nil {
-				log.Printf("Socket encontrado en: %s", socketPath)
+				LogTf("logs.wpa_socket_found", socketPath)
 				workingSocketDir = dir
 				executeCommand(fmt.Sprintf("sudo chmod 660 %s 2>/dev/null || true", socketPath))
 				executeCommand(fmt.Sprintf("sudo chown root:netdev %s 2>/dev/null || true", socketPath))
