@@ -1197,15 +1197,22 @@ func autoConnectToLastNetwork(interfaceName string) {
 
 	log.Printf("🔄 Iniciando autoconexión a última red WiFi en %s...", interfaceName)
 
+	// Verificar que la interfaz existe antes de continuar
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("ip link show %s 2>/dev/null", interfaceName))
+	if err := cmd.Run(); err != nil {
+		log.Printf("❌ Error: La interfaz %s no existe", interfaceName)
+		return
+	}
+
 	// Paso 1: Activar software switch (rfkill unblock wifi)
 	log.Printf("Paso 1: Activando software switch...")
 	executeCommand("sudo rfkill unblock wifi 2>/dev/null || true")
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// Paso 2: Activar WiFi
 	log.Printf("Paso 2: Activando interfaz WiFi %s...", interfaceName)
 	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null || true", interfaceName))
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// Paso 3: Intentar obtener la última red desde wpa_cli (más confiable)
 	log.Printf("Paso 3: Buscando última red conectada...")
