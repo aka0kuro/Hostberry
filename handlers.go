@@ -342,11 +342,11 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 		
 		ifaceCheckCmd := exec.Command("sh", "-c", fmt.Sprintf("ip link show %s 2>/dev/null", ifaceName))
 		if ifaceCheckErr := ifaceCheckCmd.Run(); ifaceCheckErr != nil {
-			log.Printf("⚠️ Interface %s no existe o no es accesible, saltando", ifaceName)
+			LogTf("logs.handlers_interface_skip", ifaceName)
 			continue
 		}
 		
-		log.Printf("✅ Procesando interfaz: %s", ifaceName)
+		LogTf("logs.handlers_interface_processing", ifaceName)
 
 		iface := map[string]interface{}{
 			"name": ifaceName,
