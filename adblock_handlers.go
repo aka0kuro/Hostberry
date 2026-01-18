@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -23,14 +25,33 @@ func getAdBlockStatus() map[string]interface{} {
 		piholeStatus = "inactive"
 	}
 
-	result["active"] = dnsmasqStatus == "active" || piholeStatus == "active"
+	// Verificar DNSCrypt
+	dnscryptCmd := exec.Command("sh", "-c", "systemctl is-active dnscrypt-proxy 2>/dev/null || echo inactive")
+	dnscryptOut, _ := dnscryptCmd.Output()
+	dnscryptStatus := strings.TrimSpace(string(dnscryptOut))
+	if dnscryptStatus == "" {
+		dnscryptStatus = "inactive"
+	}
+
+	// Verificar si dnscrypt-proxy está instalado
+	dnscryptInstalled := false
+	if checkCmd := exec.Command("sh", "-c", "command -v dnscrypt-proxy 2>/dev/null"); checkCmd.Run() == nil {
+		dnscryptInstalled = true
+	}
+
+	result["active"] = dnsmasqStatus == "active" || piholeStatus == "active" || dnscryptStatus == "active"
 	result["type"] = "none"
 
-	if dnsmasqStatus == "active" {
+	if dnscryptStatus == "active" {
+		result["type"] = "dnscrypt"
+	} else if dnsmasqStatus == "active" {
 		result["type"] = "dnsmasq"
 	} else if piholeStatus == "active" {
 		result["type"] = "pihole"
 	}
+
+	result["dnscrypt_installed"] = dnscryptInstalled
+	result["dnscrypt_active"] = dnscryptStatus == "active"
 
 	if result["active"] == true {
 		if hostsContent, err := os.ReadFile("/etc/hosts"); err == nil {
