@@ -357,22 +357,22 @@
                         
                         <div class="mb-3">
                             <label for="hostapd-gateway" class="form-label">{{ call .t "hostapd.gateway" "Gateway (Router)" }}</label>
-                            <input type="text" class="form-control" id="hostapd-gateway" name="gateway" placeholder="192.168.4.1" value="192.168.4.1" pattern="^([0-9]{1,3}\.){3}[0-9]{1,3}$">
+                            <input type="text" class="form-control" id="hostapd-gateway" name="gateway" placeholder="{{ call .t "hostapd.gateway_placeholder" "192.168.4.1" }}" value="192.168.4.1" pattern="^([0-9]{1,3}\.){3}[0-9]{1,3}$">
                             <small class="form-text text-muted">{{ call .t "hostapd.gateway_help" "IP address for the access point gateway" }}</small>
                         </div>
                         
                         <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label for="hostapd-dhcp-start" class="form-label">{{ call .t "hostapd.dhcp_range_start" "DHCP Range Start" }}</label>
-                                <input type="text" class="form-control" id="hostapd-dhcp-start" name="dhcp_range_start" placeholder="192.168.4.2" value="192.168.4.2" pattern="^([0-9]{1,3}\.){3}[0-9]{1,3}$">
+                                <input type="text" class="form-control" id="hostapd-dhcp-start" name="dhcp_range_start" placeholder="{{ call .t "hostapd.dhcp_start_placeholder" "192.168.4.2" }}" value="192.168.4.2" pattern="^([0-9]{1,3}\.){3}[0-9]{1,3}$">
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label for="hostapd-dhcp-end" class="form-label">{{ call .t "hostapd.dhcp_range_end" "DHCP Range End" }}</label>
-                                <input type="text" class="form-control" id="hostapd-dhcp-end" name="dhcp_range_end" placeholder="192.168.4.254" value="192.168.4.254" pattern="^([0-9]{1,3}\.){3}[0-9]{1,3}$">
+                                <input type="text" class="form-control" id="hostapd-dhcp-end" name="dhcp_range_end" placeholder="{{ call .t "hostapd.dhcp_end_placeholder" "192.168.4.254" }}" value="192.168.4.254" pattern="^([0-9]{1,3}\.){3}[0-9]{1,3}$">
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label for="hostapd-lease-time" class="form-label">{{ call .t "hostapd.lease_time" "Lease Time" }}</label>
-                                <input type="text" class="form-control" id="hostapd-lease-time" name="lease_time" placeholder="12h" value="12h">
+                                <input type="text" class="form-control" id="hostapd-lease-time" name="lease_time" placeholder="{{ call .t "hostapd.lease_time_placeholder" "12h" }}" value="12h">
                                 <small class="form-text text-muted">{{ call .t "hostapd.lease_time_help" "Example: 12h, 30m, 1d" }}</small>
                             </div>
                         </div>
