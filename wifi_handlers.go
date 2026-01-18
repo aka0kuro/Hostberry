@@ -1266,7 +1266,7 @@ func autoConnectToLastNetwork(interfaceName string) {
 		if err == nil {
 			// Verificar si ya está conectado (verificación inmediata)
 			if strings.Contains(statusOut, "wpa_state=COMPLETED") {
-				log.Printf("✅ Ya está conectado a una red WiFi")
+				LogT("logs.wifi_already_connected")
 				// Iniciar DHCP en segundo plano si no tiene IP
 				go func() {
 					ipCmd := exec.Command("sh", "-c", fmt.Sprintf("ip addr show %s 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1", interfaceName))
@@ -1300,7 +1300,7 @@ func autoConnectToLastNetwork(interfaceName string) {
 					}
 					
 					if netID != "" {
-						log.Printf("Reconectando rápidamente a red ID: %s", netID)
+						LogTf("logs.wifi_reconnecting", netID)
 						// Hacer todo en secuencia rápida
 						runWpaCli("enable_network", netID)
 						runWpaCli("select_network", netID)
@@ -1311,7 +1311,7 @@ func autoConnectToLastNetwork(interfaceName string) {
 							time.Sleep(1 * time.Second) // Reducido de 2 a 1 segundo
 							statusOut2, _ := runWpaCli("status")
 							if strings.Contains(statusOut2, "wpa_state=COMPLETED") {
-								log.Printf("✅ Reconectado exitosamente a la red WiFi")
+								LogT("logs.wifi_reconnected")
 								// Iniciar DHCP en segundo plano
 								go func() {
 									executeCommand(fmt.Sprintf("sudo dhclient -v %s 2>&1 || sudo udhcpc -i %s -q -n 2>&1 || true", interfaceName, interfaceName))
