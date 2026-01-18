@@ -119,7 +119,7 @@
                     <div class="col-6 mb-3">
                         <div class="text-center">
                                 <h6 class="text-white">{{ call .t "profile.last_login" "Last Login" }}</h6>
-                                <p class="text-white-50 mb-0">{{ if .user.LastLogin }}{{ .user.LastLogin }}{{ else }}Nunca{{ end }}</p>
+                                <p class="text-white-50 mb-0">{{ if .user.LastLogin }}{{ .user.LastLogin }}{{ else }}{{ call .t "profile.never" "Never" }}{{ end }}</p>
                         </div>
                     </div>
                     <div class="col-6 mb-3">
@@ -137,7 +137,7 @@
                     <div class="col-6 mb-3">
                         <div class="text-center">
                                 <h6 class="text-white">{{ call .t "profile.account_age" "Account Age" }}</h6>
-                                <p class="text-white-50 mb-0">{{ if .user.CreatedAt }}{{ .user.CreatedAt }}{{ else }}0 días{{ end }}</p>
+                                <p class="text-white-50 mb-0">{{ if .user.CreatedAt }}{{ .user.CreatedAt }}{{ else }}{{ call .t "profile.zero_days" "0 days" }}{{ end }}</p>
                         </div>
                     </div>
                 </div>
