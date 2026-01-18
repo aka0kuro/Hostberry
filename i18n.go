@@ -278,6 +278,87 @@ func getSection(translations map[string]interface{}, section string) map[string]
 	return make(map[string]interface{})
 }
 
+// SetLogLanguage establece el idioma para los logs del sistema
+func SetLogLanguage(lang string) {
+	if isLanguageSupported(lang) {
+		logLanguage = lang
+	}
+}
+
+// GetLogLanguage obtiene el idioma actual para logs
+func GetLogLanguage() string {
+	return logLanguage
+}
+
+// LogT traduce y registra un mensaje de log
+func LogT(key string, args ...interface{}) {
+	if i18nManager == nil {
+		// Fallback: usar el mensaje sin traducir
+		if len(args) > 0 {
+			log.Printf(key, args...)
+		} else {
+			log.Print(key)
+		}
+		return
+	}
+	
+	translated := i18nManager.GetText(key, logLanguage, key)
+	if len(args) > 0 {
+		log.Printf(translated, args...)
+	} else {
+		log.Print(translated)
+	}
+}
+
+// LogTf traduce y registra un mensaje de log con formato
+func LogTf(key string, args ...interface{}) {
+	if i18nManager == nil {
+		log.Printf(key, args...)
+		return
+	}
+	
+	translated := i18nManager.GetText(key, logLanguage, key)
+	log.Printf(translated, args...)
+}
+
+// LogTln traduce y registra un mensaje de log con nueva línea
+func LogTln(key string, args ...interface{}) {
+	if i18nManager == nil {
+		if len(args) > 0 {
+			log.Printf(key+"\n", args...)
+		} else {
+			log.Println(key)
+		}
+		return
+	}
+	
+	translated := i18nManager.GetText(key, logLanguage, key)
+	if len(args) > 0 {
+		log.Printf(translated+"\n", args...)
+	} else {
+		log.Println(translated)
+	}
+}
+
+// LogTfatal traduce y registra un mensaje fatal
+func LogTfatal(key string, args ...interface{}) {
+	if i18nManager == nil {
+		if len(args) > 0 {
+			log.Fatalf(key, args...)
+		} else {
+			log.Fatal(key)
+		}
+		return
+	}
+	
+	translated := i18nManager.GetText(key, logLanguage, key)
+	if len(args) > 0 {
+		log.Fatalf(translated, args...)
+	} else {
+		log.Fatal(translated)
+	}
+}
+
 func LanguageMiddleware(c *fiber.Ctx) error {
 	language := GetCurrentLanguage(c)
 	c.Locals("language", language)
