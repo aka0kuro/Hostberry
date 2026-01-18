@@ -711,7 +711,7 @@ country=%s
 				mkdirAltCmd := exec.Command("sudo", "mkdir", "-p", WpaSupplicantAltConfigDir)
 				mkdirAltCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 				if mkdirOut, mkdirErr := mkdirAltCmd.CombinedOutput(); mkdirErr != nil {
-					log.Printf("ERROR: No se pudo crear directorio alternativo: %v, output: %s", mkdirErr, string(mkdirOut))
+					LogTf("logs.wifi_alt_dir_error", mkdirErr, string(mkdirOut))
 					os.Remove(tmpConfigFile)
 					result["error"] = fmt.Sprintf("Error al guardar configuración: no se pudo crear directorio alternativo")
 					return result
