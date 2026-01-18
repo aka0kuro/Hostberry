@@ -89,10 +89,15 @@ func main() {
 
 	// Iniciar autoconexión WiFi en segundo plano
 	go func() {
-		// Esperar un poco para que el sistema esté listo
-		time.Sleep(3 * time.Second)
+		// Esperar un poco para que el sistema esté listo (aumentado a 5 segundos)
+		time.Sleep(5 * time.Second)
 		interfaceName := detectWiFiInterface()
-		autoConnectToLastNetwork(interfaceName)
+		if interfaceName != "" {
+			log.Printf("🔌 Detectada interfaz WiFi: %s", interfaceName)
+			autoConnectToLastNetwork(interfaceName)
+		} else {
+			log.Printf("⚠️  No se detectó interfaz WiFi, omitiendo autoconexión")
+		}
 	}()
 
 	app := createApp()
