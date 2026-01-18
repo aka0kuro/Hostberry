@@ -107,7 +107,7 @@ func networkRoutingHandler(c *fiber.Ctx) error {
 		routes = append(routes, route)
 	}
 	
-	log.Printf("✅ Devolviendo %d rutas", len(routes))
+	LogTf("logs.api_returning_routes", len(routes))
 	return c.JSON(routes)
 }
 
@@ -237,20 +237,20 @@ func networkConfigHandler(c *fiber.Ctx) error {
 							currentHostname := strings.TrimSpace(string(verifyOut))
 							if currentHostname == req.Hostname {
 								hostnameApplied = true
-								log.Printf("Hostname successfully set to %s via hostnamectl", req.Hostname)
+								LogTf("logs.api_hostname_set", req.Hostname)
 								_ = out
 							} else {
-								log.Printf("Hostname verification failed: expected %s, got %s", req.Hostname, currentHostname)
+								LogTf("logs.api_hostname_verify_failed", req.Hostname, currentHostname)
 								lastError = fmt.Errorf("verification failed: got %s", currentHostname)
 								lastOutput = out
 							}
 						} else {
-							log.Printf("Failed to verify hostname after change: %v", err)
+							LogTf("logs.api_hostname_verify_error", err)
 							lastError = err
 							lastOutput = out
 						}
 					} else {
-						log.Printf("hostnamectl failed: %v, output: %s", err, out)
+						LogTf("logs.api_hostnamectl_failed", err, out)
 						lastError = err
 						lastOutput = out
 					}
