@@ -547,10 +547,10 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	iwInfoCmd := exec.Command("sh", "-c", fmt.Sprintf("iw dev %s info 2>/dev/null", interfaceName))
 	if iwInfoOut, err := iwInfoCmd.Output(); err == nil {
 		if strings.Contains(string(iwInfoOut), "type AP") {
-			log.Printf("La interfaz %s está en modo AP; cambiándola a modo managed...", interfaceName)
+			LogTf("logs.wifi_interface_ap_mode", interfaceName)
 			executeCommand(fmt.Sprintf("sudo iw dev %s set type managed 2>/dev/null || true", interfaceName))
 			time.Sleep(1 * time.Second)
-			log.Printf("Interfaz %s cambiada a modo managed", interfaceName)
+			LogTf("logs.wifi_interface_managed", interfaceName)
 		}
 	}
 
@@ -558,15 +558,15 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 	nmActiveOut, _ := nmActiveCmd.Output()
 	nmState := strings.TrimSpace(string(nmActiveOut))
 	if nmState == "connected" || nmState == "connecting" {
-		log.Printf("NetworkManager está gestionando una conexión activa; intentando liberar %s...", interfaceName)
+		LogTf("logs.wifi_networkmanager_active", interfaceName)
 		executeCommand(fmt.Sprintf("sudo nmcli dev disconnect %s 2>/dev/null || true", interfaceName))
 		executeCommand(fmt.Sprintf("sudo nmcli dev set %s managed no 2>/dev/null || true", interfaceName))
 	} else {
-		log.Printf("Deteniendo NetworkManager para evitar conflictos...")
+		LogT("logs.wifi_networkmanager_stopping")
 		executeCommand("sudo systemctl stop NetworkManager 2>/dev/null || true")
 	}
 
-	log.Printf("Paso 3: Preparando interfaz %s...", interfaceName)
+	LogTf("logs.wifi_preparing_interface", interfaceName)
 	executeCommand("sudo rfkill unblock wifi 2>/dev/null || true")
 	executeCommand(fmt.Sprintf("sudo ip link set %s down 2>/dev/null || true", interfaceName))
 	time.Sleep(1 * time.Second)
