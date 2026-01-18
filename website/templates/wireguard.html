@@ -28,7 +28,7 @@
                         <div class="text-center">
                             <i class="bi bi-speedometer2 text-warning" style="font-size: 2rem;"></i>
                             <h6 class="mt-2">{{ call .t "wireguard.bandwidth" "Bandwidth" }}</h6>
-                            <h4 class="text-warning">{{ if .wireguard_stats.total_bandwidth }}{{ .wireguard_stats.total_bandwidth }}{{ else }}100 Mbps{{ end }}</h4>
+                            <h4 class="text-warning">{{ if .wireguard_stats.total_bandwidth }}{{ .wireguard_stats.total_bandwidth }}{{ else }}{{ call .t "wireguard.default_bandwidth" "100 Mbps" }}{{ end }}</h4>
                         </div>
                     </div>
                     <div class="col-md-3 mb-3">
@@ -189,7 +189,7 @@
                     <div class="col-md-3 mb-3">
                         <div class="text-center">
                             <h6>{{ call .t "wireguard.total_traffic" "Total Traffic" }}</h6>
-                            <h4 class="text-primary">{{ if .wireguard_stats.total_traffic }}{{ .wireguard_stats.total_traffic }}{{ else }}3.2 GB{{ end }}</h4>
+                            <h4 class="text-primary">{{ if .wireguard_stats.total_traffic }}{{ .wireguard_stats.total_traffic }}{{ else }}{{ call .t "wireguard.default_traffic" "3.2 GB" }}{{ end }}</h4>
                         </div>
                     </div>
                     <div class="col-md-3 mb-3">
