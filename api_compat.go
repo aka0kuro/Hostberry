@@ -61,12 +61,12 @@ func systemBackupHandler(c *fiber.Ctx) error {
 func networkRoutingHandler(c *fiber.Ctx) error {
 	out, err := exec.Command("sh", "-c", "ip route 2>/dev/null").CombinedOutput()
 	if err != nil {
-		log.Printf("⚠️ Error ejecutando ip route: %v, output: %s", err, string(out))
+		LogTf("logs.api_route_error", err, string(out))
 		return c.Status(500).JSON(fiber.Map{"error": strings.TrimSpace(string(out))})
 	}
 	var routes []fiber.Map
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	log.Printf("🔍 Procesando %d líneas de routing table", len(lines))
+	LogTf("logs.api_processing_routes", len(lines))
 	
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
