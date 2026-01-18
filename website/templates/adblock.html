@@ -138,9 +138,9 @@
                     <div class="mb-3">
                         <label for="update_interval" class="form-label">{{ call .t "adblock.update_interval" "Update Interval" }}</label>
                         <select class="form-select" id="update_interval" name="update_interval">
-                            <option value="daily" {{ if eq .adblock_config.update_interval "daily" }}selected{{ end }}>Daily</option>
-                            <option value="weekly" {{ if eq .adblock_config.update_interval "weekly" }}selected{{ end }}>Weekly</option>
-                            <option value="monthly" {{ if eq .adblock_config.update_interval "monthly" }}selected{{ end }}>Monthly</option>
+                            <option value="daily" {{ if eq .adblock_config.update_interval "daily" }}selected{{ end }}>{{ call .t "adblock.daily" "Daily" }}</option>
+                            <option value="weekly" {{ if eq .adblock_config.update_interval "weekly" }}selected{{ end }}>{{ call .t "adblock.weekly" "Weekly" }}</option>
+                            <option value="monthly" {{ if eq .adblock_config.update_interval "monthly" }}selected{{ end }}>{{ call .t "adblock.monthly" "Monthly" }}</option>
                         </select>
                     </div>
                     
