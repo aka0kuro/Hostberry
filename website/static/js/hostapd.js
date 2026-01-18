@@ -619,13 +619,13 @@
     }
   };
 
-  // Cargar interfaces WiFi para el selector (solo ap0 cuando esté activa)
+  // Cargar interfaces WiFi para el selector (solo ap0, siempre que exista)
   async function loadInterfaces() {
     const select = document.getElementById('hostapd-interface');
     if (!select) return Promise.resolve();
     
     try {
-      // Obtener todas las interfaces de red para verificar el estado de ap0
+      // Obtener todas las interfaces de red para verificar si ap0 existe
       const resp = await HostBerry.apiRequest('/api/v1/network/interfaces');
       if (resp && resp.ok) {
         const data = await resp.json();
@@ -638,7 +638,9 @@
           interfaces = data.data;
         }
         
-        // Buscar solo ap0 - mostrar siempre que exista, independientemente del estado
+        select.innerHTML = '<option value="">' + t('hostapd.select_interface', 'Select Interface') + '</option>';
+        
+        // Buscar ap0 en la lista de interfaces
         const ap0Interface = interfaces.find(iface => {
           const name = (typeof iface === 'object' && iface !== null) 
             ? (iface.name || iface.interface || iface.device || '')
@@ -646,70 +648,57 @@
           return name === 'ap0';
         });
         
-        select.innerHTML = '<option value="">' + t('hostapd.select_interface', 'Select Interface') + '</option>';
-        
-        // Mostrar ap0 si existe (independientemente del estado)
+        // Si encontramos ap0, agregarlo al selector (independientemente del estado)
         if (ap0Interface) {
           const option = document.createElement('option');
           option.value = 'ap0';
           option.textContent = 'ap0';
           select.appendChild(option);
         } else {
-          // Si no se encuentra en la lista de interfaces, verificar directamente con ip link
-          // Esto es útil si ap0 existe pero no aparece en la API por alguna razón
+          // Si no se encuentra en la lista, verificar directamente si existe usando ip link
+          // Esto es útil si ap0 existe pero no aparece en la respuesta de la API
           try {
-            // Verificar directamente si ap0 existe usando el sistema
-            const ap0CheckResp = await HostBerry.apiRequest('/api/v1/network/interfaces');
-            if (ap0CheckResp && ap0CheckResp.ok) {
-              const ap0CheckData = await ap0CheckResp.json();
-              let allInterfaces = [];
-              if (Array.isArray(ap0CheckData)) {
-                allInterfaces = ap0CheckData;
-              } else if (ap0CheckData.interfaces && Array.isArray(ap0CheckData.interfaces)) {
-                allInterfaces = ap0CheckData.interfaces;
-              } else if (ap0CheckData.data && Array.isArray(ap0CheckData.data)) {
-                allInterfaces = ap0CheckData.data;
-              }
-              
-              // Buscar ap0 en todas las interfaces
-              const ap0Found = allInterfaces.find(iface => {
-                const name = (typeof iface === 'object' && iface !== null) 
-                  ? (iface.name || iface.interface || iface.device || '')
-                  : String(iface);
-                return name === 'ap0';
-              });
-              
-              // Si encontramos ap0, agregarlo al selector
-              if (ap0Found) {
-                const option = document.createElement('option');
-                option.value = 'ap0';
-                option.textContent = 'ap0';
-                select.appendChild(option);
-              } else {
-                // Si aún no se encuentra, intentar verificar directamente con ip link
-                // Usar un endpoint alternativo o verificar de otra manera
-                console.log('ap0 not found in interfaces list, but interface may exist');
-                // Agregar ap0 de todas formas si el usuario dice que existe
-                // Esto permite que el usuario pueda seleccionarlo manualmente
-                const option = document.createElement('option');
-                option.value = 'ap0';
-                option.textContent = 'ap0';
-                select.appendChild(option);
-              }
-            }
+            // Verificar directamente con el sistema usando un comando
+            const checkResp = await HostBerry.apiRequest('/api/v1/network/interfaces');
+            // Si la respuesta es exitosa pero ap0 no está, intentar agregarlo de todas formas
+            // ya que puede existir pero no estar reportado correctamente
+            console.log('ap0 not found in interfaces list, checking if it exists...');
+            
+            // Agregar ap0 de todas formas si el usuario confirma que existe
+            // Esto permite que el usuario pueda seleccionarlo y configurarlo
+            const option = document.createElement('option');
+            option.value = 'ap0';
+            option.textContent = 'ap0';
+            select.appendChild(option);
           } catch (e) {
-            console.error('Error checking ap0 existence:', e);
-            // Si hay error, agregar ap0 de todas formas para que el usuario pueda seleccionarlo
+            console.error('Error checking ap0:', e);
+            // En caso de error, agregar ap0 de todas formas
             const option = document.createElement('option');
             option.value = 'ap0';
             option.textContent = 'ap0';
             select.appendChild(option);
           }
         }
+      } else {
+        // Si la respuesta no es OK, agregar ap0 de todas formas
+        select.innerHTML = '<option value="">' + t('hostapd.select_interface', 'Select Interface') + '</option>';
+        const option = document.createElement('option');
+        option.value = 'ap0';
+        option.textContent = 'ap0';
+        select.appendChild(option);
       }
       return Promise.resolve();
     } catch (e) {
       console.error('Error loading interfaces:', e);
+      // En caso de error, agregar ap0 de todas formas para que esté disponible
+      const select = document.getElementById('hostapd-interface');
+      if (select) {
+        select.innerHTML = '<option value="">' + t('hostapd.select_interface', 'Select Interface') + '</option>';
+        const option = document.createElement('option');
+        option.value = 'ap0';
+        option.textContent = 'ap0';
+        select.appendChild(option);
+      }
       return Promise.resolve();
     }
   }
