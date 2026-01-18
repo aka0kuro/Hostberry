@@ -64,7 +64,7 @@ func systemConfigHandler(c *fiber.Ctx) error {
 			output, err := cmd.CombinedOutput()
 			if err != nil {
 				combined := strings.TrimSpace(string(output))
-				log.Printf("⚠️ Error aplicando timezone: %v, Output: %s", err, combined)
+				LogTf("logs.config_timezone_error", err, combined)
 				
 				baseMsg := "No se pudo aplicar la zona horaria al sistema"
 				if combined != "" {
@@ -78,27 +78,27 @@ func systemConfigHandler(c *fiber.Ctx) error {
 					errors = append(errors, fmt.Sprintf("%s (rc=%v)", baseMsg, err))
 				}
 			} else {
-				log.Printf("✅ Timezone aplicado exitosamente: %s", tz)
+				LogTf("logs.config_timezone_success", tz)
 			}
 		}
 		
 		if key == "session_timeout" {
 			if timeout, err := strconv.Atoi(valueStr); err == nil && timeout > 0 {
 				appConfig.Security.TokenExpiry = timeout
-				log.Printf("✅ Session timeout actualizado: %d minutos", timeout)
+				LogTf("logs.config_session_timeout", timeout)
 			}
 		}
 		
 		if key == "max_login_attempts" {
-			log.Printf("✅ Max login attempts actualizado: %s", valueStr)
+			LogTf("logs.config_max_login", valueStr)
 		}
 		
 		if key == "cache_enabled" {
-			log.Printf("✅ Cache enabled actualizado: %s", valueStr)
+			LogTf("logs.config_cache_enabled", valueStr)
 		}
 		
 		if key == "compression_enabled" {
-			log.Printf("✅ Compression enabled actualizado: %s", valueStr)
+			LogTf("logs.config_compression", valueStr)
 		}
 		
 		updatedKeys = append(updatedKeys, key)
