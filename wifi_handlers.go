@@ -430,7 +430,7 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 					if signalNum >= -100 && signalNum <= -30 {
 						currentNetwork["signal"] = int(signalNum)
 					} else {
-						log.Printf("Señal fuera de rango: %.2f dBm", signalNum)
+						LogTf("logs.wifi_signal_out_of_range", signalNum)
 					}
 				}
 			} else {
