@@ -1106,7 +1106,7 @@ func getLastConnectedNetwork(interfaceName string) (string, string, error) {
 							ssid := strings.Trim(fields[1], "\"")
 							if ssid != "" && ssid != "--" {
 								if len(fields) >= 4 && (fields[3] == "[CURRENT]" || fields[2] == "[ENABLED]") {
-									log.Printf("Red encontrada en wpa_cli (global): %s", ssid)
+									LogTf("logs.wifi_network_found_global", ssid)
 									return ssid, "", nil
 								}
 							}
@@ -1119,7 +1119,7 @@ func getLastConnectedNetwork(interfaceName string) (string, string, error) {
 						if len(fields) >= 2 {
 							ssid := strings.Trim(fields[1], "\"")
 							if ssid != "" && ssid != "--" {
-								log.Printf("Primera red encontrada en wpa_cli (global): %s", ssid)
+								LogTf("logs.wifi_first_network_global", ssid)
 								return ssid, "", nil
 							}
 						}
@@ -1188,7 +1188,7 @@ func getLastConnectedNetwork(interfaceName string) (string, string, error) {
 		return "", "", fmt.Errorf("no se pudo extraer SSID del archivo de configuración")
 	}
 
-	log.Printf("SSID encontrado en archivo de configuración: %s", ssid)
+	LogTf("logs.wifi_ssid_found_config", ssid)
 	// No retornamos password porque no podemos obtenerla del archivo (está hasheada)
 	// La contraseña ya está en el archivo de configuración, solo necesitamos el SSID
 	return ssid, "", nil
