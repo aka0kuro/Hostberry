@@ -199,7 +199,7 @@
                     
                     <div class="mb-3">
                         <label for="server_address" class="form-label">{{ call .t "vpn.server_address" "Server Address" }}</label>
-                        <input type="text" class="form-control" id="server_address" name="server_address" value="{{ if .vpn_config.server_address }}{{ .vpn_config.server_address }}{{ else }}192.168.1.100{{ end }}">
+                        <input type="text" class="form-control" id="server_address" name="server_address" value="{{ if .vpn_config.server_address }}{{ .vpn_config.server_address }}{{ else }}{{ call .t "vpn.default_server_address" "192.168.1.100" }}{{ end }}">
                     </div>
                     
                     <div class="mb-3">
