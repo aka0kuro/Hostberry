@@ -538,15 +538,171 @@ function t(key, defaultValue = '') {
     return typeof value === 'string' ? value : (defaultValue || key);
 }
 
+// Funciones para DNSCrypt
+async function loadDNSCryptStatus() {
+    try {
+        const response = await fetch('/api/v1/adblock/dnscrypt/status', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            }
+        });
+        
+        if (response.ok) {
+            const status = await response.json();
+            const statusIndicator = document.getElementById('dnscrypt-status-indicator');
+            const statusText = document.getElementById('dnscrypt-status-text');
+            const installBtn = document.getElementById('dnscrypt-install-btn');
+            const configureBtn = document.getElementById('dnscrypt-configure-btn');
+            const enableBtn = document.getElementById('dnscrypt-enable-btn');
+            const disableBtn = document.getElementById('dnscrypt-disable-btn');
+            
+            if (status.installed) {
+                installBtn.style.display = 'none';
+                configureBtn.style.display = 'block';
+                
+                if (status.active) {
+                    statusIndicator.className = 'status-indicator status-online';
+                    statusText.textContent = t('dnscrypt.active', 'Active');
+                    enableBtn.style.display = 'none';
+                    disableBtn.style.display = 'block';
+                } else {
+                    statusIndicator.className = 'status-indicator status-offline';
+                    statusText.textContent = t('dnscrypt.inactive', 'Inactive');
+                    enableBtn.style.display = 'block';
+                    disableBtn.style.display = 'none';
+                }
+            } else {
+                statusIndicator.className = 'status-indicator status-offline';
+                statusText.textContent = t('dnscrypt.not_installed', 'Not installed');
+                installBtn.style.display = 'block';
+                configureBtn.style.display = 'none';
+                enableBtn.style.display = 'none';
+                disableBtn.style.display = 'none';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading DNSCrypt status:', error);
+    }
+}
+
+async function installDNSCrypt() {
+    if (!confirm(t('dnscrypt.install', 'Install DNSCrypt') + '?')) return;
+    
+    try {
+        const response = await fetch('/api/v1/adblock/dnscrypt/install', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            }
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showAlert('success', result.message || t('dnscrypt.installed', 'Installed'));
+            loadDNSCryptStatus();
+        } else {
+            showAlert('danger', result.error || 'Error installing DNSCrypt');
+        }
+    } catch (error) {
+        console.error('Error installing DNSCrypt:', error);
+        showAlert('danger', 'Error installing DNSCrypt');
+    }
+}
+
+function showDNSCryptConfig() {
+    const form = document.getElementById('dnscrypt-config-form');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+async function enableDNSCrypt() {
+    try {
+        const response = await fetch('/api/v1/adblock/dnscrypt/enable', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            }
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showAlert('success', result.message || t('dnscrypt.enabled', 'Enabled'));
+            loadDNSCryptStatus();
+        } else {
+            showAlert('danger', result.error || 'Error enabling DNSCrypt');
+        }
+    } catch (error) {
+        console.error('Error enabling DNSCrypt:', error);
+        showAlert('danger', 'Error enabling DNSCrypt');
+    }
+}
+
+async function disableDNSCrypt() {
+    if (!confirm(t('dnscrypt.disable', 'Disable') + ' DNSCrypt?')) return;
+    
+    try {
+        const response = await fetch('/api/v1/adblock/dnscrypt/disable', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            }
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showAlert('success', result.message || t('dnscrypt.disabled', 'Disabled'));
+            loadDNSCryptStatus();
+        } else {
+            showAlert('danger', result.error || 'Error disabling DNSCrypt');
+        }
+    } catch (error) {
+        console.error('Error disabling DNSCrypt:', error);
+        showAlert('danger', 'Error disabling DNSCrypt');
+    }
+}
+
+// Configurar formulario de DNSCrypt
+document.getElementById('dnscryptConfigForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const data = {
+        server_name: formData.get('server_name') || 'adguard-dns',
+        block_ads: formData.get('block_ads') === 'on'
+    };
+    
+    try {
+        const response = await fetch('/api/v1/adblock/dnscrypt/configure', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showAlert('success', result.message || t('dnscrypt.configured', 'Configured'));
+            document.getElementById('dnscrypt-config-form').style.display = 'none';
+        } else {
+            showAlert('danger', result.error || 'Error configuring DNSCrypt');
+        }
+    } catch (error) {
+        console.error('Error configuring DNSCrypt:', error);
+        showAlert('danger', 'Error configuring DNSCrypt');
+    }
+});
+
 // Cargar datos al cargar la página
 document.addEventListener('DOMContentLoaded', function() {
     loadLists();
     loadDomains();
+    loadDNSCryptStatus();
     
     // Auto-refresh cada 30 segundos
     setInterval(() => {
         loadLists();
         loadDomains();
+        loadDNSCryptStatus();
     }, 30000);
 });
 </script>
