@@ -685,24 +685,24 @@ country=%s
 	if cpErr != nil {
 		cpOutLower := strings.ToLower(cpOutStr)
 		if strings.Contains(cpOutLower, "read-only") || strings.Contains(cpOutLower, "readonly") {
-			log.Printf("ERROR detectado (sistema de solo lectura): %s", cpOutStr)
-			log.Printf("Sistema de archivos de solo lectura detectado, intentando remontar...")
+			LogTf("logs.wifi_readonly_detected", cpOutStr)
+			LogT("logs.wifi_readonly_remounting")
 			remountCmd := exec.Command("sudo", "mount", "-o", "remount,rw", "/")
 			remountCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 			remountOut, remountErr := remountCmd.CombinedOutput()
 			if remountErr != nil {
-				log.Printf("No se pudo remontar como lectura-escritura: %v, output: %s", remountErr, string(remountOut))
-				log.Printf("Usando directorio alternativo persistente: %s", WpaSupplicantAltConfigDir)
+				LogTf("logs.wifi_remount_failed", remountErr, string(remountOut))
+				LogTf("logs.wifi_using_alt_dir", WpaSupplicantAltConfigDir)
 				parentDir := "/var/lib/hostberry"
 				mkdirParentCmd := exec.Command("sudo", "mkdir", "-p", parentDir)
 				mkdirParentCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 				if mkdirParentOut, mkdirParentErr := mkdirParentCmd.CombinedOutput(); mkdirParentErr != nil {
-					log.Printf("Warning: No se pudo crear directorio padre %s: %v, output: %s", parentDir, mkdirParentErr, string(mkdirParentOut))
+					LogTf("logs.wifi_parent_dir_error", parentDir, mkdirParentErr, string(mkdirParentOut))
 					remountVarCmd := exec.Command("sudo", "mount", "-o", "remount,rw", "/var")
 					remountVarCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 					remountVarCmd.Run() // Intentar remontar
 					if mkdirParentOut2, mkdirParentErr2 := mkdirParentCmd.CombinedOutput(); mkdirParentErr2 != nil {
-						log.Printf("ERROR: No se pudo crear directorio padre incluso después de remontar: %v, output: %s", mkdirParentErr2, string(mkdirParentOut2))
+						LogTf("logs.wifi_parent_dir_error2", mkdirParentErr2, string(mkdirParentOut2))
 						os.Remove(tmpConfigFile)
 						result["error"] = fmt.Sprintf("Error al guardar configuración: no se pudo crear directorio alternativo")
 						return result
