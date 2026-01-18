@@ -370,7 +370,7 @@ func scanWiFiNetworks(interfaceName string) map[string]interface{} {
 	scanCmd := exec.Command("sh", "-c", fmt.Sprintf("sudo iw dev %s scan 2>/dev/null", interfaceName))
 	scanOut, err := scanCmd.Output()
 	if err != nil {
-		log.Printf("Error escaneando WiFi: %v", err)
+		LogTf("logs.wifi_scan_error", err)
 		result["success"] = false
 		result["error"] = fmt.Sprintf("Error escaneando redes: %v", err)
 		result["networks"] = networks
