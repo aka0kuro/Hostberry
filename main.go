@@ -79,15 +79,15 @@ func main() {
 		LogTf("logs.i18n_init_warning", err)
 	}
 
-	// Establecer idioma de logs desde configuración del sistema
+	if err := initDatabase(); err != nil {
+		LogTfatal("logs.db_init_error", err)
+	}
+
+	// Establecer idioma de logs desde configuración del sistema (después de inicializar BD)
 	if configs, err := GetAllConfigs(); err == nil {
 		if lang, ok := configs["log_language"]; ok && lang != "" {
 			SetLogLanguage(lang)
 		}
-	}
-
-	if err := initDatabase(); err != nil {
-		LogTfatal("logs.db_init_error", err)
 	}
 
 	LogTln("logs.checking_admin")
