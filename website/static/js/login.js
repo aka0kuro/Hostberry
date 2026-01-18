@@ -56,8 +56,10 @@
       const isPass = input.getAttribute('type') === 'password';
       input.setAttribute('type', isPass ? 'text' : 'password');
       if(eye) eye.textContent = isPass ? '🙈' : '👁️';
-      this.setAttribute('aria-label', isPass ? 'Ocultar contraseña' : 'Mostrar contraseña');
-      this.setAttribute('title', isPass ? 'Ocultar contraseña' : 'Mostrar contraseña');
+      const hideText = window.HostBerry && window.HostBerry.t ? window.HostBerry.t('common.hide_password', 'Hide password') : 'Hide password';
+      const showText = window.HostBerry && window.HostBerry.t ? window.HostBerry.t('common.show_password', 'Show password') : 'Show password';
+      this.setAttribute('aria-label', isPass ? hideText : showText);
+      this.setAttribute('title', isPass ? hideText : showText);
     });
   })();
 

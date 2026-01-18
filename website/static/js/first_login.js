@@ -86,7 +86,7 @@
     alertDiv.className = `alert alert-${type} alert-dismissible fade show first-login-alert`;
     alertDiv.innerHTML = `
       ${message}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="${t('common.close', 'Close')}"></button>
     `;
     document.body.appendChild(alertDiv);
     setTimeout(() => {
