@@ -70,7 +70,7 @@
                     <label class="form-label">{{ call .t "wireguard.interface_address" "Interface Address" }}</label>
                     <div class="d-flex align-items-center">
                         <i class="bi bi-geo-alt text-info me-2"></i>
-                        <span class="h6 mb-0">{{ if .wireguard_status.interface_address }}{{ .wireguard_status.interface_address }}{{ else }}10.0.0.1/24{{ end }}</span>
+                        <span class="h6 mb-0">{{ if .wireguard_status.interface_address }}{{ .wireguard_status.interface_address }}{{ else }}{{ call .t "wireguard.default_address" "10.0.0.1/24" }}{{ end }}</span>
                     </div>
                 </div>
                 
