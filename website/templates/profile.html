@@ -47,7 +47,7 @@
                     
                     <div class="mb-3">
                             <label for="role" class="form-label text-white">{{ call .t "profile.role" "Role" }}</label>
-                            <input type="text" class="form-control bg-dark text-white border-secondary text-center" id="role" name="role" value="{{ if .user.Role }}{{ .user.Role }}{{ else }}admin{{ end }}" readonly>
+                            <input type="text" class="form-control bg-dark text-white border-secondary text-center" id="role" name="role" value="{{ if .user.Role }}{{ .user.Role }}{{ else }}{{ call .t "profile.default_role" "admin" }}{{ end }}" readonly>
                     </div>
                     
                     <div class="mb-3">
