@@ -96,7 +96,7 @@ func requireAuth(c *fiber.Ctx) error {
 
 	var user User
 	if err := db.First(&user, claims.UserID).Error; err != nil {
-		log.Printf("ERROR: No se pudo encontrar usuario con ID %d en requireAuth: %v", claims.UserID, err)
+		LogTf("logs.middleware_user_not_found", claims.UserID, err)
 		if strings.HasPrefix(path, "/api/") {
 			return c.Status(401).JSON(fiber.Map{
 				"error": "Usuario no encontrado. Por favor, inicia sesión nuevamente.",

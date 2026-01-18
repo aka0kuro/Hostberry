@@ -175,14 +175,14 @@ func configureWireGuard(config, user string) map[string]interface{} {
 		user = "unknown"
 	}
 
-	log.Printf("Configurando WireGuard (usuario: %s)", user)
+	LogTf("logs.vpn_wireguard_config", user)
 
 	configFile := "/etc/wireguard/wg0.conf"
 	if err := os.WriteFile(configFile, []byte(config), 0600); err != nil {
 		result["success"] = false
 		result["error"] = fmt.Sprintf("Error guardando configuración: %v", err)
 		result["message"] = "Error guardando configuración"
-		log.Printf("ERROR: Error guardando configuración WireGuard: %v", err)
+		LogTf("logs.vpn_wireguard_error", err)
 		return result
 	}
 
@@ -196,6 +196,6 @@ func configureWireGuard(config, user string) map[string]interface{} {
 	}
 
 	result["success"] = true
-	log.Printf("INFO: WireGuard configurado exitosamente")
+	LogT("logs.vpn_wireguard_success")
 	return result
 }
