@@ -619,7 +619,7 @@
     }
   };
 
-  // Cargar interfaces WiFi para el selector (solo ap0, siempre que exista)
+  // Cargar interfaces WiFi para el selector (solo ap0)
   async function loadInterfaces() {
     const select = document.getElementById('hostapd-interface');
     if (!select) return Promise.resolve();
@@ -627,6 +627,8 @@
     try {
       // Obtener todas las interfaces de red para verificar si ap0 existe
       const resp = await HostBerry.apiRequest('/api/v1/network/interfaces');
+      let ap0Exists = false;
+      
       if (resp && resp.ok) {
         const data = await resp.json();
         let interfaces = [];
@@ -638,59 +640,31 @@
           interfaces = data.data;
         }
         
-        select.innerHTML = '<option value="">' + t('hostapd.select_interface', 'Select Interface') + '</option>';
-        
         // Buscar ap0 en la lista de interfaces
-        const ap0Interface = interfaces.find(iface => {
+        ap0Exists = interfaces.some(iface => {
           const name = (typeof iface === 'object' && iface !== null) 
             ? (iface.name || iface.interface || iface.device || '')
             : String(iface);
           return name === 'ap0';
         });
-        
-        // Si encontramos ap0, agregarlo al selector (independientemente del estado)
-        if (ap0Interface) {
-          const option = document.createElement('option');
-          option.value = 'ap0';
-          option.textContent = 'ap0';
-          select.appendChild(option);
-        } else {
-          // Si no se encuentra en la lista, verificar directamente si existe usando ip link
-          // Esto es útil si ap0 existe pero no aparece en la respuesta de la API
-          try {
-            // Verificar directamente con el sistema usando un comando
-            const checkResp = await HostBerry.apiRequest('/api/v1/network/interfaces');
-            // Si la respuesta es exitosa pero ap0 no está, intentar agregarlo de todas formas
-            // ya que puede existir pero no estar reportado correctamente
-            console.log('ap0 not found in interfaces list, checking if it exists...');
-            
-            // Agregar ap0 de todas formas si el usuario confirma que existe
-            // Esto permite que el usuario pueda seleccionarlo y configurarlo
-            const option = document.createElement('option');
-            option.value = 'ap0';
-            option.textContent = 'ap0';
-            select.appendChild(option);
-          } catch (e) {
-            console.error('Error checking ap0:', e);
-            // En caso de error, agregar ap0 de todas formas
-            const option = document.createElement('option');
-            option.value = 'ap0';
-            option.textContent = 'ap0';
-            select.appendChild(option);
-          }
-        }
-      } else {
-        // Si la respuesta no es OK, agregar ap0 de todas formas
-        select.innerHTML = '<option value="">' + t('hostapd.select_interface', 'Select Interface') + '</option>';
-        const option = document.createElement('option');
-        option.value = 'ap0';
-        option.textContent = 'ap0';
-        select.appendChild(option);
       }
+      
+      // Siempre mostrar ap0 en el selector (es la única interfaz válida para HostAPD)
+      // Si no existe, se creará automáticamente cuando se configure HostAPD
+      select.innerHTML = '<option value="">' + t('hostapd.select_interface', 'Select Interface') + '</option>';
+      const option = document.createElement('option');
+      option.value = 'ap0';
+      option.textContent = 'ap0';
+      if (!ap0Exists) {
+        // Si no existe, agregar un indicador visual
+        option.textContent = 'ap0 (' + t('hostapd.will_be_created', 'will be created') + ')';
+      }
+      select.appendChild(option);
+      
       return Promise.resolve();
     } catch (e) {
       console.error('Error loading interfaces:', e);
-      // En caso de error, agregar ap0 de todas formas para que esté disponible
+      // En caso de error, mostrar ap0 de todas formas
       const select = document.getElementById('hostapd-interface');
       if (select) {
         select.innerHTML = '<option value="">' + t('hostapd.select_interface', 'Select Interface') + '</option>';
