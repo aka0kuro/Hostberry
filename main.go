@@ -561,7 +561,7 @@ func wifiInterfacesHandler(c *fiber.Ctx) error {
 func wifiScanHandler(c *fiber.Ctx) error {
 	userInterface := c.Locals("user")
 	if userInterface == nil {
-		log.Printf("ERROR: Usuario no encontrado en wifiScanHandler")
+		LogT("logs.user_not_found")
 		return c.Status(401).JSON(fiber.Map{
 			"error": "No autenticado. Por favor, inicia sesión nuevamente.",
 		})
@@ -569,7 +569,7 @@ func wifiScanHandler(c *fiber.Ctx) error {
 	
 	user, ok := userInterface.(*User)
 	if !ok || user == nil {
-		log.Printf("ERROR: Usuario inválido en wifiScanHandler")
+		LogT("logs.user_invalid")
 		return c.Status(401).JSON(fiber.Map{
 			"error": "Usuario no encontrado. Por favor, inicia sesión nuevamente.",
 		})
