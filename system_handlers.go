@@ -232,7 +232,7 @@ func systemRestart(user string) map[string]interface{} {
 					result["success"] = true
 					result["message"] = "Sistema se reiniciará en 1 minuto"
 					result["output"] = strings.TrimSpace(out2)
-					log.Printf("INFO: Comando de reinicio ejecutado exitosamente")
+					LogT("logs.system_restart_success")
 					return result
 				}
 				found = true
@@ -245,7 +245,7 @@ func systemRestart(user string) map[string]interface{} {
 				result["success"] = false
 				result["error"] = err3.Error()
 				result["message"] = "Error al ejecutar comando de reinicio"
-				log.Printf("ERROR: Error reiniciando sistema: %v", err3)
+				LogTf("logs.system_restart_error", err3)
 				return result
 			}
 			result["success"] = true
@@ -256,14 +256,14 @@ func systemRestart(user string) map[string]interface{} {
 		result["success"] = false
 		result["error"] = err.Error()
 		result["message"] = "Error al ejecutar comando de reinicio"
-		log.Printf("ERROR: Error reiniciando sistema: %v", err)
+		LogTf("logs.system_restart_error", err)
 		return result
 	}
 
 	result["success"] = true
 	result["message"] = "Sistema se reiniciará en breve"
 	result["output"] = ""
-	log.Printf("INFO: Comando de reinicio ejecutado exitosamente")
+	LogT("logs.system_restart_success")
 	return result
 }
 
@@ -274,11 +274,11 @@ func systemShutdown(user string) map[string]interface{} {
 		user = "unknown"
 	}
 
-	log.Printf("INFO: Apagado del sistema solicitado por: %s", user)
+	LogTf("logs.system_shutdown_requested", user)
 
 	shutdownCmd := "systemctl poweroff"
 	if _, err := executeCommand(shutdownCmd); err != nil {
-		log.Printf("WARN: systemctl poweroff falló, intentando con shutdown: %v", err)
+		LogTf("logs.system_shutdown_fallback", err)
 		shutdownPaths := []string{"/usr/sbin/shutdown", "/sbin/shutdown", "shutdown"}
 		found := false
 		for _, path := range shutdownPaths {
@@ -289,7 +289,7 @@ func systemShutdown(user string) map[string]interface{} {
 					result["success"] = true
 					result["message"] = "Sistema se apagará en 1 minuto"
 					result["output"] = strings.TrimSpace(out2)
-					log.Printf("INFO: Comando de apagado ejecutado exitosamente")
+					LogT("logs.system_shutdown_success")
 					return result
 				}
 				found = true
@@ -302,7 +302,7 @@ func systemShutdown(user string) map[string]interface{} {
 				result["success"] = false
 				result["error"] = err3.Error()
 				result["message"] = "Error al ejecutar comando de apagado"
-				log.Printf("ERROR: Error apagando sistema: %v", err3)
+				LogTf("logs.system_shutdown_error", err3)
 				return result
 			}
 			result["success"] = true
@@ -313,13 +313,13 @@ func systemShutdown(user string) map[string]interface{} {
 		result["success"] = false
 		result["error"] = err.Error()
 		result["message"] = "Error al ejecutar comando de apagado"
-		log.Printf("ERROR: Error apagando sistema: %v", err)
+		LogTf("logs.system_shutdown_error", err)
 		return result
 	}
 
 	result["success"] = true
 	result["message"] = "Sistema se apagará en breve"
 	result["output"] = ""
-	log.Printf("INFO: Comando de apagado ejecutado exitosamente")
+	LogT("logs.system_shutdown_success")
 	return result
 }
