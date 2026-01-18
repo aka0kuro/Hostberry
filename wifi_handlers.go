@@ -296,13 +296,13 @@ func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, err
 			lastPingOutput = pingOut
 			lastPingErr = pingErr
 			if lastPingOutput != "" {
-				log.Printf("wpa_cli ping (%s): %s", dir, lastPingOutput)
+				LogTf("logs.wpa_cli_ping", dir, lastPingOutput)
 			}
 			if pingErr != nil && lastPingOutput != "" {
-				log.Printf("wpa_cli ping error (%s): %v", dir, pingErr)
+				LogTf("logs.wpa_cli_ping_error", dir, pingErr)
 			}
 			if strings.Contains(lastPingOutput, "PONG") {
-				log.Printf("wpa_cli respondió correctamente desde %s", dir)
+				LogTf("logs.wpa_cli_responded", dir)
 				return dir, nil
 			}
 
@@ -310,13 +310,13 @@ func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, err
 			lastStatusOutput = statusOut
 			lastStatusErr = statusErr
 			if lastStatusOutput != "" {
-				log.Printf("wpa_cli status (%s): %s", dir, lastStatusOutput)
+				LogTf("logs.wpa_cli_status", dir, lastStatusOutput)
 			}
 			if statusErr != nil && lastStatusOutput != "" {
-				log.Printf("wpa_cli status error (%s): %v", dir, statusErr)
+				LogTf("logs.wpa_cli_status_error", dir, statusErr)
 			}
 			if strings.Contains(lastStatusOutput, "wpa_state=") {
-				log.Printf("wpa_cli respondió con status válido desde %s", dir)
+				LogTf("logs.wpa_cli_status_valid", dir)
 				return dir, nil
 			}
 
@@ -324,27 +324,27 @@ func waitForWpaCliConnection(interfaceName string, maxAttempts int) (string, err
 			if _, err := os.Stat(globalSocket); err == nil {
 				globalPingOut, globalPingErr := runWpaCli("wpa_cli", "-g", dir, "-i", interfaceName, "ping")
 				if strings.TrimSpace(globalPingOut) != "" {
-					log.Printf("wpa_cli global ping (%s): %s", dir, strings.TrimSpace(globalPingOut))
+					LogTf("logs.wpa_cli_global_ping", dir, strings.TrimSpace(globalPingOut))
 				}
 				if globalPingErr == nil && strings.Contains(globalPingOut, "PONG") {
-					log.Printf("wpa_cli respondió correctamente desde interfaz global en %s", dir)
+					LogTf("logs.wpa_cli_global_responded", dir)
 					return dir, nil
 				}
 				globalStatusOut, globalStatusErr := runWpaCli("wpa_cli", "-g", dir, "-i", interfaceName, "status")
 				if strings.TrimSpace(globalStatusOut) != "" {
-					log.Printf("wpa_cli global status (%s): %s", dir, strings.TrimSpace(globalStatusOut))
+					LogTf("logs.wpa_cli_global_status", dir, strings.TrimSpace(globalStatusOut))
 				}
 				if globalStatusErr == nil && strings.Contains(globalStatusOut, "wpa_state=") {
-					log.Printf("wpa_cli respondió con status válido desde interfaz global en %s", dir)
+					LogTf("logs.wpa_cli_global_status_valid", dir)
 					return dir, nil
 				}
 			}
 		}
 
 		if workingSocketDir != "" {
-			log.Printf("Intento %d/%d: wpa_cli sin PONG aún (socket detectado en %s)", attempt+1, maxAttempts, workingSocketDir)
+			LogTf("logs.wpa_cli_attempt", attempt+1, maxAttempts, workingSocketDir)
 		} else {
-			log.Printf("Intento %d/%d: Socket no encontrado aún", attempt+1, maxAttempts)
+			LogTf("logs.wpa_cli_socket_not_found", attempt+1, maxAttempts)
 		}
 
 		time.Sleep(1 * time.Second)
