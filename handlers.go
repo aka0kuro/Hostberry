@@ -1072,6 +1072,108 @@ func dnscryptDisableHandler(c *fiber.Ctx) error {
 	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
 }
 
+// Handlers para Tor
+func torStatusHandler(c *fiber.Ctx) error {
+	result := getTorStatus()
+	return c.JSON(result)
+}
+
+func torInstallHandler(c *fiber.Ctx) error {
+	user := c.Locals("user").(*User)
+	userID := user.ID
+
+	result := installTor(user.Username)
+	if success, ok := result["success"].(bool); ok && success {
+		InsertLog("INFO", fmt.Sprintf("Tor instalado por usuario %s", user.Username), "tor", &userID)
+		return c.JSON(result)
+	}
+
+	if errorMsg, ok := result["error"].(string); ok {
+		InsertLog("ERROR", fmt.Sprintf("Error instalando Tor: %s (usuario: %s)", errorMsg, user.Username), "tor", &userID)
+		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
+	}
+
+	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+}
+
+func torConfigureHandler(c *fiber.Ctx) error {
+	var req struct {
+		EnableSocks         bool `json:"enable_socks"`
+		SocksPort           int  `json:"socks_port"`
+		EnableControlPort   bool `json:"enable_control_port"`
+		ControlPort         int  `json:"control_port"`
+		EnableHiddenService bool `json:"enable_hidden_service"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Datos inválidos"})
+	}
+
+	user := c.Locals("user").(*User)
+	userID := user.ID
+
+	if req.SocksPort == 0 {
+		req.SocksPort = 9050
+	}
+	if req.ControlPort == 0 {
+		req.ControlPort = 9051
+	}
+
+	result := configureTor(req.EnableSocks, req.SocksPort, req.EnableControlPort, req.ControlPort, req.EnableHiddenService, user.Username)
+	if success, ok := result["success"].(bool); ok && success {
+		InsertLog("INFO", fmt.Sprintf("Tor configurado por usuario %s", user.Username), "tor", &userID)
+		return c.JSON(result)
+	}
+
+	if errorMsg, ok := result["error"].(string); ok {
+		InsertLog("ERROR", fmt.Sprintf("Error configurando Tor: %s (usuario: %s)", errorMsg, user.Username), "tor", &userID)
+		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
+	}
+
+	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+}
+
+func torEnableHandler(c *fiber.Ctx) error {
+	user := c.Locals("user").(*User)
+	userID := user.ID
+
+	result := enableTor(user.Username)
+	if success, ok := result["success"].(bool); ok && success {
+		InsertLog("INFO", fmt.Sprintf("Tor habilitado por usuario %s", user.Username), "tor", &userID)
+		return c.JSON(result)
+	}
+
+	if errorMsg, ok := result["error"].(string); ok {
+		InsertLog("ERROR", fmt.Sprintf("Error habilitando Tor: %s (usuario: %s)", errorMsg, user.Username), "tor", &userID)
+		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
+	}
+
+	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+}
+
+func torDisableHandler(c *fiber.Ctx) error {
+	user := c.Locals("user").(*User)
+	userID := user.ID
+
+	result := disableTor(user.Username)
+	if success, ok := result["success"].(bool); ok && success {
+		InsertLog("INFO", fmt.Sprintf("Tor deshabilitado por usuario %s", user.Username), "tor", &userID)
+		return c.JSON(result)
+	}
+
+	if errorMsg, ok := result["error"].(string); ok {
+		InsertLog("ERROR", fmt.Sprintf("Error deshabilitando Tor: %s (usuario: %s)", errorMsg, user.Username), "tor", &userID)
+		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
+	}
+
+	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+}
+
+func torCircuitHandler(c *fiber.Ctx) error {
+	result := getTorCircuitInfo()
+	return c.JSON(result)
+}
+
 func networkPageHandler(c *fiber.Ctx) error {
 	return renderTemplate(c, "network", fiber.Map{
 		"Title": T(c, "network.title", "Network Management"),
