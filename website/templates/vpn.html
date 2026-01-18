@@ -67,7 +67,7 @@
                     <label class="form-label">{{ call .t "vpn.server_name" "Server Name" }}</label>
                     <div class="d-flex align-items-center">
                         <i class="bi bi-server text-primary me-2"></i>
-                        <span class="h6 mb-0">{{ if .vpn_status.current_server }}{{ .vpn_status.current_server }}{{ else }}HostBerry-VPN{{ end }}</span>
+                        <span class="h6 mb-0">{{ if .vpn_status.current_server }}{{ .vpn_status.current_server }}{{ else }}{{ call .t "vpn.default_server_name" "HostBerry-VPN" }}{{ end }}</span>
                     </div>
                 </div>
                 
