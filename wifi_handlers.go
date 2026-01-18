@@ -1209,15 +1209,11 @@ func autoConnectToLastNetwork(interfaceName string) {
 		return
 	}
 
-	// Paso 1: Activar software switch (rfkill unblock wifi)
-	log.Printf("Paso 1: Activando software switch...")
+	// Paso 1: Activar software switch y WiFi en paralelo (más rápido)
+	log.Printf("Paso 1: Activando software switch y WiFi...")
 	executeCommand("sudo rfkill unblock wifi 2>/dev/null || true")
-	time.Sleep(2 * time.Second)
-
-	// Paso 2: Activar WiFi
-	log.Printf("Paso 2: Activando interfaz WiFi %s...", interfaceName)
 	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null || true", interfaceName))
-	time.Sleep(3 * time.Second)
+	time.Sleep(1 * time.Second) // Reducido de 3 a 1 segundo
 
 	// Paso 3: Intentar obtener la última red desde wpa_cli (más confiable)
 	log.Printf("Paso 3: Buscando última red conectada...")
@@ -1251,15 +1247,13 @@ func autoConnectToLastNetwork(interfaceName string) {
 	}
 
 	if workingSocketDir != "" {
-		// wpa_supplicant está corriendo, intentar reconectar a la red activa
-		log.Printf("wpa_supplicant está corriendo, intentando reconectar...")
+		// wpa_supplicant está corriendo, intentar reconectar a la red activa (método más rápido)
+		log.Printf("wpa_supplicant está corriendo, intentando reconectar rápidamente...")
 		runWpaCli := func(args ...string) (string, error) {
 			var base []string
 			if useGlobalSocket {
-				// Usar socket global con -g y especificar interfaz con -i
 				base = []string{"wpa_cli", "-g", workingSocketDir, "-i", interfaceName}
 			} else {
-				// Usar socket de interfaz específica
 				base = []string{"wpa_cli", "-i", interfaceName, "-p", workingSocketDir}
 			}
 			cmd := exec.Command("sudo", append(base, args...)...)
@@ -1267,65 +1261,67 @@ func autoConnectToLastNetwork(interfaceName string) {
 			return strings.TrimSpace(string(out)), err
 		}
 
-		// Obtener estado actual
+		// Obtener estado actual (verificación rápida)
 		statusOut, err := runWpaCli("status")
 		if err == nil {
-			log.Printf("Estado actual wpa_cli: %s", statusOut)
-			// Verificar si ya está conectado
+			// Verificar si ya está conectado (verificación inmediata)
 			if strings.Contains(statusOut, "wpa_state=COMPLETED") {
 				log.Printf("✅ Ya está conectado a una red WiFi")
+				// Iniciar DHCP en segundo plano si no tiene IP
+				go func() {
+					ipCmd := exec.Command("sh", "-c", fmt.Sprintf("ip addr show %s 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1", interfaceName))
+					if ipOut, _ := ipCmd.Output(); ipOut == nil || strings.TrimSpace(string(ipOut)) == "" {
+						executeCommand(fmt.Sprintf("sudo dhclient -v %s 2>&1 || sudo udhcpc -i %s -q -n 2>&1 || true", interfaceName, interfaceName))
+					}
+				}()
 				return
 			}
 
-			// Intentar reconectar usando la red activa
+			// Reconexión rápida: habilitar y reconectar directamente
 			listOut, _ := runWpaCli("list_networks")
-			log.Printf("Redes guardadas: %s", listOut)
 			if listOut != "" {
 				lines := strings.Split(listOut, "\n")
 				if len(lines) > 1 {
-					// Buscar la red activa (CURRENT)
+					// Buscar red CURRENT o primera habilitada
+					var netID string
+					foundCurrent := false
 					for i, line := range lines {
 						if i == 0 {
-							continue // Saltar encabezado
+							continue
 						}
 						fields := strings.Fields(line)
-						if len(fields) >= 4 && fields[3] == "[CURRENT]" {
-							log.Printf("Red activa encontrada: %s", line)
-							// Intentar reconectar
-							log.Printf("Reconectando a red guardada...")
-							runWpaCli("reconnect")
-							time.Sleep(5 * time.Second)
-							
-							// Verificar si se conectó
-							statusOut2, _ := runWpaCli("status")
-							log.Printf("Estado después de reconectar: %s", statusOut2)
-							if strings.Contains(statusOut2, "wpa_state=COMPLETED") {
-								log.Printf("✅ Reconectado exitosamente a la red WiFi")
-								return
+						if len(fields) >= 1 {
+							if len(fields) >= 4 && fields[3] == "[CURRENT]" {
+								netID = fields[0]
+								foundCurrent = true
+								break
+							} else if netID == "" && len(fields) >= 2 {
+								netID = fields[0]
 							}
-							break
 						}
 					}
 					
-					// Si no hay red CURRENT, intentar habilitar la primera red guardada
-					if len(lines) > 1 {
-						firstLine := lines[1]
-						fields := strings.Fields(firstLine)
-						if len(fields) >= 1 {
-							netID := fields[0]
-							log.Printf("Habilitando red guardada ID: %s", netID)
-							runWpaCli("enable_network", netID)
-							runWpaCli("select_network", netID)
-							runWpaCli("reconnect")
-							time.Sleep(5 * time.Second)
-							
-							statusOut3, _ := runWpaCli("status")
-							log.Printf("Estado después de habilitar red: %s", statusOut3)
-							if strings.Contains(statusOut3, "wpa_state=COMPLETED") {
-								log.Printf("✅ Conectado exitosamente a red guardada")
+					if netID != "" {
+						log.Printf("Reconectando rápidamente a red ID: %s", netID)
+						// Hacer todo en secuencia rápida
+						runWpaCli("enable_network", netID)
+						runWpaCli("select_network", netID)
+						runWpaCli("reconnect")
+						
+						// Verificar conexión más rápido (menos espera)
+						for attempt := 0; attempt < 5; attempt++ {
+							time.Sleep(1 * time.Second) // Reducido de 2 a 1 segundo
+							statusOut2, _ := runWpaCli("status")
+							if strings.Contains(statusOut2, "wpa_state=COMPLETED") {
+								log.Printf("✅ Reconectado exitosamente a la red WiFi")
+								// Iniciar DHCP en segundo plano
+								go func() {
+									executeCommand(fmt.Sprintf("sudo dhclient -v %s 2>&1 || sudo udhcpc -i %s -q -n 2>&1 || true", interfaceName, interfaceName))
+								}()
 								return
 							}
 						}
+						log.Printf("⚠️  Reconexión iniciada pero aún no completada")
 					}
 				}
 			}
