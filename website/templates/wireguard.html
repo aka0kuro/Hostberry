@@ -195,7 +195,7 @@
                     <div class="col-md-3 mb-3">
                         <div class="text-center">
                             <h6>{{ call .t "wireguard.active_peers" "Active Peers" }}</h6>
-                            <h4 class="text-success">{{ if .wireguard_stats.active_peers }}{{ .wireguard_stats.active_peers }}{{ else }}3{{ end }}</h4>
+                            <h4 class="text-success">{{ if .wireguard_stats.active_peers }}{{ .wireguard_stats.active_peers }}{{ else }}{{ call .t "wireguard.default_active_peers" "3" }}{{ end }}</h4>
                         </div>
                     </div>
                     <div class="col-md-3 mb-3">
