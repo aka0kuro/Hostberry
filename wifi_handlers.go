@@ -1097,7 +1097,7 @@ func autoConnectToLastNetwork(interfaceName string) {
 		interfaceName = DefaultWiFiInterface
 	}
 
-	log.Printf("🔄 Iniciando autoconexión a última red WiFi...")
+	log.Printf("🔄 Iniciando autoconexión a última red WiFi en %s...", interfaceName)
 
 	// Paso 1: Activar software switch (rfkill unblock wifi)
 	log.Printf("Paso 1: Activando software switch...")
@@ -1120,6 +1120,7 @@ func autoConnectToLastNetwork(interfaceName string) {
 		socketPath := fmt.Sprintf("%s/%s", dir, interfaceName)
 		if _, err := os.Stat(socketPath); err == nil {
 			workingSocketDir = dir
+			log.Printf("Socket encontrado en: %s", socketPath)
 			break
 		}
 	}
@@ -1137,35 +1138,74 @@ func autoConnectToLastNetwork(interfaceName string) {
 		// Obtener estado actual
 		statusOut, err := runWpaCli("status")
 		if err == nil {
+			log.Printf("Estado actual wpa_cli: %s", statusOut)
 			// Verificar si ya está conectado
 			if strings.Contains(statusOut, "wpa_state=COMPLETED") {
 				log.Printf("✅ Ya está conectado a una red WiFi")
 				return
 			}
 
-			// Intentar reconectar
+			// Intentar reconectar usando la red activa
 			listOut, _ := runWpaCli("list_networks")
+			log.Printf("Redes guardadas: %s", listOut)
 			if listOut != "" {
 				lines := strings.Split(listOut, "\n")
 				if len(lines) > 1 {
-					// Hay redes guardadas, intentar reconectar
-					log.Printf("Reconectando a red guardada...")
-					runWpaCli("reconnect")
-					time.Sleep(3 * time.Second)
+					// Buscar la red activa (CURRENT)
+					for i, line := range lines {
+						if i == 0 {
+							continue // Saltar encabezado
+						}
+						fields := strings.Fields(line)
+						if len(fields) >= 4 && fields[3] == "[CURRENT]" {
+							log.Printf("Red activa encontrada: %s", line)
+							// Intentar reconectar
+							log.Printf("Reconectando a red guardada...")
+							runWpaCli("reconnect")
+							time.Sleep(5 * time.Second)
+							
+							// Verificar si se conectó
+							statusOut2, _ := runWpaCli("status")
+							log.Printf("Estado después de reconectar: %s", statusOut2)
+							if strings.Contains(statusOut2, "wpa_state=COMPLETED") {
+								log.Printf("✅ Reconectado exitosamente a la red WiFi")
+								return
+							}
+							break
+						}
+					}
 					
-					// Verificar si se conectó
-					statusOut2, _ := runWpaCli("status")
-					if strings.Contains(statusOut2, "wpa_state=COMPLETED") {
-						log.Printf("✅ Reconectado exitosamente a la red WiFi")
-						return
+					// Si no hay red CURRENT, intentar habilitar la primera red guardada
+					if len(lines) > 1 {
+						firstLine := lines[1]
+						fields := strings.Fields(firstLine)
+						if len(fields) >= 1 {
+							netID := fields[0]
+							log.Printf("Habilitando red guardada ID: %s", netID)
+							runWpaCli("enable_network", netID)
+							runWpaCli("select_network", netID)
+							runWpaCli("reconnect")
+							time.Sleep(5 * time.Second)
+							
+							statusOut3, _ := runWpaCli("status")
+							log.Printf("Estado después de habilitar red: %s", statusOut3)
+							if strings.Contains(statusOut3, "wpa_state=COMPLETED") {
+								log.Printf("✅ Conectado exitosamente a red guardada")
+								return
+							}
+						}
 					}
 				}
 			}
+		} else {
+			log.Printf("Error obteniendo estado de wpa_cli: %v", err)
 		}
+	} else {
+		log.Printf("wpa_supplicant no está corriendo, buscando archivos de configuración...")
 	}
 
 	// Paso 4: Si no hay wpa_supplicant corriendo o no se pudo reconectar,
-	// buscar el último archivo de configuración y conectarse
+	// buscar el último archivo de configuración y conectarse usando connectWiFi
 	log.Printf("Paso 4: Buscando última red en archivos de configuración...")
 	ssid, _, err := getLastConnectedNetwork(interfaceName)
 	if err != nil {
@@ -1175,48 +1215,23 @@ func autoConnectToLastNetwork(interfaceName string) {
 
 	log.Printf("Última red encontrada: %s", ssid)
 
-	// Paso 5: Conectarse a la última red (sin contraseña, ya está en el archivo)
-	// Usar una conexión automática que lea del archivo de configuración
-	log.Printf("Paso 5: Conectándose a %s...", ssid)
+	// Paso 5: Usar connectWiFi con contraseña vacía (la contraseña está en el archivo de configuración)
+	// Esto es más confiable que iniciar wpa_supplicant manualmente
+	log.Printf("Paso 5: Conectándose a %s usando connectWiFi...", ssid)
 	
-	// Verificar si existe el archivo de configuración para esta red
-	safeSSID := regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(ssid, "_")
-	wpaConfigPath := fmt.Sprintf("%s/wpa_supplicant-%s.conf", WpaSupplicantConfigDir, safeSSID)
+	// Obtener país por defecto
+	country := DefaultCountryCode
 	
-	if _, err := os.Stat(wpaConfigPath); os.IsNotExist(err) {
-		// Intentar directorio alternativo
-		wpaConfigPath = fmt.Sprintf("%s/wpa_supplicant-%s.conf", WpaSupplicantAltConfigDir, safeSSID)
-		if _, err := os.Stat(wpaConfigPath); os.IsNotExist(err) {
-			log.Printf("⚠️  Archivo de configuración no encontrado para %s", ssid)
-			return
-		}
-	}
-
-	// Iniciar wpa_supplicant con el archivo de configuración existente
-	runDir := getRunDir()
-	if err := startWpaSupplicant(interfaceName, wpaConfigPath, runDir); err != nil {
-		log.Printf("⚠️  Error iniciando wpa_supplicant: %v", err)
-		return
-	}
-
-	// Esperar a que se conecte
-	time.Sleep(5 * time.Second)
+	// Intentar conectar usando la función existente (sin contraseña, ya está guardada)
+	result := connectWiFi(ssid, "", interfaceName, country, "system")
 	
-	// Verificar conexión
-	socketDir, err := waitForWpaCliConnection(interfaceName, 5)
-	if err == nil {
-		runWpaCli := func(args ...string) (string, error) {
-			base := []string{"wpa_cli", "-i", interfaceName, "-p", socketDir}
-			cmd := exec.Command("sudo", append(base, args...)...)
-			out, err := cmd.CombinedOutput()
-			return strings.TrimSpace(string(out)), err
+	if success, ok := result["success"].(bool); ok && success {
+		log.Printf("✅ Autoconexión exitosa a %s", ssid)
+	} else {
+		errorMsg := "Error desconocido"
+		if err, ok := result["error"].(string); ok && err != "" {
+			errorMsg = err
 		}
-
-		statusOut, _ := runWpaCli("status")
-		if strings.Contains(statusOut, "wpa_state=COMPLETED") {
-			log.Printf("✅ Conectado exitosamente a %s", ssid)
-		} else {
-			log.Printf("⚠️  Estado de conexión: %s", statusOut)
-		}
+		log.Printf("⚠️  Error en autoconexión a %s: %s", ssid, errorMsg)
 	}
 }
