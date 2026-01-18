@@ -15,7 +15,7 @@ func getNetworkInterfaces() map[string]interface{} {
 	cmd := exec.Command("sh", "-c", "ip -o link show | awk -F': ' '{print $2}'")
 	output, err := cmd.Output()
 	if err != nil {
-		log.Printf("⚠️ Error obteniendo interfaces: %v", err)
+		LogTf("logs.network_interfaces_error", err)
 		result["interfaces"] = interfaces
 		result["success"] = true
 		result["count"] = 0
@@ -23,7 +23,7 @@ func getNetworkInterfaces() map[string]interface{} {
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	log.Printf("📡 Interfaces encontradas: %v", lines)
+	LogTf("logs.network_interfaces_found", lines)
 
 	for _, ifaceName := range lines {
 		ifaceName = strings.TrimSpace(ifaceName)
