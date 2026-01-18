@@ -36,7 +36,7 @@
                         <div class="text-center">
                             <i class="bi bi-clock text-info" style="font-size: 2rem;"></i>
                             <h6 class="mt-2">{{ call .t "adblock.last_update" "Last Update" }}</h6>
-                            <h4 class="text-info">{{ if .adblock_stats.last_update }}{{ .adblock_stats.last_update }}{{ else }}2 horas{{ end }}</h4>
+                            <h4 class="text-info">{{ if .adblock_stats.last_update }}{{ .adblock_stats.last_update }}{{ else }}{{ call .t "adblock.default_last_update" "2 hours" }}{{ end }}</h4>
                         </div>
                     </div>
                 </div>
