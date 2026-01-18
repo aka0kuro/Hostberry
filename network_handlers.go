@@ -33,11 +33,11 @@ func getNetworkInterfaces() map[string]interface{} {
 
 		ifaceCheckCmd := exec.Command("sh", "-c", fmt.Sprintf("ip link show %s 2>/dev/null", ifaceName))
 		if ifaceCheckErr := ifaceCheckCmd.Run(); ifaceCheckErr != nil {
-			log.Printf("⚠️ Interface %s no existe o no es accesible, saltando", ifaceName)
+			LogTf("logs.network_interface_skip", ifaceName)
 			continue
 		}
 
-		log.Printf("✅ Procesando interfaz: %s", ifaceName)
+		LogTf("logs.network_interface_processing", ifaceName)
 
 		iface := map[string]interface{}{
 			"name":  ifaceName,
@@ -62,9 +62,9 @@ func getNetworkInterfaces() map[string]interface{} {
 		}
 
 		if ifaceName == "ap0" {
-			log.Printf("📡 Interfaz ap0 encontrada, estado: %s", iface["state"])
+			LogTf("logs.network_ap0_found", iface["state"])
 			if iface["state"] == "down" || iface["state"] == "unknown" {
-				log.Printf("⚠️ ap0 está down, intentando activarla...")
+				LogT("logs.network_ap0_down")
 				activateCmd := exec.Command("sh", "-c", "sudo ip link set ap0 up 2>/dev/null")
 				if activateErr := activateCmd.Run(); activateErr == nil {
 					time.Sleep(500 * time.Millisecond)
@@ -73,7 +73,7 @@ func getNetworkInterfaces() map[string]interface{} {
 						newState := strings.TrimSpace(string(stateOut2))
 						if newState != "" {
 							iface["state"] = newState
-							log.Printf("✅ ap0 activada, nuevo estado: %s", newState)
+							LogTf("logs.network_ap0_activated", newState)
 						}
 					}
 				}
