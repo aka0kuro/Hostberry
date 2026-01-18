@@ -1319,24 +1319,24 @@ func autoConnectToLastNetwork(interfaceName string) {
 								return
 							}
 						}
-						log.Printf("⚠️  Reconexión iniciada pero aún no completada")
+						LogT("logs.wifi_reconnect_started")
 					}
 				}
 			}
 		} else {
-			log.Printf("Error obteniendo estado de wpa_cli: %v", err)
+			// Error obteniendo estado - no traducir, es debug interno
 		}
 	} else {
-		log.Printf("wpa_supplicant no está corriendo, buscando archivos de configuración...")
+		LogT("logs.wifi_wpa_not_running")
 	}
 
 	// Paso 4: Si no hay wpa_supplicant corriendo o no se pudo reconectar,
 	// buscar el último archivo de configuración y conectarse usando connectWiFi
-	log.Printf("Paso 4: Buscando última red en archivos de configuración...")
+	LogT("logs.wifi_searching_config")
 	ssid, _, err := getLastConnectedNetwork(interfaceName)
 	if err != nil {
-		log.Printf("⚠️  No se encontró última red guardada: %v", err)
-		log.Printf("💡 Intentando buscar redes guardadas en wpa_supplicant de otra manera...")
+		LogTf("logs.wifi_config_not_found", err)
+		LogT("logs.wifi_trying_other_way")
 		
 		// Último intento: buscar cualquier archivo de configuración reciente
 		configDirs := []string{WpaSupplicantConfigDir, WpaSupplicantAltConfigDir}
@@ -1382,15 +1382,15 @@ func autoConnectToLastNetwork(interfaceName string) {
 		}
 		
 		if ssid == "" {
-			log.Printf("❌ No se pudo encontrar ninguna red guardada para autoconexión")
+			LogT("logs.wifi_no_network_found")
 			return
 		}
 	} else {
-		log.Printf("✅ Última red encontrada: %s", ssid)
+		// Última red encontrada - no traducir, es debug interno
 	}
 
 	// Paso 5: Usar el archivo de configuración existente para iniciar wpa_supplicant
-	log.Printf("Paso 5: Conectándose a %s usando archivo de configuración existente...", ssid)
+	// Paso 5: Conectándose usando archivo de configuración existente...
 	
 	// Buscar el archivo de configuración para esta red
 	safeSSID := regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(ssid, "_")
