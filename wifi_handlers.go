@@ -1426,26 +1426,26 @@ func autoConnectToLastNetwork(interfaceName string) {
 				}
 			}
 			if !found {
-				log.Printf("❌ No se encontró archivo de configuración para %s, intentando con connectWiFi...", ssid)
+				// No se encontró archivo de configuración - no traducir, es debug interno
 				// Último recurso: usar connectWiFi
 				country := DefaultCountryCode
 				result := connectWiFi(ssid, "", interfaceName, country, "system")
 				if success, ok := result["success"].(bool); ok && success {
-					log.Printf("✅ Autoconexión exitosa a %s", ssid)
+					LogTf("logs.wifi_auto_success", ssid)
 					return
 				} else {
 					errorMsg := "Error desconocido"
 					if err, ok := result["error"].(string); ok && err != "" {
 						errorMsg = err
 					}
-					log.Printf("❌ Error en autoconexión: %s", errorMsg)
+					LogTf("logs.wifi_auto_error", errorMsg)
 					return
 				}
 			}
 		}
 	}
 	
-	log.Printf("📁 Usando archivo de configuración: %s", wpaConfigPath)
+	// Usando archivo de configuración - no traducir, es debug interno
 	
 	// Detener wpa_supplicant existente si está corriendo (más rápido)
 	stopWpaSupplicant(interfaceName)
@@ -1453,16 +1453,16 @@ func autoConnectToLastNetwork(interfaceName string) {
 	
 	// Iniciar wpa_supplicant con el archivo de configuración existente
 	runDir := getRunDir()
-	log.Printf("🚀 Iniciando wpa_supplicant con archivo de configuración...")
+	LogT("logs.wifi_starting_wpa")
 	if err := startWpaSupplicant(interfaceName, wpaConfigPath, runDir); err != nil {
-		log.Printf("❌ Error iniciando wpa_supplicant: %v", err)
-		log.Printf("💡 Intentando con connectWiFi como respaldo...")
+		LogTf("logs.wifi_wpa_start_error", err)
+		LogT("logs.wifi_trying_connect")
 		country := DefaultCountryCode
 		result := connectWiFi(ssid, "", interfaceName, country, "system")
 		if success, ok := result["success"].(bool); ok && success {
-			log.Printf("✅ Autoconexión exitosa a %s (vía connectWiFi)", ssid)
+			LogTf("logs.wifi_auto_success", ssid)
 		} else {
-			log.Printf("❌ Error en autoconexión: %v", result["error"])
+			LogTf("logs.wifi_auto_error", result["error"])
 		}
 		return
 	}
@@ -1473,7 +1473,7 @@ func autoConnectToLastNetwork(interfaceName string) {
 	// Verificar conexión usando wpa_cli (menos intentos, más rápido)
 	socketDir, err := waitForWpaCliConnection(interfaceName, 5) // Reducido de 10 a 5 intentos
 	if err != nil {
-		log.Printf("⚠️  No se pudo conectar a wpa_cli: %v", err)
+		// No se pudo conectar a wpa_cli - no traducir, es debug interno
 		return
 	}
 	
@@ -1485,20 +1485,20 @@ func autoConnectToLastNetwork(interfaceName string) {
 	}
 	
 	// Habilitar y seleccionar la red (todo en secuencia rápida)
-	log.Printf("🔌 Habilitando y reconectando red...")
+	LogT("logs.wifi_enabling_network")
 	runWpaCli("enable_network", "0")
 	runWpaCli("select_network", "0")
 	runWpaCli("reconnect")
 	
 	// Verificar conexión más rápido (menos espera, menos intentos)
-	log.Printf("⏳ Esperando autenticación...")
+	LogT("logs.wifi_waiting_auth")
 	connected := false
 	for attempt := 0; attempt < 8; attempt++ { // Reducido de 15 a 8 intentos
 		time.Sleep(1 * time.Second) // Reducido de 2 a 1 segundo
 		statusOut, _ := runWpaCli("status")
 		if strings.Contains(statusOut, "wpa_state=COMPLETED") {
 			connected = true
-			log.Printf("✅ WiFi autenticado exitosamente a %s", ssid)
+			LogTf("logs.wifi_authenticated", ssid)
 			break
 		}
 		if attempt%3 == 0 && attempt > 0 {
