@@ -201,7 +201,7 @@
                     <div class="col-md-3 mb-3">
                         <div class="text-center">
                             <h6>{{ call .t "wireguard.peak_bandwidth" "Peak Bandwidth" }}</h6>
-                            <h4 class="text-warning">{{ if .wireguard_stats.peak_bandwidth }}{{ .wireguard_stats.peak_bandwidth }}{{ else }}50 Mbps{{ end }}</h4>
+                            <h4 class="text-warning">{{ if .wireguard_stats.peak_bandwidth }}{{ .wireguard_stats.peak_bandwidth }}{{ else }}{{ call .t "wireguard.default_peak_bandwidth" "50 Mbps" }}{{ end }}</h4>
                         </div>
                     </div>
                     <div class="col-md-3 mb-3">
