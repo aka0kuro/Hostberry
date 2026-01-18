@@ -27,10 +27,10 @@ func getRunDir() string {
 			if err := os.WriteFile(testFile, []byte("test"), 0644); err == nil {
 				os.Remove(testFile)
 				activeRunDir = dir
-				log.Printf("Directorio de socket seleccionado (escribible): %s", activeRunDir)
+				LogTf("logs.socket_dir_selected", activeRunDir)
 				return activeRunDir
 			} else {
-				log.Printf("Directorio %s no es escribible: %v", dir, err)
+				LogTf("logs.socket_dir_not_writable", dir, err)
 			}
 		} else {
 			if err := os.MkdirAll(dir, 0755); err == nil {
@@ -38,7 +38,7 @@ func getRunDir() string {
 				if err := os.WriteFile(testFile, []byte("test"), 0644); err == nil {
 					os.Remove(testFile)
 					activeRunDir = dir
-					log.Printf("Directorio de socket creado y seleccionado: %s", activeRunDir)
+					LogTf("logs.socket_dir_created", activeRunDir)
 					return activeRunDir
 				}
 			}
@@ -46,7 +46,7 @@ func getRunDir() string {
 	}
 	activeRunDir = "/tmp/wpa_supplicant"
 	os.MkdirAll(activeRunDir, 0755)
-	log.Printf("Usando directorio de socket por defecto (fallback): %s", activeRunDir)
+	LogTf("logs.socket_dir_default", activeRunDir)
 	return activeRunDir
 }
 
