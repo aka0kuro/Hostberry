@@ -616,25 +616,50 @@
     }
   };
 
-  // Cargar interfaces WiFi para el selector
+  // Cargar interfaces WiFi para el selector (solo ap0 cuando esté activa)
   async function loadInterfaces() {
     const select = document.getElementById('hostapd-interface');
     if (!select) return Promise.resolve();
     
     try {
-      const resp = await HostBerry.apiRequest('/api/v1/wifi/interfaces');
+      // Obtener todas las interfaces de red para verificar el estado de ap0
+      const resp = await HostBerry.apiRequest('/api/v1/network/interfaces');
       if (resp && resp.ok) {
         const data = await resp.json();
-        const interfaces = Array.isArray(data) ? data : (data.interfaces || []);
+        let interfaces = [];
+        if (Array.isArray(data)) {
+          interfaces = data;
+        } else if (data.interfaces && Array.isArray(data.interfaces)) {
+          interfaces = data.interfaces;
+        } else if (data.data && Array.isArray(data.data)) {
+          interfaces = data.data;
+        }
+        
+        // Buscar solo ap0 y verificar si está activa
+        const ap0Interface = interfaces.find(iface => {
+          const name = (typeof iface === 'object' && iface !== null) 
+            ? (iface.name || iface.interface || iface.device || '')
+            : String(iface);
+          return name === 'ap0';
+        });
         
         select.innerHTML = '<option value="">' + t('hostapd.select_interface', 'Select Interface') + '</option>';
-        interfaces.forEach(iface => {
-          const name = iface.name || iface;
-          const option = document.createElement('option');
-          option.value = name;
-          option.textContent = name;
-          select.appendChild(option);
-        });
+        
+        // Solo mostrar ap0 si existe y está activa (state === "up" o similar)
+        if (ap0Interface) {
+          const state = (typeof ap0Interface === 'object' && ap0Interface !== null)
+            ? (ap0Interface.state || ap0Interface.status || '')
+            : '';
+          
+          // Mostrar ap0 solo si está activa (up, running, o similar)
+          if (state === 'up' || state === 'running' || state === 'active' || 
+              (ap0Interface.state && ap0Interface.state.toLowerCase().includes('up'))) {
+            const option = document.createElement('option');
+            option.value = 'ap0';
+            option.textContent = 'ap0';
+            select.appendChild(option);
+          }
+        }
       }
       return Promise.resolve();
     } catch (e) {
