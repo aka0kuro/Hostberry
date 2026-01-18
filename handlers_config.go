@@ -42,7 +42,7 @@ func systemConfigHandler(c *fiber.Ctx) error {
 		}
 		
 		if err := SetConfig(key, valueStr); err != nil {
-			log.Printf("⚠️ Error guardando configuración %s: %v", key, err)
+			LogTf("logs.config_save_error", key, err)
 			errors = append(errors, fmt.Sprintf("Error guardando %s", key))
 		}
 		
