@@ -602,7 +602,7 @@ func connectWiFi(ssid, password, interfaceName, country, user string) map[string
 		cmd := exec.Command("wpa_passphrase", ssid, password)
 		passphraseOut, err := cmd.Output()
 		if err != nil || !strings.Contains(string(passphraseOut), "network=") {
-			log.Printf("ERROR: wpa_passphrase falló: %v", err)
+			LogTf("logs.wifi_wpa_passphrase_error", err)
 			result["error"] = "Error al generar la clave PSK. Verifica el SSID y la contraseña."
 			return result
 		}
