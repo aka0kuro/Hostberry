@@ -167,7 +167,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="hostname" class="form-label">{{ call .t "network.hostname" "Hostname" }}</label>
-                                <input type="text" class="form-control" id="hostname" name="hostname" placeholder="hostberry" required>
+                                <input type="text" class="form-control" id="hostname" name="hostname" placeholder="{{ call .t "network.hostname_placeholder" "hostberry" }}" required>
                                 <small class="form-text text-muted">{{ call .t "network.hostname_help" "System hostname identifier" }}</small>
                             </div>
                             <div class="col-md-6 mb-3">
