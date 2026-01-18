@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,6 +20,7 @@ type I18nManager struct {
 }
 
 var i18nManager *I18nManager
+var logLanguage string = "es" // Idioma por defecto para logs del sistema
 
 func InitI18n(localesPath string) error {
 	i18nManager = &I18nManager{
