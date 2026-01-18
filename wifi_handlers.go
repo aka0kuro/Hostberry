@@ -52,10 +52,10 @@ func getRunDir() string {
 
 func ensureWpaSupplicantDirs() error {
 	if _, err := os.Stat(WpaSupplicantConfigDir); os.IsNotExist(err) {
-		log.Printf("Creando directorio de configuración: %s", WpaSupplicantConfigDir)
+		LogTf("logs.wpa_config_dir_creating", WpaSupplicantConfigDir)
 		cmd := exec.Command("sudo", "mkdir", "-p", WpaSupplicantConfigDir)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			log.Printf("Warning: no se pudo crear %s: %v (output: %s)", WpaSupplicantConfigDir, err, string(out))
+			LogTf("logs.wpa_config_dir_error", WpaSupplicantConfigDir, err, string(out))
 		}
 	}
 	exec.Command("sudo", "chmod", "755", WpaSupplicantConfigDir).Run()
@@ -66,20 +66,20 @@ func ensureWpaSupplicantDirs() error {
 
 	for _, dir := range runDirCandidates {
 		if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
-			log.Printf("Directorio de socket ya existe: %s", dir)
+			LogTf("logs.socket_dir_exists", dir)
 			createdDir = dir
 			break
 		}
 
-		log.Printf("Intentando crear directorio de socket: %s", dir)
+		LogTf("logs.socket_dir_creating", dir)
 		cmd := exec.Command("sudo", "mkdir", "-p", dir)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			log.Printf("No se pudo crear %s: %v (output: %s)", dir, err, string(out))
+			LogTf("logs.socket_dir_create_error", dir, err, string(out))
 			continue
 		}
 
 		if _, err := os.Stat(dir); err == nil {
-			log.Printf("Directorio de socket creado: %s", dir)
+			LogTf("logs.socket_dir_created_ok", dir)
 			createdDir = dir
 			break
 		}
@@ -88,20 +88,20 @@ func ensureWpaSupplicantDirs() error {
 	if createdDir == "" {
 		createdDir = "/tmp/wpa_supplicant"
 		os.MkdirAll(createdDir, 0775)
-		log.Printf("Usando directorio temporal: %s", createdDir)
+		LogTf("logs.socket_dir_temp", createdDir)
 	}
 
 	exec.Command("sudo", "chmod", "775", createdDir).Run()
 	exec.Command("sudo", "chown", "root:netdev", createdDir).Run()
 
 	activeRunDir = createdDir
-	log.Printf("Directorio de socket activo: %s", activeRunDir)
+	LogTf("logs.socket_dir_active", activeRunDir)
 
 	return nil
 }
 
 func stopWpaSupplicant(interfaceName string) {
-	log.Printf("Deteniendo wpa_supplicant para interfaz %s...", interfaceName)
+	LogTf("logs.wpa_stopping", interfaceName)
 
 	executeCommand(fmt.Sprintf("sudo pkill -f 'wpa_supplicant.*-i.*%s' 2>/dev/null || true", interfaceName))
 	executeCommand(fmt.Sprintf("sudo pkill -f 'wpa_supplicant.*%s' 2>/dev/null || true", interfaceName))
@@ -115,7 +115,7 @@ func stopWpaSupplicant(interfaceName string) {
 		}
 		time.Sleep(500 * time.Millisecond)
 		if i == 4 {
-			log.Printf("Forzando cierre de wpa_supplicant (kill -9)...")
+			LogT("logs.wpa_force_kill")
 			executeCommand(fmt.Sprintf("sudo pkill -9 -f 'wpa_supplicant.*%s' 2>/dev/null || true", interfaceName))
 			executeCommand("sudo killall -9 wpa_supplicant 2>/dev/null || true")
 		}
