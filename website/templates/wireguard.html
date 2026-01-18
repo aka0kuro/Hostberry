@@ -160,8 +160,8 @@
                 <form id="wireguardConfigForm">
                     <div class="mb-3">
                         <label for="wg_config" class="form-label">{{ call .t "wireguard.configuration" "Configuration" }} (wg0.conf)</label>
-                        <textarea class="form-control font-monospace" id="wg_config" name="config" rows="12" placeholder="[Interface]\nAddress = ...\nPrivateKey = ...\n\n[Peer]\nPublicKey = ...\nAllowedIPs = ..."></textarea>
-                        <small class="text-muted">{{ call .t "wireguard.config_hint" "Se carga desde /etc/wireguard/wg0.conf (si existe) y se guarda vía API." }}</small>
+                        <textarea class="form-control font-monospace" id="wg_config" name="config" rows="12" placeholder="{{ call .t "wireguard.config_placeholder" "[Interface]\nAddress = ...\nPrivateKey = ...\n\n[Peer]\nPublicKey = ...\nAllowedIPs = ..." }}"></textarea>
+                        <small class="text-muted">{{ call .t "wireguard.config_hint" "Loaded from /etc/wireguard/wg0.conf (if exists) and saved via API." }}</small>
                     </div>
                     
                     <div class="d-grid">
