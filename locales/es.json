@@ -2054,6 +2054,9 @@
     "logs.connected": "conectado",
     "logs.wireguard_configured": "WireGuard configurado",
     "logs.adblock_enabled": "AdBlock habilitado",
-    "logs.adblock_disabled": "AdBlock deshabilitado"
+    "logs.adblock_disabled": "AdBlock deshabilitado",
+    "wireguard.default_interface": "wg0",
+    "wireguard.default_address": "10.0.0.1/24",
+    "wireguard.default_active_peers": "3"
   }
 }
