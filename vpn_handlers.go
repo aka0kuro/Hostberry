@@ -70,7 +70,7 @@ func connectVPN(config, vpnType, user string) map[string]interface{} {
 		user = "unknown"
 	}
 
-	log.Printf("Conectando VPN tipo: %s (usuario: %s)", vpnType, user)
+	LogTf("logs.vpn_connecting", vpnType, user)
 
 	if vpnType == "openvpn" {
 		configFile := "/etc/openvpn/client.conf"

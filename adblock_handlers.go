@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -55,7 +54,7 @@ func enableAdBlock(user string) map[string]interface{} {
 		user = "unknown"
 	}
 
-	log.Printf("Habilitando AdBlock (usuario: %s)", user)
+	LogTf("logs.adblock_enabling", user)
 
 	dnsmasqCmd := "sudo systemctl start dnsmasq"
 	if _, err := executeCommand(dnsmasqCmd); err != nil {
@@ -67,14 +66,14 @@ func enableAdBlock(user string) map[string]interface{} {
 				result["error"] = strings.TrimSpace(out2)
 			}
 			result["message"] = "Error iniciando servicio AdBlock"
-			log.Printf("ERROR: Error habilitando AdBlock: %v", err2)
+			LogTf("logs.adblock_enable_error", err2)
 			return result
 		}
 	}
 
 	result["success"] = true
 	result["message"] = "AdBlock habilitado"
-	log.Printf("INFO: AdBlock habilitado exitosamente")
+	LogT("logs.adblock_enabled")
 	return result
 }
 
@@ -85,7 +84,7 @@ func disableAdBlock(user string) map[string]interface{} {
 		user = "unknown"
 	}
 
-	log.Printf("Deshabilitando AdBlock (usuario: %s)", user)
+	LogTf("logs.adblock_disabling", user)
 
 	executeCommand("sudo systemctl stop dnsmasq")
 
@@ -93,6 +92,6 @@ func disableAdBlock(user string) map[string]interface{} {
 
 	result["success"] = true
 	result["message"] = "AdBlock deshabilitado"
-	log.Printf("INFO: AdBlock deshabilitado exitosamente")
+	LogT("logs.adblock_disabled")
 	return result
 }
