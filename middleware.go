@@ -197,7 +197,7 @@ func errorHandler(c *fiber.Ctx, err error) error {
 
 	if code >= 500 {
 		if appConfig.Server.Debug {
-			log.Printf("Error en %s %s: %v", method, path, err)
+			LogTf("logs.middleware_error", method, path, err)
 		}
 		go func() {
 			InsertLog(
@@ -224,7 +224,7 @@ func errorHandler(c *fiber.Ctx, err error) error {
 		"Message": message,
 		"Details": err.Error(),
 	}); renderErr != nil {
-		log.Printf("❌ Error al renderizar página de error: %v", renderErr)
+		LogTf("logs.middleware_render_error", renderErr)
 		return c.Status(code).SendString(fmt.Sprintf(
 			"<html><body><h1>Error %d</h1><p>%s</p><p>%s</p></body></html>",
 			code, message, err.Error(),
