@@ -1115,13 +1115,28 @@ func autoConnectToLastNetwork(interfaceName string) {
 	// Primero intentar con wpa_cli si wpa_supplicant está corriendo
 	socketDirs := []string{"/run/wpa_supplicant", "/var/run/wpa_supplicant", "/tmp/wpa_supplicant"}
 	var workingSocketDir string
+	var useGlobalSocket bool
 	
+	// Buscar socket de interfaz específica
 	for _, dir := range socketDirs {
 		socketPath := fmt.Sprintf("%s/%s", dir, interfaceName)
 		if _, err := os.Stat(socketPath); err == nil {
 			workingSocketDir = dir
-			log.Printf("Socket encontrado en: %s", socketPath)
+			log.Printf("Socket de interfaz encontrado en: %s", socketPath)
 			break
+		}
+	}
+	
+	// Si no hay socket de interfaz, intentar con socket global
+	if workingSocketDir == "" {
+		for _, dir := range socketDirs {
+			globalSocket := fmt.Sprintf("%s/global", dir)
+			if _, err := os.Stat(globalSocket); err == nil {
+				workingSocketDir = dir
+				useGlobalSocket = true
+				log.Printf("Socket global encontrado en: %s", globalSocket)
+				break
+			}
 		}
 	}
 
@@ -1129,7 +1144,14 @@ func autoConnectToLastNetwork(interfaceName string) {
 		// wpa_supplicant está corriendo, intentar reconectar a la red activa
 		log.Printf("wpa_supplicant está corriendo, intentando reconectar...")
 		runWpaCli := func(args ...string) (string, error) {
-			base := []string{"wpa_cli", "-i", interfaceName, "-p", workingSocketDir}
+			var base []string
+			if useGlobalSocket {
+				// Usar socket global con -g y especificar interfaz con -i
+				base = []string{"wpa_cli", "-g", workingSocketDir, "-i", interfaceName}
+			} else {
+				// Usar socket de interfaz específica
+				base = []string{"wpa_cli", "-i", interfaceName, "-p", workingSocketDir}
+			}
 			cmd := exec.Command("sudo", append(base, args...)...)
 			out, err := cmd.CombinedOutput()
 			return strings.TrimSpace(string(out)), err
