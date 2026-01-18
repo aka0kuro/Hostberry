@@ -168,15 +168,15 @@ func createTemplateEngine() *html.Engine {
 					for _, tmpl := range criticalTemplates {
 						if testFile, err := tmplFS.Open(tmpl); err == nil {
 							testFile.Close()
-							log.Printf("   ✅ %s verificado en FS embebido", tmpl)
+							LogTf("logs.templates_embedded_verified", tmpl)
 						} else {
-							log.Printf("   ⚠️  No se pudo abrir %s: %v", tmpl, err)
+							LogTf("logs.templates_embedded_open_error", tmpl, err)
 							allCriticalFound = false
 						}
 					}
 					
 					if !allCriticalFound {
-						log.Printf("⚠️  No todos los templates críticos están disponibles en embebidos, usando fallback")
+						LogT("logs.templates_embedded_incomplete")
 						err = fmt.Errorf("templates críticos faltantes")
 					} else {
 						engine = html.NewFileSystem(http.FS(tmplFS), ".html")
@@ -184,25 +184,25 @@ func createTemplateEngine() *html.Engine {
 							registerTemplateFuncs(engine)
 							
 							if err := engine.Load(); err != nil {
-								log.Printf("❌ Error cargando templates embebidos: %v", err)
+								LogTf("logs.templates_embedded_load_error", err)
 								engine = nil
 								err = err // para el log de abajo
 							} else {
 								engine.Reload(false)
-								log.Printf("✅ Templates embebidos cargados (MÁS RÁPIDO): %d archivos .html", htmlFiles)
-								log.Printf("   Templates encontrados: %v", templateNames)
+								LogTf("logs.templates_embedded_loaded", htmlFiles)
+								LogTf("logs.templates_embedded_list", templateNames)
 							}
 						} else {
-							log.Printf("⚠️  Error: engine es nil después de NewFileSystem con embebidos")
+							LogT("logs.templates_embedded_nil")
 							err = fmt.Errorf("engine es nil")
 						}
 					}
 				} else {
-					log.Printf("⚠️  Templates embebidos vacíos, usando fallback")
+					LogT("logs.templates_embedded_empty")
 					err = fmt.Errorf("templates embebidos vacíos")
 				}
 			} else {
-				log.Printf("⚠️  Error leyendo directorio embebido: %v", err)
+				LogTf("logs.templates_embedded_read_error", err)
 			}
 		} else {
 			log.Printf("⚠️  Error creando sub-FS de templates embebidos: %v", err)
