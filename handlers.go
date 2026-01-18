@@ -316,7 +316,7 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 		if interfaces, ok := result["interfaces"]; ok {
 			if interfacesArray, ok := interfaces.([]map[string]interface{}); ok && len(interfacesArray) > 0 {
 				if appConfig.Server.Debug {
-					log.Printf("Función Go devolvió %d interfaces", len(interfacesArray))
+					LogTf("logs.handlers_interfaces_count", len(interfacesArray))
 				}
 				return c.JSON(result)
 			}
@@ -328,12 +328,12 @@ func networkInterfacesHandler(c *fiber.Ctx) error {
 	cmd := exec.Command("sh", "-c", "ip -o link show | awk -F': ' '{print $2}'")
 	output, err := cmd.Output()
 	if err != nil {
-		log.Printf("⚠️ Error obteniendo interfaces: %v", err)
+		LogTf("logs.handlers_interfaces_error", err)
 		return c.JSON(fiber.Map{"interfaces": interfaces})
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	log.Printf("📡 Interfaces encontradas: %v", lines)
+	LogTf("logs.handlers_interfaces_found", lines)
 	for _, ifaceName := range lines {
 		ifaceName = strings.TrimSpace(ifaceName)
 		if ifaceName == "" || ifaceName == "lo" {
