@@ -98,7 +98,7 @@
             fill: true
           },
           {
-            label: 'Upload KB/s',
+            label: (window.HostBerry && window.HostBerry.t ? window.HostBerry.t('monitoring.upload_kb_s', 'Upload KB/s') : 'Upload KB/s'),
             data: netHistory.upload,
             borderColor: '#ec4899',
             backgroundColor: 'rgba(236, 72, 153, 0.2)',
