@@ -43,7 +43,7 @@
         peers.forEach(function(peer){
           const tr = document.createElement('tr');
           tr.innerHTML = '<td>'+peer.name+'</td>'+
-            '<td><span class="badge bg-'+(peer.connected?'success':'danger')+'">'+(peer.connected?'Connected':'Disconnected')+'</span></td>'+
+            '<td><span class="badge bg-'+(peer.connected?'success':'danger')+'">'+(peer.connected?(HostBerry.t?HostBerry.t('wireguard.connected','Connected'):'Connected'):(HostBerry.t?HostBerry.t('wireguard.disconnected','Disconnected'):'Disconnected'))+'</span></td>'+
             '<td>'+peer.bandwidth+'</td>'+
             '<td>'+peer.uptime+'</td>';
           tbody.appendChild(tr);
