@@ -105,42 +105,42 @@ func createTemplateEngine() *html.Engine {
 						}
 					}
 						if htmlFiles > 0 {
-							log.Printf("✅ %d templates encontrados en %s", htmlFiles, path)
+							LogTf("logs.templates_found", htmlFiles, path)
 							criticalTemplates := []string{"dashboard.html", "login.html", "base.html", "error.html"}
 							missingCritical := false
 							for _, tmpl := range criticalTemplates {
 								if _, err := os.Stat(filepath.Join(path, tmpl)); err != nil {
-									log.Printf("   ⚠️  %s NO encontrado en %s", tmpl, path)
+									LogTf("logs.templates_missing", tmpl, path)
 									missingCritical = true
 								}
 							}
 							if missingCritical {
-								log.Printf("⚠️  Directorio de templates rechazado por faltantes críticos: %s", path)
+								LogTf("logs.templates_rejected", path)
 								continue
 							}
 
 							engine = html.New(path, ".html")
 						if engine == nil {
-							log.Printf("❌ Error: engine es nil después de html.New para %s", path)
+							LogTf("logs.templates_engine_nil", path)
 							continue
 						}
 						
 						registerTemplateFuncs(engine)
 						
 						if err := engine.Load(); err != nil {
-							log.Printf("❌ Error cargando templates desde %s: %v", path, err)
+							LogTf("logs.templates_load_error", path, err)
 							engine = nil
 							continue
 						}
 
-						log.Printf("✅ Templates cargados desde sistema de archivos: %s", path)
-						log.Printf("📊 Total de archivos .html detectados: %d", htmlFiles)
-						log.Printf("📝 Lista de templates registrados: %v", foundTemplates)
+						LogTf("logs.templates_loaded", path)
+						LogTf("logs.templates_html_count", htmlFiles)
+						LogTf("logs.templates_registered", foundTemplates)
 
 						engine.Reload(!appConfig.Server.Debug)
 						break // Salir del loop, engine encontrado y cargado con éxito
 					} else {
-						log.Printf("⚠️  Directorio %s existe pero no contiene archivos .html", path)
+						LogTf("logs.templates_no_html", path)
 					}
 				}
 			}
@@ -148,7 +148,7 @@ func createTemplateEngine() *html.Engine {
 	}
 	
 	if engine == nil {
-		log.Println("⚠️  Sistema de archivos no disponible, intentando templates embebidos...")
+		LogTln("logs.templates_fs_unavailable")
 		tmplFS, err := fs.Sub(templatesFS, "website/templates")
 		if err == nil {
 			if entries, err := fs.ReadDir(tmplFS, "."); err == nil {
