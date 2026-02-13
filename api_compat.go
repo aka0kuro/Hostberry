@@ -1205,7 +1205,7 @@ func hostapdAccessPointsHandler(c *fiber.Ctx) error {
 	if hostapdActive || len(config) > 0 {
 		ssid := config["ssid"]
 		if ssid == "" {
-			ssid = "hostberry-ap" // Valor por defecto
+			ssid = "hostberry" // Valor por defecto (red + portal cautivo)
 		}
 
 		interfaceName := config["interface"]

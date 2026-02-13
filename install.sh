@@ -1277,9 +1277,9 @@ EOF
 create_hostapd_default_config() {
     print_info "Creando configuración por defecto de HostAPD..."
     
-    # Valores por defecto
+    # Valores por defecto (red "hostberry" + portal cautivo hacia la web de Hostberry)
     HOSTAPD_INTERFACE="wlan0"
-    HOSTAPD_SSID="hostberry-ap"
+    HOSTAPD_SSID="hostberry"
     HOSTAPD_PASSWORD="hostberry12"
     HOSTAPD_CHANNEL="6"
     HOSTAPD_GATEWAY="192.168.4.1"
@@ -1455,12 +1455,14 @@ EOF
 
 # Configuración para HostAPD (agregada por HostBerry) - Modo AP+STA según TheWalrus (Raspberry Pi 3 B+)
 # Solo servir DHCP en ap0, no en wlan0 (que es STA)
+# Portal cautivo: todo el DNS de la red hostberry resuelve al gateway para mostrar la web de Hostberry
 interface=${DNSMASQ_INTERFACE}
 no-dhcp-interface=${HOSTAPD_INTERFACE}
 bind-interfaces
 dhcp-range=${HOSTAPD_DHCP_START},${HOSTAPD_DHCP_END},255.255.255.0,${HOSTAPD_LEASE_TIME}
 dhcp-option=3,${HOSTAPD_GATEWAY}
 dhcp-option=6,${HOSTAPD_GATEWAY}
+address=/#/${HOSTAPD_GATEWAY}
 server=8.8.8.8
 server=8.8.4.4
 domain-needed
@@ -1480,12 +1482,14 @@ EOF
         cat > "$DNSMASQ_CONFIG" <<EOF
 # Configuración de dnsmasq para HostAPD (creada por HostBerry) - Modo AP+STA según TheWalrus (Raspberry Pi 3 B+)
 # Solo servir DHCP en ap0, no en wlan0 (que es STA)
+# Portal cautivo: todo el DNS de la red hostberry resuelve al gateway para mostrar la web de Hostberry
 interface=${DNSMASQ_INTERFACE}
 no-dhcp-interface=${HOSTAPD_INTERFACE}
 bind-interfaces
 dhcp-range=${HOSTAPD_DHCP_START},${HOSTAPD_DHCP_END},255.255.255.0,${HOSTAPD_LEASE_TIME}
 dhcp-option=3,${HOSTAPD_GATEWAY}
 dhcp-option=6,${HOSTAPD_GATEWAY}
+address=/#/${HOSTAPD_GATEWAY}
 server=8.8.8.8
 server=8.8.4.4
 domain-needed
@@ -1615,6 +1619,52 @@ EOF
     
     # Asegurar permisos correctos del archivo de configuración
     chmod 644 "$HOSTAPD_CONFIG" 2>/dev/null || true
+    
+    # ----- Portal cautivo: redirigir HTTP (80) desde ap0 al puerto de la web de Hostberry -----
+    CAPTIVE_SCRIPT="${INSTALL_DIR}/scripts/captive-portal-setup.sh"
+    CAPTIVE_SERVICE="/etc/systemd/system/hostberry-captive-portal.service"
+    mkdir -p "${INSTALL_DIR}/scripts"
+    if [ ! -f "$CAPTIVE_SCRIPT" ]; then
+        print_info "Creando script de portal cautivo (HTTP 80 -> web Hostberry)..."
+        cat > "$CAPTIVE_SCRIPT" <<'CAPTIVE_EOF'
+#!/bin/bash
+# Portal cautivo HostBerry: redirige tráfico HTTP (puerto 80) desde la red ap0 al puerto de la web
+CONFIG_FILE="/opt/hostberry/config.yaml"
+PORT=$(grep -E "^  port:" "$CONFIG_FILE" 2>/dev/null | awk '{print $2}' | tr -d '"' || echo "8000")
+# Evitar reglas duplicadas: borrar si existe y volver a añadir
+iptables -t nat -D PREROUTING -i ap0 -p tcp --dport 80 -j REDIRECT --to-ports "$PORT" 2>/dev/null || true
+iptables -t nat -A PREROUTING -i ap0 -p tcp --dport 80 -j REDIRECT --to-ports "$PORT"
+exit 0
+CAPTIVE_EOF
+        chmod 755 "$CAPTIVE_SCRIPT"
+        chown root:root "$CAPTIVE_SCRIPT"
+        print_success "Script de portal cautivo creado: $CAPTIVE_SCRIPT"
+    fi
+    if [ ! -f "$CAPTIVE_SERVICE" ]; then
+        print_info "Creando servicio systemd para portal cautivo..."
+        cat > "$CAPTIVE_SERVICE" <<EOF
+[Unit]
+Description=HostBerry captive portal - redirect HTTP to web UI on AP
+After=network.target hostapd.service
+Wants=hostapd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=${CAPTIVE_SCRIPT}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        chmod 644 "$CAPTIVE_SERVICE"
+        systemctl daemon-reload 2>/dev/null || true
+        systemctl enable hostberry-captive-portal.service 2>/dev/null || true
+        systemctl start hostberry-captive-portal.service 2>/dev/null || true
+        print_success "Servicio de portal cautivo creado, habilitado e iniciado"
+    else
+        print_info "Servicio de portal cautivo ya existe"
+        systemctl start hostberry-captive-portal.service 2>/dev/null || true
+    fi
     
     print_success "Configuración por defecto de HostAPD creada"
 }
