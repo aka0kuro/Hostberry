@@ -58,21 +58,23 @@ func createDefaultAdmin() {
 		}
 
 		adminPassword := strings.TrimSpace(os.Getenv("HOSTBERRY_DEFAULT_ADMIN_PASSWORD"))
+		useBootstrap := false
 		if adminPassword == "" {
-			generatedPassword, genErr := generateSecureAdminPassword()
-			if genErr != nil {
-				LogTf("logs.utils_admin_error", genErr)
-				return
-			}
-			adminPassword = generatedPassword
-			log.Printf("SECURITY: usuario admin creado con contraseña temporal generada: %s", adminPassword)
-			log.Printf("SECURITY: cambia esta contraseña en el primer inicio de sesión")
+			adminPassword = "admin"
+			useBootstrap = true
+			log.Printf("SECURITY: usuario admin creado con contraseña por defecto 'admin'. Cámbiala en Ajustes tras el primer acceso.")
 		} else if err := ValidatePassword(adminPassword); err != nil {
 			LogTf("logs.utils_admin_error", fmt.Errorf("HOSTBERRY_DEFAULT_ADMIN_PASSWORD inválida: %w", err))
 			return
 		}
 
-		admin, err := Register("admin", adminPassword, "admin@hostberry.local")
+		var admin *User
+		var err error
+		if useBootstrap {
+			admin, err = RegisterBootstrap("admin", adminPassword, "admin@hostberry.local")
+		} else {
+			admin, err = Register("admin", adminPassword, "admin@hostberry.local")
+		}
 		if err != nil {
 			LogTf("logs.utils_admin_error", err)
 		} else {
