@@ -14,6 +14,37 @@
     --bs-gutter-y: 2rem;
 }
 
+/* Dashboard: más separación entre tarjetas */
+.dashboard-page .quick-stats-row,
+.dashboard-page .dashboard-grid {
+    --bs-gutter-x: 1.5rem;
+    --bs-gutter-y: 1.5rem;
+}
+@media (min-width: 576px) {
+    .dashboard-page .quick-stats-row,
+    .dashboard-page .dashboard-grid {
+        --bs-gutter-x: 2rem;
+        --bs-gutter-y: 2rem;
+    }
+}
+@media (min-width: 992px) {
+    .dashboard-page .quick-stats-row,
+    .dashboard-page .dashboard-grid {
+        --bs-gutter-x: 2.25rem;
+        --bs-gutter-y: 2.25rem;
+    }
+}
+.dashboard-page .quick-stats-row > [class*="col-"],
+.dashboard-page .dashboard-grid > [class*="col-"] {
+    margin-bottom: 1.25rem;
+}
+@media (min-width: 768px) {
+    .dashboard-page .quick-stats-row > [class*="col-"],
+    .dashboard-page .dashboard-grid > [class*="col-"] {
+        margin-bottom: 1.5rem;
+    }
+}
+
 /* Header Section - Efecto Cristal tipo Alas */
 .dashboard-header {
     background: rgba(255, 255, 255, 0.08);
