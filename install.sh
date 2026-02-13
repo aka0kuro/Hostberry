@@ -682,6 +682,9 @@ EOF
 # Compilar el proyecto
 #
 # Descarga de dependencias Go: reintentos y fallbacks para redes lentas o bloqueo de proxy.golang.org
+# Guardamos el último log de error para mostrarlo si fallan todos los intentos
+HOSTBERRY_GO_DEPS_ERROR_LOG="${HOSTBERRY_GO_DEPS_ERROR_LOG:-/tmp/hostberry_go_deps_error.log}"
+
 try_go_mod_download() {
     local env_kv="$1"
     local attempt="$2"
@@ -693,17 +696,18 @@ try_go_mod_download() {
     export GOTOOLCHAIN=local
 
     if [ -n "$env_kv" ]; then
-        if env $env_kv go mod download >"$tmp_log" 2>&1; then
+        if env GOTOOLCHAIN=local $env_kv go mod download >"$tmp_log" 2>&1; then
             rm -f "$tmp_log"
             return 0
         fi
     else
-        if go mod download >"$tmp_log" 2>&1; then
+        if env GOTOOLCHAIN=local go mod download >"$tmp_log" 2>&1; then
             rm -f "$tmp_log"
             return 0
         fi
     fi
 
+    cp -f "$tmp_log" "$HOSTBERRY_GO_DEPS_ERROR_LOG" 2>/dev/null || true
     rm -f "$tmp_log"
     return 1
 }
@@ -742,6 +746,12 @@ download_go_deps() {
     fi
 
     print_error "Error al descargar dependencias de Go"
+    if [ -s "$HOSTBERRY_GO_DEPS_ERROR_LOG" ]; then
+        print_info "Detalle del último intento:"
+        cat "$HOSTBERRY_GO_DEPS_ERROR_LOG" | head -50
+        rm -f "$HOSTBERRY_GO_DEPS_ERROR_LOG"
+    fi
+    print_info "Sugerencia: compruebe conexión a Internet, proxy/firewall (proxy.golang.org) o ejecute con HOSTBERRY_GO_MOD_RETRIES=10"
     return 1
 }
 
