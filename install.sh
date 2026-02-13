@@ -1286,12 +1286,11 @@ create_hostapd_default_config() {
     HOSTAPD_DHCP_END="192.168.4.254"
     HOSTAPD_LEASE_TIME="12h"
     
-    # Crear archivo de configuración de hostapd si no existe
+    # En instalación: siempre valores de fábrica (hostapd incluido). En actualización: preservar si ya existe.
     # Modo AP+STA según método del blog de TheWalrus (Raspberry Pi 3 B+)
-    # Usar interfaz virtual ap0 para el AP, permitiendo que wlan0 funcione como estación (STA)
     HOSTAPD_CONFIG="/etc/hostapd/hostapd.conf"
-    if [ ! -f "$HOSTAPD_CONFIG" ]; then
-        print_info "Creando archivo de configuración de HostAPD (modo AP+STA según TheWalrus - Raspberry Pi 3 B+): $HOSTAPD_CONFIG"
+    if [ "$MODE" = "install" ] || [ ! -f "$HOSTAPD_CONFIG" ]; then
+        print_info "Creando/configurando HostAPD de fábrica (modo AP+STA): $HOSTAPD_CONFIG"
         
         # Validar interfaz WiFi
         if [ ! -d "/sys/class/net/${HOSTAPD_INTERFACE}" ]; then
@@ -1421,13 +1420,12 @@ EOF
         print_info "  - SSID: $HOSTAPD_SSID (red abierta, sin contraseña)"
         print_info "  - Gateway: $HOSTAPD_GATEWAY"
     else
-        print_info "Archivo de configuración de HostAPD ya existe"
-        # Actualizar SSID a hostberry
+        # Actualización: archivo ya existe, solo ajustar SSID y red abierta
+        print_info "Archivo de configuración de HostAPD ya existe (actualización)"
         if grep -q "ssid=hostberry-ap" "$HOSTAPD_CONFIG" 2>/dev/null || grep -q "^ssid=.*" "$HOSTAPD_CONFIG" 2>/dev/null; then
             sed -i "s/^ssid=.*/ssid=${HOSTAPD_SSID}/" "$HOSTAPD_CONFIG" 2>/dev/null || true
             print_info "  SSID actualizado a: ${HOSTAPD_SSID}"
         fi
-        # Red abierta: quitar WPA y asegurar auth_algs=1
         sed -i '/^wpa=/d' "$HOSTAPD_CONFIG" 2>/dev/null || true
         sed -i '/^wpa_passphrase=/d' "$HOSTAPD_CONFIG" 2>/dev/null || true
         sed -i '/^wpa_key_mgmt=/d' "$HOSTAPD_CONFIG" 2>/dev/null || true
