@@ -537,7 +537,78 @@ body.light-theme .health-item { background: rgba(36, 26, 18, 0.05); }
 }
 body.light-theme .health-text { color: #212529; }
 
-/* Setup wizard - indicador de pasos */
+/* Setup wizard: sin menú, una página por paso */
+.setup-wizard-main {
+  width: 100%;
+  margin-left: 0 !important;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.setup-wizard-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 1.5rem 1rem 2rem;
+}
+.setup-wizard-header {
+  flex-shrink: 0;
+  padding: 1rem 0 1.5rem;
+}
+.setup-wizard-header .step-indicator { align-items: center; }
+.setup-wizard-header .step-dot {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.95rem;
+  background: rgba(255, 244, 235, 0.12);
+  border: 2px solid var(--hb-border);
+  color: var(--hb-text-muted);
+  transition: all 0.2s ease;
+}
+.setup-wizard-header .step-dot.active {
+  background: var(--hb-primary);
+  border-color: var(--hb-primary);
+  color: #fff;
+}
+.setup-wizard-header .step-line {
+  width: 40px; height: 2px;
+  background: var(--hb-border);
+}
+.setup-wizard-pages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.setup-wizard-page-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: 0.5rem 0;
+}
+.setup-wizard-page-content.d-none { display: none !important; }
+.wizard-page-inner {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.wizard-page-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--hb-text-light);
+}
+.wizard-page-desc {
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+.wizard-card {
+  width: 100%;
+}
+
+/* Compatibilidad: indicador de pasos dentro de .setup-wizard-steps (por si se usa en otro sitio) */
 .setup-wizard-steps .step-indicator { align-items: center; }
 .setup-wizard-steps .step-dot {
   width: 36px; height: 36px; border-radius: 50%;
