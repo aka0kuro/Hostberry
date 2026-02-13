@@ -1628,40 +1628,62 @@ EOF
     # Recargar systemd para aplicar cambios
     systemctl daemon-reload 2>/dev/null || true
     
+    # Asegurar que dnsmasq esté instalado y el servicio systemd exista (DHCP/DNS para la red hostberry)
+    if ! systemctl list-unit-files 2>/dev/null | grep -q 'dnsmasq\.service'; then
+        print_info "Servicio dnsmasq no encontrado; instalando paquete dnsmasq..."
+        if command -v apt-get &> /dev/null; then
+            apt-get update -qq && apt-get install -y dnsmasq 2>/dev/null || true
+            systemctl daemon-reload 2>/dev/null || true
+        fi
+    fi
+    if ! systemctl list-unit-files 2>/dev/null | grep -q 'dnsmasq\.service'; then
+        print_warning "dnsmasq no está instalado. Instálalo manualmente para DHCP en la red hostberry (p. ej. sudo apt-get install dnsmasq)"
+    fi
+    
     # dnsmasq debe arrancar después de hostapd para que ap0 exista y tenga IP (así asigna DHCP)
-    DNSMASQ_OVERRIDE_DIR="/etc/systemd/system/dnsmasq.service.d"
-    DNSMASQ_OVERRIDE_FILE="${DNSMASQ_OVERRIDE_DIR}/hostberry.conf"
-    if [ ! -f "$DNSMASQ_OVERRIDE_FILE" ] || ! grep -q "After=.*hostapd" "$DNSMASQ_OVERRIDE_FILE" 2>/dev/null; then
-        print_info "Configurando dnsmasq para arrancar después de hostapd (DHCP en ap0)..."
-        mkdir -p "$DNSMASQ_OVERRIDE_DIR"
-        cat > "$DNSMASQ_OVERRIDE_FILE" <<EOF
+    if systemctl list-unit-files 2>/dev/null | grep -q 'dnsmasq\.service'; then
+        DNSMASQ_OVERRIDE_DIR="/etc/systemd/system/dnsmasq.service.d"
+        DNSMASQ_OVERRIDE_FILE="${DNSMASQ_OVERRIDE_DIR}/hostberry.conf"
+        if [ ! -f "$DNSMASQ_OVERRIDE_FILE" ] || ! grep -q "After=.*hostapd" "$DNSMASQ_OVERRIDE_FILE" 2>/dev/null; then
+            print_info "Configurando dnsmasq para arrancar después de hostapd (DHCP en ap0)..."
+            mkdir -p "$DNSMASQ_OVERRIDE_DIR"
+            cat > "$DNSMASQ_OVERRIDE_FILE" <<EOF
 [Unit]
 After=network.target hostapd.service create-ap0.service
 EOF
-        chmod 644 "$DNSMASQ_OVERRIDE_FILE"
-        print_success "Override de dnsmasq creado"
+            chmod 644 "$DNSMASQ_OVERRIDE_FILE"
+            print_success "Override de dnsmasq creado"
+        fi
     fi
     
     # Habilitar e iniciar hostapd y dnsmasq para que el AP "hostberry" esté disponible
     print_info "Habilitando e iniciando hostapd y dnsmasq..."
     systemctl enable hostapd 2>/dev/null || true
-    systemctl enable dnsmasq 2>/dev/null || true
+    if systemctl list-unit-files 2>/dev/null | grep -q 'dnsmasq\.service'; then
+        systemctl enable dnsmasq 2>/dev/null || true
+    fi
     systemctl daemon-reload 2>/dev/null || true
     systemctl start hostapd 2>/dev/null || true
     sleep 2
     # Asegurar que ap0 tenga la IP del gateway (imprescindible para DHCP)
     ip addr add "${HOSTAPD_GATEWAY}/24" dev ap0 2>/dev/null || true
-    systemctl restart dnsmasq 2>/dev/null || true
-    sleep 1
+    if systemctl list-unit-files 2>/dev/null | grep -q 'dnsmasq\.service'; then
+        systemctl restart dnsmasq 2>/dev/null || true
+        sleep 1
+    fi
     if systemctl is-active --quiet hostapd 2>/dev/null; then
         print_success "hostapd iniciado (red hostberry disponible en ap0)"
     else
         print_warning "hostapd no pudo iniciarse. Comprueba: systemctl status hostapd"
     fi
-    if systemctl is-active --quiet dnsmasq 2>/dev/null; then
-        print_success "dnsmasq iniciado (DHCP y DNS para la red hostberry)"
+    if systemctl list-unit-files 2>/dev/null | grep -q 'dnsmasq\.service'; then
+        if systemctl is-active --quiet dnsmasq 2>/dev/null; then
+            print_success "dnsmasq iniciado (DHCP y DNS para la red hostberry)"
+        else
+            print_warning "dnsmasq no pudo iniciarse. Comprueba: systemctl status dnsmasq"
+        fi
     else
-        print_warning "dnsmasq no pudo iniciarse. Comprueba: systemctl status dnsmasq"
+        print_warning "dnsmasq no instalado: los clientes de la red hostberry no recibirán IP por DHCP. Instala con: sudo apt-get install dnsmasq"
     fi
     
     # Asegurar permisos correctos del archivo de configuración
