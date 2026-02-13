@@ -10,8 +10,8 @@
   --hb-danger-rgb: 239, 68, 68;
 
   --hb-success: #22c55e;
-  --hb-warning: #fbbf24;
-  --hb-warning-rgb: 251, 191, 36;
+  --hb-warning: #ef4444;
+  --hb-warning-rgb: 239, 68, 68;
   --hb-info: #38bdf8;
 
   --hb-bg-dark: #120f0a;
@@ -725,7 +725,7 @@ body.dark-theme .sidebar-nav {
 .alert { padding:.75rem 1rem; border-radius:.5rem; border:1px solid transparent; }
 .alert-success { background:#d1e7dd; color:#0f5132; border-color:#badbcc; }
 .alert-danger { background:#f8d7da; color:#842029; border-color:#f5c2c7; }
-.alert-warning { background:#fff3cd; color:#664d03; border-color:#ffecb5; }
+.alert-warning { background: rgba(var(--hb-warning-rgb), 0.15); color: var(--hb-warning); border-color: rgba(var(--hb-warning-rgb), 0.4); }
 
 /* Utilities */
 .position-fixed { position:fixed; }

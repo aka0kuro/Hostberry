@@ -418,7 +418,8 @@
                 configForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 // Resaltar el formulario brevemente
                 configForm.style.transition = 'box-shadow 0.3s ease';
-                configForm.style.boxShadow = '0 0 20px rgba(255, 193, 7, 0.5)';
+                const wrgb = getComputedStyle(document.documentElement).getPropertyValue('--hb-warning-rgb').trim() || '239, 68, 68';
+                configForm.style.boxShadow = '0 0 20px rgba(' + wrgb + ', 0.5)';
                 setTimeout(() => {
                   configForm.style.boxShadow = '';
                 }, 2000);
