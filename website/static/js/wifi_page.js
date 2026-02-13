@@ -1142,13 +1142,11 @@
   }
 
   // Exportar funciones globales
+  window.loadConnectionStatus = loadConnectionStatus;
   window.toggleWiFi = toggleWiFi;
   window.unblockWiFi = unblockWiFi;
   window.toggleSoftwareSwitch = toggleSoftwareSwitch;
   window.scanNetworks = scanNetworks;
-  window.connectToNetwork = connectToNetwork;
-  window.submitConnect = submitConnect;
-  window.disconnectWiFi = disconnectWiFi;
 
   // Actualizar textos de botones según el estado
   function updateButtonTexts(data) {

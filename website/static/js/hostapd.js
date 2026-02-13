@@ -609,9 +609,27 @@
 
   // Configure Access Point
   window.configureAccessPoint = function(apName) {
-    HostBerry.showAlert('info', t('hostapd.configuring_access_point', 'Configuring access point') + ': ' + apName);
-    // TODO: Implementar modal de configuración
+    const form = document.getElementById('hostapdConfigForm');
+    const ssidInput = document.getElementById('hostapd-ssid');
+    const targetName = String(apName || '').trim();
+
+    if (targetName && ssidInput) {
+      ssidInput.value = targetName;
+    }
+
+    if (form) {
+      form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      form.classList.add('border', 'border-info');
+      setTimeout(() => form.classList.remove('border', 'border-info'), 1200);
+    }
+
+    HostBerry.showAlert('info', t('hostapd.configuring_access_point', 'Configuring access point') + (targetName ? ': ' + targetName : ''));
   };
+
+  // Compatibilidad con botones inline de la plantilla
+  window.loadHostAPDStatus = loadHostAPDStatus;
+  window.loadAccessPoints = loadAccessPoints;
+  window.loadClients = loadClients;
 
   // Toggle password visibility
   window.toggleHostAPDPassword = function() {
