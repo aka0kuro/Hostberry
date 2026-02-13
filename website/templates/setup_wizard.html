@@ -33,10 +33,15 @@
                     {{ call .t "setup_wizard.scan_networks" "Buscar redes" }}
                 </button>
             </div>
-            <div id="wizard-networks-list" class="list-group mb-3" style="max-height: 280px; overflow-y: auto;"></div>
+            <div id="wizard-networks-grid" class="wizard-networks-grid mb-4"></div>
             <div id="wizard-wifi-password-box" class="mb-3 d-none">
                 <label class="form-label">{{ call .t "setup_wizard.password" "Contraseña" }}</label>
-                <input type="password" class="form-control" id="wizard-wifi-password" placeholder="">
+                <div class="input-group">
+                    <input type="password" class="form-control" id="wizard-wifi-password" placeholder="">
+                    <button type="button" class="btn btn-outline-secondary wizard-toggle-password" id="wizard-wifi-toggle-pwd" title="{{ call .t "setup_wizard.show_password" "Ver contraseña" }}" aria-label="{{ call .t "setup_wizard.show_password" "Ver contraseña" }}">
+                        <i class="bi bi-eye" aria-hidden="true"></i>
+                    </button>
+                </div>
                 <button type="button" class="btn btn-primary mt-2" id="wizard-connect-btn">
                     <span class="btn-text">{{ call .t "setup_wizard.connect" "Conectar" }}</span>
                 </button>
@@ -69,7 +74,12 @@
                 </div>
                 <div id="wizard-ap-password-box" class="d-none">
                     <label class="form-label">{{ call .t "setup_wizard.ap_password" "Contraseña del punto de acceso" }}</label>
-                    <input type="password" class="form-control" id="wizard-ap-password" placeholder="">
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="wizard-ap-password" placeholder="">
+                        <button type="button" class="btn btn-outline-secondary wizard-toggle-password" id="wizard-ap-toggle-pwd" title="{{ call .t "setup_wizard.show_password" "Ver contraseña" }}" aria-label="{{ call .t "setup_wizard.show_password" "Ver contraseña" }}">
+                            <i class="bi bi-eye" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="d-flex justify-content-between mt-4">

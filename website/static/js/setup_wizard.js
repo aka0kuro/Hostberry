@@ -16,32 +16,70 @@
     });
   }
 
+  function signalBars(signal) {
+    if (signal == null || signal === '') return '';
+    var n = Number(signal);
+    if (isNaN(n)) return '';
+    if (n >= -50) return '4'; // 4 barras
+    if (n >= -60) return '3';
+    if (n >= -70) return '2';
+    if (n >= -80) return '1';
+    return '0';
+  }
+
   function fillNetworksList(networks) {
-    const list = document.getElementById('wizard-networks-list');
-    if (!list) return;
-    list.innerHTML = '';
+    const grid = document.getElementById('wizard-networks-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
     if (!Array.isArray(networks) || networks.length === 0) {
-      list.innerHTML = '<div class="list-group-item text-muted">' + t('setup_wizard.select_network', 'Selecciona una red') + '</div>';
+      grid.innerHTML = '<p class="wizard-networks-empty text-muted">' + t('setup_wizard.select_network', 'Selecciona una red') + '</p>';
       return;
     }
+    var escapeHtml = window.HostBerry && HostBerry.escapeHtml ? function(s) { return HostBerry.escapeHtml(s); } : function(s) { return s; };
     networks.forEach(function(net) {
       const ssid = net.ssid || net.SSID || '';
       if (!ssid) return;
-      const signal = net.signal || net.signal_strength || '';
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
-      item.dataset.ssid = ssid;
-      item.innerHTML = '<span>' + (window.HostBerry && HostBerry.escapeHtml ? HostBerry.escapeHtml(ssid) : ssid) + '</span>' + (signal ? '<small class="text-muted">' + signal + '</small>' : '');
-      item.addEventListener('click', function() {
+      const signal = net.signal != null ? net.signal : net.signal_strength;
+      const bars = signalBars(signal);
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'wizard-network-card';
+      card.dataset.ssid = ssid;
+      card.innerHTML =
+        '<span class="wizard-network-icon"><i class="bi bi-wifi"></i><span class="wizard-signal-bars" data-bars="' + bars + '"></span></span>' +
+        '<span class="wizard-network-ssid">' + escapeHtml(ssid) + '</span>' +
+        (signal !== '' && signal != null ? '<span class="wizard-network-signal">' + signal + ' dBm</span>' : '');
+      card.addEventListener('click', function() {
         selectedSSID = ssid;
-        list.querySelectorAll('.list-group-item-action').forEach(function(i) { i.classList.remove('active'); });
-        item.classList.add('active');
+        grid.querySelectorAll('.wizard-network-card').forEach(function(c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
         document.getElementById('wizard-wifi-password-box').classList.remove('d-none');
         document.getElementById('wizard-wifi-password').value = '';
         document.getElementById('wizard-wifi-password').focus();
       });
-      list.appendChild(item);
+      grid.appendChild(card);
+    });
+  }
+
+  function setupPasswordToggle(inputId, toggleBtnId) {
+    var input = document.getElementById(inputId);
+    var btn = document.getElementById(toggleBtnId);
+    if (!input || !btn) return;
+    var icon = btn.querySelector('i.bi');
+    var showLabel = t('setup_wizard.show_password', 'Ver contraseña');
+    var hideLabel = t('setup_wizard.hide_password', 'Ocultar contraseña');
+    btn.addEventListener('click', function() {
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.title = hideLabel;
+        btn.setAttribute('aria-label', hideLabel);
+        if (icon) { icon.classList.remove('bi-eye'); icon.classList.add('bi-eye-slash'); }
+      } else {
+        input.type = 'password';
+        btn.title = showLabel;
+        btn.setAttribute('aria-label', showLabel);
+        if (icon) { icon.classList.remove('bi-eye-slash'); icon.classList.add('bi-eye'); }
+      }
     });
   }
 
@@ -139,6 +177,9 @@
     document.getElementById('wizard-next-1').addEventListener('click', function() { setStep(2); });
     document.getElementById('wizard-back-2').addEventListener('click', function() { setStep(1); });
     document.getElementById('wizard-save-ap').addEventListener('click', saveHostapd);
+
+    setupPasswordToggle('wizard-wifi-password', 'wizard-wifi-toggle-pwd');
+    setupPasswordToggle('wizard-ap-password', 'wizard-ap-toggle-pwd');
 
     document.getElementById('wizard-ap-open').addEventListener('change', function() {
       document.getElementById('wizard-ap-password-box').classList.toggle('d-none', this.checked);

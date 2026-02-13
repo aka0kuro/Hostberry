@@ -2184,6 +2184,8 @@
     "error_scan": "Error al buscar redes",
     "error_connect": "Error al conectar",
     "error_save_ap": "Error al guardar la configuración del punto de acceso",
-    "success_ap": "Punto de acceso configurado correctamente"
+    "success_ap": "Punto de acceso configurado correctamente",
+    "show_password": "Ver contraseña",
+    "hide_password": "Ocultar contraseña"
   }
 }

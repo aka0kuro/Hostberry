@@ -2664,6 +2664,12 @@ wpa_cli -i %s reconfigure 2>/dev/null || true
 		log.Printf("hostapd process check: %s", strings.TrimSpace(pgrepOut))
 	}
 
+	// Asegurar que ap0 tenga la IP del gateway y reiniciar dnsmasq para que los clientes reciban IP por DHCP
+	executeCommand("sudo ip addr add 192.168.4.1/24 dev ap0 2>/dev/null || true")
+	if out, err := executeCommand("sudo systemctl restart dnsmasq 2>/dev/null"); err != nil {
+		log.Printf("Warning: dnsmasq restart after hostapd config: %s", strings.TrimSpace(out))
+	}
+
 	return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Configuration saved and services restarted",

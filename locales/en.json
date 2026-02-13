@@ -2157,6 +2157,8 @@
     "error_scan": "Error scanning networks",
     "error_connect": "Error connecting",
     "error_save_ap": "Error saving access point configuration",
-    "success_ap": "Access point configured successfully"
+    "success_ap": "Access point configured successfully",
+    "show_password": "Show password",
+    "hide_password": "Hide password"
   }
 }
