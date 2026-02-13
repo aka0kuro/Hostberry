@@ -769,15 +769,21 @@ func vpnConnectHandler(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Datos inválidos"})
 	}
-	config, vpnType := req.Config, req.Type
-	if vpnType == "" {
-		vpnType = "openvpn"
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
 	}
-	return RunActionWithUser(c, "vpn", "VPN conectado: %s (usuario: %s)", "Error conectando VPN: %s (usuario: %s)", func(user *User) map[string]interface{} {
-		result := connectVPN(config, vpnType, user.Username)
-		// Log incluye tipo; el mensaje de error del helper usa (errorMsg, username), el successLog solo username
-		return result
-	})
+	userID := user.ID
+	result := connectVPN(req.Config, req.Type, user.Username)
+	if success, ok := result["success"].(bool); ok && success {
+		InsertLog("INFO", fmt.Sprintf("VPN conectado: %s (usuario: %s)", req.Type, user.Username), "vpn", &userID)
+		return c.JSON(result)
+	}
+	if errorMsg, ok := result["error"].(string); ok {
+		InsertLog("ERROR", fmt.Sprintf("Error conectando VPN %s: %s (usuario: %s)", req.Type, errorMsg, user.Username), "vpn", &userID)
+		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
+	}
+	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
 }
 
 func wireguardStatusHandler(c *fiber.Ctx) error {
@@ -1196,11 +1202,20 @@ func systemLogsHandler(c *fiber.Ctx) error {
 	limitStr := c.Query("limit", "20")
 	offsetStr := c.Query("offset", "0")
 
+	switch level {
+	case "all", "INFO", "WARNING", "ERROR", "DEBUG":
+	default:
+		level = "all"
+	}
+
 	limit, _ := strconv.Atoi(limitStr)
 	offset, _ := strconv.Atoi(offsetStr)
 
 	if limit <= 0 || limit > 100 {
 		limit = 20
+	}
+	if offset < 0 || offset > 10000 {
+		offset = 0
 	}
 
 	logs, total, err := GetLogs(level, limit, offset)

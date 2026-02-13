@@ -286,16 +286,27 @@ install_dependencies() {
                 ;;
         esac
         
-        # Descargar e instalar Go
+        # Descargar e instalar Go (versión fija para evitar que el toolchain intente descargar otra, p. ej. en Raspberry Pi)
         GO_VERSION="1.21.5"
         GO_TAR="go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
         GO_URL="https://go.dev/dl/${GO_TAR}"
         
-        print_info "Instalando Go ${GO_VERSION}..."
-        wget -q "${GO_URL}" -O "/tmp/${GO_TAR}"
+        print_info "Instalando Go ${GO_VERSION} para ${GO_ARCH}..."
+        if ! wget -q "${GO_URL}" -O "/tmp/${GO_TAR}" || [ ! -s "/tmp/${GO_TAR}" ]; then
+            print_warning "No se pudo descargar Go desde go.dev (${GO_ARCH}), intentando desde el repositorio del sistema..."
+            apt-get update -qq
+            apt-get install -y golang-go
+            return
+        fi
         rm -rf /usr/local/go
-        tar -C /usr/local -xzf "/tmp/${GO_TAR}"
-        rm "/tmp/${GO_TAR}"
+        if ! tar -C /usr/local -xzf "/tmp/${GO_TAR}"; then
+            print_error "Error extrayendo Go. Instalando desde repositorio..."
+            apt-get update -qq
+            apt-get install -y golang-go
+            rm -f "/tmp/${GO_TAR}"
+            return
+        fi
+        rm -f "/tmp/${GO_TAR}"
         
         # Agregar Go al PATH
         if ! grep -q "/usr/local/go/bin" /etc/profile; then
@@ -678,6 +689,8 @@ try_go_mod_download() {
     local tmp_log
 
     tmp_log="$(mktemp)"
+    # GOTOOLCHAIN=local evita que Go intente descargar otra toolchain (p. ej. en Raspberry Pi arm64)
+    export GOTOOLCHAIN=local
 
     if [ -n "$env_kv" ]; then
         if env $env_kv go mod download >"$tmp_log" 2>&1; then
@@ -805,9 +818,10 @@ build_project() {
         exit 1
     fi
     
+    export GOTOOLCHAIN=local
     env $HOSTBERRY_GO_MOD_ENV go mod tidy > /dev/null 2>&1 || true
     
-    # Compilar
+    # Compilar (GOTOOLCHAIN=local evita "toolchain not available" en Raspberry Pi / arm64)
     print_info "Compilando..."
     if CGO_ENABLED=1 go build -ldflags="-s -w" -o "${INSTALL_DIR}/hostberry" .; then
         if [ -f "${INSTALL_DIR}/hostberry" ]; then
