@@ -16,6 +16,13 @@
     return window.HostBerry?.t ? window.HostBerry.t(key, fallback) : (fallback || key);
   }
 
+  function escapeHtml(value) {
+    const s = String(value ?? '');
+    return window.HostBerry?.escapeHtml
+      ? window.HostBerry.escapeHtml(s)
+      : s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
   // DNS Presets
   const dnsPresets = {
     google: { primary: '8.8.8.8', secondary: '8.8.4.4' },
@@ -193,8 +200,12 @@
       const ifaceName = iface.name || iface.interface || 'Unknown';
       const ifaceIp = iface.ip || iface.ip_address || 'N/A';
       const ifaceMac = iface.mac || iface.mac_address || 'N/A';
+      const safeIfaceName = escapeHtml(ifaceName);
+      const safeIfaceIp = escapeHtml(ifaceIp);
+      const safeIfaceMac = escapeHtml(ifaceMac);
+      const safeStatusText = escapeHtml(statusText);
       
-      html += '<tr><td><strong>' + ifaceName + '</strong></td><td><span class="badge bg-' + statusClass + '"><i class="bi ' + statusIcon + '"></i> ' + statusText + '</span></td><td>' + ifaceIp + '</td><td>' + ifaceMac + '</td></tr>';
+      html += '<tr><td><strong>' + safeIfaceName + '</strong></td><td><span class="badge bg-' + statusClass + '"><i class="bi ' + statusIcon + '"></i> ' + safeStatusText + '</span></td><td>' + safeIfaceIp + '</td><td>' + safeIfaceMac + '</td></tr>';
     });
     
     html += '</tbody></table></div>';
@@ -327,7 +338,11 @@
     let html = '';
     routes.forEach(function(route) {
       if (!route) return;
-      html += '<tr><td>' + (route.destination || '0.0.0.0') + '</td><td>' + (route.gateway || '*') + '</td><td>' + (route.interface || route.dev || '-') + '</td><td>' + (route.metric || '0') + '</td></tr>';
+      const safeDestination = escapeHtml(route.destination || '0.0.0.0');
+      const safeGateway = escapeHtml(route.gateway || '*');
+      const safeInterface = escapeHtml(route.interface || route.dev || '-');
+      const safeMetric = escapeHtml(route.metric || '0');
+      html += '<tr><td>' + safeDestination + '</td><td>' + safeGateway + '</td><td>' + safeInterface + '</td><td>' + safeMetric + '</td></tr>';
     });
     tbody.innerHTML = html;
   }

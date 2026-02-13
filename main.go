@@ -448,9 +448,6 @@ func setupRoutes(app *fiber.App) {
 
 func indexHandler(c *fiber.Ctx) error {
 	token := c.Cookies("access_token")
-	if token == "" {
-		token = c.Query("token")
-	}
 
 	if token != "" {
 		claims, err := ValidateToken(token)

@@ -55,9 +55,6 @@ func requireAuth(c *fiber.Ctx) error {
 		if authHeader == "" {
 			token = c.Cookies("access_token")
 			if token == "" {
-				token = c.Query("token")
-			}
-			if token == "" {
 				return c.Status(401).JSON(fiber.Map{
 					"error": "No autorizado - token requerido",
 				})
@@ -74,10 +71,6 @@ func requireAuth(c *fiber.Ctx) error {
 
 	} else {
 		token = c.Cookies("access_token")
-		if token == "" {
-			token = c.Query("token")
-		}
-
 		if token == "" {
 			return c.Redirect("/login")
 		}
@@ -140,8 +133,9 @@ func loggingMiddleware(c *fiber.Ctx) error {
 	userID := c.Locals("user_id")
 	var userIDPtr *int
 	if userID != nil {
-		id := userID.(int)
-		userIDPtr = &id
+		if id, ok := userID.(int); ok {
+			userIDPtr = &id
+		}
 	}
 
 	statusEmoji := "✅"
@@ -190,8 +184,9 @@ func errorHandler(c *fiber.Ctx, err error) error {
 	userID := c.Locals("user_id")
 	var userIDPtr *int
 	if userID != nil {
-		id := userID.(int)
-		userIDPtr = &id
+		if id, ok := userID.(int); ok {
+			userIDPtr = &id
+		}
 	}
 
 	if code >= 500 {
@@ -209,24 +204,31 @@ func errorHandler(c *fiber.Ctx, err error) error {
 	}
 
 	if strings.HasPrefix(c.Path(), "/api/") {
-		return c.Status(code).JSON(fiber.Map{
+		resp := fiber.Map{
 			"error":   message,
 			"path":    c.Path(),
 			"method":  c.Method(),
-			"details": err.Error(),
-		})
+		}
+		if appConfig.Server.Debug {
+			resp["details"] = err.Error()
+		}
+		return c.Status(code).JSON(resp)
 	}
 
+	renderDetails := ""
+	if appConfig.Server.Debug {
+		renderDetails = err.Error()
+	}
 	if renderErr := renderTemplate(c, "error", fiber.Map{
 		"Title":   "Error",
 		"Code":    code,
 		"Message": message,
-		"Details": err.Error(),
+		"Details": renderDetails,
 	}); renderErr != nil {
 		LogTf("logs.middleware_render_error", renderErr)
 		return c.Status(code).SendString(fmt.Sprintf(
-			"<html><body><h1>Error %d</h1><p>%s</p><p>%s</p></body></html>",
-			code, message, err.Error(),
+			"<html><body><h1>Error %d</h1><p>%s</p></body></html>",
+			code, message,
 		))
 	}
 	return nil

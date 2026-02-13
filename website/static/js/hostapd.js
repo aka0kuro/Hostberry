@@ -318,11 +318,15 @@
         html += '</tr></thead><tbody>';
         
         clients.forEach(client => {
+          const safeMac = escapeHtml(client.mac_address || client.mac || '-');
+          const safeIp = escapeHtml(client.ip_address || client.ip || '-');
+          const safeSignal = escapeHtml(client.signal ? client.signal + ' dBm' : '-');
+          const safeUptime = escapeHtml(client.uptime || '-');
           html += '<tr>';
-          html += `<td>${client.mac_address || client.mac || '-'}</td>`;
-          html += `<td>${client.ip_address || client.ip || '-'}</td>`;
-          html += `<td>${client.signal ? client.signal + ' dBm' : '-'}</td>`;
-          html += `<td>${client.uptime || '-'}</td>`;
+          html += `<td>${safeMac}</td>`;
+          html += `<td>${safeIp}</td>`;
+          html += `<td>${safeSignal}</td>`;
+          html += `<td>${safeUptime}</td>`;
           html += '</tr>';
         });
         

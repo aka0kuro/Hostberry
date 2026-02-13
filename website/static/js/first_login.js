@@ -85,10 +85,16 @@
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert alert-${type} alert-dismissible fade show first-login-alert`;
     const closeLabel = t('common.close', 'Close');
-    alertDiv.innerHTML = `
-      ${message}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="${closeLabel}"></button>
-    `;
+    const messageNode = document.createElement('span');
+    messageNode.textContent = String(message ?? '');
+    alertDiv.appendChild(messageNode);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'btn-close';
+    closeBtn.setAttribute('data-bs-dismiss', 'alert');
+    closeBtn.setAttribute('aria-label', closeLabel);
+    alertDiv.appendChild(closeBtn);
     document.body.appendChild(alertDiv);
     setTimeout(() => {
       if (alertDiv.parentNode) {

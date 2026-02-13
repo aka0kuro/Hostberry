@@ -164,16 +164,6 @@
     // Auth token
     if(!headers.has('Authorization')){
       let token = localStorage.getItem('access_token');
-      // Fallback: si no hay token en localStorage, intentar leerlo de la URL (?token=)
-      // Esto permite que funcione incluso si el navegador no guarda cookies.
-      if(!token){
-        try{
-          const u = new URL(window.location.href);
-          token = u.searchParams.get('token') || '';
-        }catch(_e){
-          token = '';
-        }
-      }
       if(token) headers.set('Authorization', 'Bearer ' + token);
     }
     
@@ -406,6 +396,18 @@
   }
 
   document.addEventListener('DOMContentLoaded', async function(){
+    // Limpiar token heredado en URL para reducir exposición en historial/referrer.
+    try{
+      const currentUrl = new URL(window.location.href);
+      if(currentUrl.searchParams.has('token')){
+        currentUrl.searchParams.delete('token');
+        const nextUrl = currentUrl.pathname + (currentUrl.search ? currentUrl.search : '') + (currentUrl.hash || '');
+        window.history.replaceState({}, '', nextUrl);
+      }
+    }catch(_e){
+      // silent
+    }
+
     setupSidebarToggle();
     setupSessionKeepAlive();
     
