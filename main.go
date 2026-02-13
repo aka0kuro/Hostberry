@@ -52,10 +52,11 @@ type DatabaseConfig struct {
 }
 
 type SecurityConfig struct {
-	JWTSecret    string `yaml:"jwt_secret"`
-	TokenExpiry  int    `yaml:"token_expiry"` // minutos
-	BcryptCost   int    `yaml:"bcrypt_cost"`
-	RateLimitRPS int    `yaml:"rate_limit_rps"`
+	JWTSecret      string `yaml:"jwt_secret"`
+	TokenExpiry    int    `yaml:"token_expiry"`    // minutos
+	BcryptCost     int    `yaml:"bcrypt_cost"`
+	RateLimitRPS   int    `yaml:"rate_limit_rps"`
+	LockoutMinutes int    `yaml:"lockout_minutes"` // duración del bloqueo por intentos fallidos (0 = indefinido)
 }
 
 var appConfig Config
@@ -169,10 +170,11 @@ func loadConfig() error {
 				Path: "data/hostberry.db",
 			},
 			Security: SecurityConfig{
-				JWTSecret:    generateRandomSecret(),
-				TokenExpiry:  60, // 1 hora
-				BcryptCost:   10,
-				RateLimitRPS: 10,
+				JWTSecret:      generateRandomSecret(),
+				TokenExpiry:    60,  // 1 hora
+				BcryptCost:     10,
+				RateLimitRPS:   10,
+				LockoutMinutes: 15, // bloqueo por intentos fallidos
 			},
 		}
 		return nil

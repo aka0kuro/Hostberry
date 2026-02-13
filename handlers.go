@@ -2,15 +2,29 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
+
+func translateLoginError(c *fiber.Ctx, err error) string {
+	var le *LoginError
+	if errors.As(err, &le) {
+		msg := T(c, le.Key, le.Default)
+		if len(le.Args) > 0 {
+			msg = strings.ReplaceAll(msg, "{minutes}", fmt.Sprint(le.Args[0]))
+			msg = strings.ReplaceAll(msg, "{duration}", fmt.Sprint(le.Args[0]))
+		}
+		return msg
+	}
+	return err.Error()
+}
 
 func loginAPIHandler(c *fiber.Ctx) error {
 	var req struct {
@@ -20,7 +34,7 @@ func loginAPIHandler(c *fiber.Ctx) error {
 
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{
-			"error": "Datos inválidos",
+			"error": T(c, "errors.invalid_data", "Invalid data"),
 		})
 	}
 
@@ -30,14 +44,14 @@ func loginAPIHandler(c *fiber.Ctx) error {
 
 	if req.Password == "" {
 		return c.Status(400).JSON(fiber.Map{
-			"error": "La contraseña es requerida",
+			"error": T(c, "auth.password_required", "Password is required"),
 		})
 	}
 
 	user, token, err := Login(req.Username, req.Password)
 	if err != nil {
 		return c.Status(401).JSON(fiber.Map{
-			"error": err.Error(),
+			"error": translateLoginError(c, err),
 		})
 	}
 
@@ -70,7 +84,7 @@ func loginAPIHandler(c *fiber.Ctx) error {
 func logoutAPIHandler(c *fiber.Ctx) error {
 	user, ok := GetUser(c)
 	if !ok {
-		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+		return c.Status(401).JSON(fiber.Map{"error": T(c, "auth.unauthorized", "Unauthorized")})
 	}
 	userID := user.ID
 	InsertLog("INFO", fmt.Sprintf("Usuario %s cerró sesión", user.Username), "auth", &userID)
@@ -84,14 +98,14 @@ func logoutAPIHandler(c *fiber.Ctx) error {
 	})
 
 	return c.JSON(fiber.Map{
-		"message": "Sesión cerrada",
+		"message": T(c, "auth.logout_success", "Logout successful"),
 	})
 }
 
 func meHandler(c *fiber.Ctx) error {
 	user, ok := GetUser(c)
 	if !ok {
-		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+		return c.Status(401).JSON(fiber.Map{"error": T(c, "auth.unauthorized", "Unauthorized")})
 	}
 	return c.JSON(fiber.Map{
 		"id":       user.ID,
@@ -115,27 +129,27 @@ func changePasswordAPIHandler(c *fiber.Ctx) error {
 		NewPassword     string `json:"new_password"`
 	}
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Datos inválidos"})
+		return c.Status(400).JSON(fiber.Map{"error": T(c, "errors.invalid_data", "Invalid data")})
 	}
 	if req.CurrentPassword == "" || req.NewPassword == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "Contraseñas requeridas"})
+		return c.Status(400).JSON(fiber.Map{"error": T(c, "auth.passwords_required", "Passwords required")})
 	}
 	if !CheckPassword(req.CurrentPassword, user.Password) {
-		return c.Status(401).JSON(fiber.Map{"error": "Contraseña actual incorrecta"})
+		return c.Status(401).JSON(fiber.Map{"error": T(c, "auth.incorrect_current_password", "Current password is incorrect")})
 	}
 
 	hashed, err := HashPassword(req.NewPassword)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Error hasheando contraseña"})
+		return c.Status(500).JSON(fiber.Map{"error": T(c, "errors.server_error", "Internal server error")})
 	}
 	user.Password = hashed
 	if err := db.Save(user).Error; err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Error guardando contraseña"})
+		return c.Status(500).JSON(fiber.Map{"error": T(c, "errors.server_error", "Internal server error")})
 	}
 
 	userID := user.ID
-		InsertLog("INFO", fmt.Sprintf("Usuario %s cambió su contraseña", user.Username), "auth", &userID)
-	return c.JSON(fiber.Map{"message": "Contraseña actualizada"})
+	InsertLog("INFO", fmt.Sprintf("Usuario %s cambió su contraseña", user.Username), "auth", &userID)
+	return c.JSON(fiber.Map{"message": T(c, "auth.password_changed", "Password changed successfully")})
 }
 
 func firstLoginChangeAPIHandler(c *fiber.Ctx) error {
@@ -148,27 +162,27 @@ func firstLoginChangeAPIHandler(c *fiber.Ctx) error {
 
 	if tokenString == "" {
 		return c.Status(401).JSON(fiber.Map{
-			"error": "Token requerido",
+			"error": T(c, "auth.token_required", "Token required"),
 		})
 	}
 
 	claims, err := ValidateToken(tokenString)
 	if err != nil {
 		return c.Status(401).JSON(fiber.Map{
-			"error": "Token inválido",
+			"error": T(c, "auth.invalid_token", "Invalid token"),
 		})
 	}
 
 	var user User
 	if err := db.Where("id = ? AND is_active = ?", claims.UserID, true).First(&user).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{
-			"error": "Usuario no encontrado",
+			"error": T(c, "auth.user_not_found", "User not found"),
 		})
 	}
 
 	if user.LoginCount != 1 {
 		return c.Status(403).JSON(fiber.Map{
-			"error": "Este endpoint solo está disponible en el primer login",
+			"error": T(c, "auth.first_login_only", "This endpoint is only available on first login"),
 		})
 	}
 

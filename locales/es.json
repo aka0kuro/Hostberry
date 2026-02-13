@@ -364,6 +364,13 @@
     "passwords_dont_match": "Las contraseñas no coinciden",
     "credentials_updated": "Credenciales actualizadas. Vuelve a iniciar sesión.",
     "account_locked_time": "Usuario bloqueado. Intente nuevamente en {minutes} minutos.",
+    "account_locked_retry_in": "Cuenta bloqueada. Podrás intentar de nuevo en {duration}.",
+    "password_required": "La contraseña es requerida",
+    "passwords_required": "Contraseñas requeridas",
+    "incorrect_current_password": "Contraseña actual incorrecta",
+    "token_required": "Token requerido",
+    "invalid_token": "Token inválido",
+    "first_login_only": "Este endpoint solo está disponible en el primer login",
     "default_admin_missing": "El usuario admin por defecto ya no existe",
     "new_user_cannot_be_admin": "El nuevo usuario no puede ser 'admin'",
     "too_many_attempts_time": "Demasiados intentos fallidos. Usuario bloqueado por {minutes} minutos.",
@@ -1189,6 +1196,7 @@
     "firewall_apply_failed": "No se pudo aplicar el firewall al sistema"
   },
   "errors": {
+    "invalid_data": "Datos inválidos",
     "general_error": "Ha ocurrido un error",
     "general_error_message": "Ha ocurrido un error inesperado",
     "network_error": "Error de red",

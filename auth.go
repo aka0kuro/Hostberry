@@ -11,6 +11,15 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// LoginError lleva una clave i18n para que el handler traduzca el mensaje según el idioma.
+type LoginError struct {
+	Key     string        // ej: "auth.invalid_credentials"
+	Default string        // mensaje por defecto (español)
+	Args    []interface{} // argumentos para reemplazar {minutes}, {duration}, etc.
+}
+
+func (e *LoginError) Error() string { return e.Default }
+
 type Claims struct {
 	Username string `json:"username"`
 	UserID   int    `json:"user_id"`
@@ -28,8 +37,9 @@ type User struct {
 	Timezone  string `gorm:"default:UTC"`
 
 	LastLogin          *time.Time
-	LoginCount         int  `gorm:"default:0"`
-	FailedAttempts     int  `gorm:"default:0"`
+	LoginCount         int       `gorm:"default:0"`
+	FailedAttempts     int       `gorm:"default:0"`
+	LockedUntil        *time.Time // desbloqueo automático tras lockout
 	EmailNotifications bool `gorm:"default:false"`
 	SystemAlerts       bool `gorm:"default:false"`
 	SecurityAlerts     bool `gorm:"default:false"`
@@ -132,24 +142,48 @@ func getMaxLoginAttempts() int {
 	return v
 }
 
+func getLockoutMinutes() int {
+	if appConfig.Security.LockoutMinutes > 0 {
+		return appConfig.Security.LockoutMinutes
+	}
+	return 15
+}
+
 func Login(username, password string) (*User, string, error) {
 	var user User
 	if err := db.Where("username = ? AND is_active = ?", username, true).First(&user).Error; err != nil {
-		return nil, "", errors.New("usuario o contraseña incorrectos")
+		return nil, "", &LoginError{Key: "auth.invalid_credentials", Default: "usuario o contraseña incorrectos"}
 	}
 
 	maxAttempts := getMaxLoginAttempts()
+	lockoutMin := getLockoutMinutes()
+	now := time.Now()
+
 	if user.FailedAttempts >= maxAttempts {
-		return nil, "", fmt.Errorf("demasiados intentos fallidos. Intenta nuevamente más tarde")
+		if user.LockedUntil != nil && now.Before(*user.LockedUntil) {
+			remaining := time.Until(*user.LockedUntil).Round(time.Second)
+			return nil, "", &LoginError{Key: "auth.account_locked_retry_in", Default: "cuenta bloqueada. Podrás intentar de nuevo en " + remaining.String(), Args: []interface{}{remaining.String()}}
+		}
+		// Desbloqueo automático: ya pasó el tiempo
+		user.FailedAttempts = 0
+		user.LockedUntil = nil
+		_ = db.Save(&user).Error
 	}
 
 	if !CheckPassword(password, user.Password) {
 		user.FailedAttempts++
+		if user.FailedAttempts >= maxAttempts && lockoutMin > 0 {
+			until := now.Add(time.Duration(lockoutMin) * time.Minute)
+			user.LockedUntil = &until
+		}
 		_ = db.Save(&user).Error
 		if user.FailedAttempts >= maxAttempts {
-			return nil, "", fmt.Errorf("demasiados intentos fallidos. Intenta nuevamente más tarde")
+			if user.LockedUntil != nil {
+				return nil, "", &LoginError{Key: "auth.too_many_attempts_time", Default: "demasiados intentos fallidos. Cuenta bloqueada " + strconv.Itoa(lockoutMin) + " minutos.", Args: []interface{}{lockoutMin}}
+			}
+			return nil, "", &LoginError{Key: "auth.too_many_attempts", Default: "demasiados intentos fallidos. Intenta nuevamente más tarde"}
 		}
-		return nil, "", errors.New("usuario o contraseña incorrectos")
+		return nil, "", &LoginError{Key: "auth.invalid_credentials", Default: "usuario o contraseña incorrectos"}
 	}
 
 	if !strings.HasPrefix(user.Password, "$2a$") && !strings.HasPrefix(user.Password, "$2b$") {
@@ -159,8 +193,8 @@ func Login(username, password string) (*User, string, error) {
 		}
 	}
 
-	now := time.Now()
 	user.FailedAttempts = 0
+	user.LockedUntil = nil
 	user.LastLogin = &now
 	user.LoginCount++
 	_ = db.Save(&user).Error

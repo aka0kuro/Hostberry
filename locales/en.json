@@ -363,6 +363,13 @@
     "passwords_dont_match": "Passwords do not match",
     "credentials_updated": "Credentials updated. Please log in again.",
     "account_locked_time": "Account locked. Try again in {minutes} minutes.",
+    "account_locked_retry_in": "Account locked. You can try again in {duration}.",
+    "password_required": "Password is required",
+    "passwords_required": "Passwords required",
+    "incorrect_current_password": "Current password is incorrect",
+    "token_required": "Token required",
+    "invalid_token": "Invalid token",
+    "first_login_only": "This endpoint is only available on first login",
     "default_admin_missing": "Default admin user no longer exists",
     "new_user_cannot_be_admin": "New user cannot be 'admin'",
     "too_many_attempts_time": "Too many failed attempts. User locked for {minutes} minutes.",
@@ -1184,6 +1191,7 @@
     "firewall_apply_failed": "Could not apply firewall to the system"
   },
   "errors": {
+    "invalid_data": "Invalid data",
     "general_error": "An error has occurred",
     "general_error_message": "An unexpected error occurred",
     "network_error": "Network error",

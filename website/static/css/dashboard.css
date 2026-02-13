@@ -247,7 +247,7 @@
 }
 
 .disk-progress {
-    background: linear-gradient(90deg, #ffc107 0%, #856404 100%);
+    background: linear-gradient(90deg, var(--hb-warning) 0%, color-mix(in srgb, var(--hb-warning) 80%, #333) 100%);
 }
 
 .temp-progress {
@@ -271,7 +271,7 @@
 }
 
 .status-text.status-warning {
-    color: #ffc107;
+    color: var(--hb-warning);
 }
 
 .status-text.status-critical {
@@ -518,7 +518,7 @@ body.light-theme .info-item-grid .info-value {
 
 .hostberry-icon { background: linear-gradient(135deg, #dc3545 0%, #8b0000 100%); }
 .nginx-icon { background: linear-gradient(135deg, #198754 0%, #0f5132 100%); }
-.fail2ban-icon { background: linear-gradient(135deg, #ffc107 0%, #856404 100%); }
+.fail2ban-icon { background: linear-gradient(135deg, var(--hb-warning) 0%, color-mix(in srgb, var(--hb-warning) 70%, #333) 100%); }
 .ufw-icon { background: linear-gradient(135deg, #0dcaf0 0%, #055160 100%); }
 .wifi-icon { background: linear-gradient(135deg, #6610f2 0%, #3d0a91 100%); }
 .ssh-icon { background: linear-gradient(135deg, #6c757d 0%, #343a40 100%); }
@@ -772,8 +772,8 @@ body.light-theme .info-item-grid .info-value {
 }
 
 .log-level.warning {
-    background: rgba(255, 193, 7, 0.2);
-    color: #ffc107;
+    background: rgba(var(--hb-warning-rgb), 0.2);
+    color: var(--hb-warning);
 }
 
 .log-level.error {
@@ -877,7 +877,7 @@ body.light-theme .info-item-grid .info-value {
     font-weight: 500;
 }
 
-.action-restart:hover { background: linear-gradient(135deg, #ffc107 0%, #856404 100%); }
+.action-restart:hover { background: linear-gradient(135deg, var(--hb-warning) 0%, color-mix(in srgb, var(--hb-warning) 70%, #333) 100%); }
 .action-shutdown:hover { background: linear-gradient(135deg, #dc3545 0%, #8b0000 100%); }
 .action-backup:hover { background: linear-gradient(135deg, #198754 0%, #0f5132 100%); }
 .action-update:hover { background: linear-gradient(135deg, #0dcaf0 0%, #055160 100%); }
