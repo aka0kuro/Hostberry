@@ -1561,7 +1561,7 @@ Wants=network-pre.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/bash -c 'if ! ip link show ap0 > /dev/null 2>&1; then /sbin/iw phy ${PHY_NAME} interface add ap0 type __ap && /bin/ip link set ap0 address ${MAC_ADDRESS} && /bin/ip link set ap0 up; fi'
+ExecStart=/bin/bash -c 'if ! ip link show ap0 > /dev/null 2>&1; then /sbin/iw phy ${PHY_NAME} interface add ap0 type __ap && /bin/ip link set ap0 address ${MAC_ADDRESS} && /bin/ip link set ap0 up; fi && /bin/ip addr add ${HOSTAPD_GATEWAY}/24 dev ap0 2>/dev/null || true'
 ExecStop=/bin/bash -c 'if ip link show ap0 > /dev/null 2>&1; then /bin/ip link set ap0 down && /sbin/iw dev ap0 del; fi'
 
 [Install]
@@ -1616,6 +1616,26 @@ EOF
     
     # Recargar systemd para aplicar cambios
     systemctl daemon-reload 2>/dev/null || true
+    
+    # Habilitar e iniciar hostapd y dnsmasq para que el AP "hostberry" esté disponible
+    print_info "Habilitando e iniciando hostapd y dnsmasq..."
+    systemctl enable hostapd 2>/dev/null || true
+    systemctl enable dnsmasq 2>/dev/null || true
+    systemctl start hostapd 2>/dev/null || true
+    # Asegurar que ap0 tenga la IP del gateway (por si create-ap0 no la asignó)
+    ip addr add "${HOSTAPD_GATEWAY}/24" dev ap0 2>/dev/null || true
+    systemctl start dnsmasq 2>/dev/null || true
+    sleep 1
+    if systemctl is-active --quiet hostapd 2>/dev/null; then
+        print_success "hostapd iniciado (red hostberry disponible en ap0)"
+    else
+        print_warning "hostapd no pudo iniciarse. Comprueba: systemctl status hostapd"
+    fi
+    if systemctl is-active --quiet dnsmasq 2>/dev/null; then
+        print_success "dnsmasq iniciado (DHCP y DNS para la red hostberry)"
+    else
+        print_warning "dnsmasq no pudo iniciarse. Comprueba: systemctl status dnsmasq"
+    fi
     
     # Asegurar permisos correctos del archivo de configuración
     chmod 644 "$HOSTAPD_CONFIG" 2>/dev/null || true
