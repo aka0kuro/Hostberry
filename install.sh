@@ -1441,73 +1441,47 @@ EOF
         print_info "  Red configurada como abierta (sin contraseña)"
     fi
     
-    # Crear archivo de configuración de dnsmasq si no existe o hacer backup
+    # Configuración dnsmasq para DHCP y DNS en la red hostberry (ap0)
+    # Usar archivo dedicado en /etc/dnsmasq.d para no pisar la config del sistema
+    DNSMASQ_D_DIR="/etc/dnsmasq.d"
+    DNSMASQ_AP_CONFIG="${DNSMASQ_D_DIR}/hostberry-ap.conf"
+    mkdir -p "$DNSMASQ_D_DIR"
+    print_info "Escribiendo configuración DHCP/DNS para la red hostberry en ${DNSMASQ_AP_CONFIG}..."
+    cat > "$DNSMASQ_AP_CONFIG" <<EOF
+# HostBerry: DHCP y DNS para la red WiFi hostberry (ap0)
+# Los clientes reciben IP 192.168.4.x y DNS apunta al gateway (portal cautivo)
+interface=ap0
+no-dhcp-interface=wlan0
+bind-interfaces
+dhcp-range=${HOSTAPD_DHCP_START},${HOSTAPD_DHCP_END},255.255.255.0,${HOSTAPD_LEASE_TIME}
+dhcp-option=3,${HOSTAPD_GATEWAY}
+dhcp-option=6,${HOSTAPD_GATEWAY}
+address=/#/${HOSTAPD_GATEWAY}
+domain-needed
+bogus-priv
+EOF
+    chmod 644 "$DNSMASQ_AP_CONFIG"
+    print_success "Configuración dnsmasq para hostberry escrita"
+    
+    # Asegurar que dnsmasq cargue /etc/dnsmasq.d (común en Debian/Ubuntu)
     DNSMASQ_CONFIG="/etc/dnsmasq.conf"
     if [ -f "$DNSMASQ_CONFIG" ]; then
-        # Hacer backup si no existe
-        if [ ! -f "${DNSMASQ_CONFIG}.backup" ]; then
-            cp "$DNSMASQ_CONFIG" "${DNSMASQ_CONFIG}.backup"
-            print_info "Backup de configuración de dnsmasq creado"
-        fi
-        # Verificar si ya tiene configuración de hostapd
-        # En modo AP+STA, usar ap0 si existe, sino usar la interfaz física
-        DNSMASQ_INTERFACE="ap0"
-        if ! ip link show ap0 > /dev/null 2>&1; then
-            DNSMASQ_INTERFACE="$HOSTAPD_INTERFACE"
-        fi
-        
-        if grep -q "interface=${DNSMASQ_INTERFACE}" "$DNSMASQ_CONFIG" 2>/dev/null || \
-           grep -q "interface=${HOSTAPD_INTERFACE}" "$DNSMASQ_CONFIG" 2>/dev/null || \
-           grep -q "interface=ap0" "$DNSMASQ_CONFIG" 2>/dev/null; then
-            print_info "Configuración de dnsmasq para HostAPD ya existe"
-        else
-            print_info "Agregando configuración de dnsmasq para HostAPD (modo AP+STA según TheWalrus - Raspberry Pi 3 B+)..."
-            cat >> "$DNSMASQ_CONFIG" <<EOF
-
-# Configuración para HostAPD (agregada por HostBerry) - Modo AP+STA según TheWalrus (Raspberry Pi 3 B+)
-# Solo servir DHCP en ap0, no en wlan0 (que es STA)
-# Portal cautivo: todo el DNS de la red hostberry resuelve al gateway para mostrar la web de Hostberry
-interface=${DNSMASQ_INTERFACE}
-no-dhcp-interface=${HOSTAPD_INTERFACE}
-bind-interfaces
-dhcp-range=${HOSTAPD_DHCP_START},${HOSTAPD_DHCP_END},255.255.255.0,${HOSTAPD_LEASE_TIME}
-dhcp-option=3,${HOSTAPD_GATEWAY}
-dhcp-option=6,${HOSTAPD_GATEWAY}
-address=/#/${HOSTAPD_GATEWAY}
-server=8.8.8.8
-server=8.8.4.4
-domain-needed
-bogus-priv
-EOF
-            print_success "Configuración de dnsmasq actualizada"
+        if ! grep -q '^conf-dir=' "$DNSMASQ_CONFIG" 2>/dev/null && ! grep -q '^conf-dir=' "$DNSMASQ_CONFIG" 2>/dev/null; then
+            if ! grep -q 'conf-dir' "$DNSMASQ_CONFIG" 2>/dev/null; then
+                echo "" >> "$DNSMASQ_CONFIG"
+                echo "# Cargar configs adicionales (HostBerry AP)" >> "$DNSMASQ_CONFIG"
+                echo "conf-dir=/etc/dnsmasq.d" >> "$DNSMASQ_CONFIG"
+                print_info "Añadido conf-dir=/etc/dnsmasq.d a $DNSMASQ_CONFIG"
+            fi
         fi
     else
-        # Crear archivo de configuración de dnsmasq desde cero
-        # En modo AP+STA, usar ap0 si existe
-        DNSMASQ_INTERFACE="ap0"
-        if ! ip link show ap0 > /dev/null 2>&1; then
-            DNSMASQ_INTERFACE="$HOSTAPD_INTERFACE"
-        fi
-        
-        print_info "Creando archivo de configuración de dnsmasq (modo AP+STA según TheWalrus - Raspberry Pi 3 B+)..."
+        # Crear /etc/dnsmasq.conf mínimo para que dnsmasq arranque y cargue nuestro archivo
+        print_info "Creando $DNSMASQ_CONFIG mínimo..."
         cat > "$DNSMASQ_CONFIG" <<EOF
-# Configuración de dnsmasq para HostAPD (creada por HostBerry) - Modo AP+STA según TheWalrus (Raspberry Pi 3 B+)
-# Solo servir DHCP en ap0, no en wlan0 (que es STA)
-# Portal cautivo: todo el DNS de la red hostberry resuelve al gateway para mostrar la web de Hostberry
-interface=${DNSMASQ_INTERFACE}
-no-dhcp-interface=${HOSTAPD_INTERFACE}
-bind-interfaces
-dhcp-range=${HOSTAPD_DHCP_START},${HOSTAPD_DHCP_END},255.255.255.0,${HOSTAPD_LEASE_TIME}
-dhcp-option=3,${HOSTAPD_GATEWAY}
-dhcp-option=6,${HOSTAPD_GATEWAY}
-address=/#/${HOSTAPD_GATEWAY}
-server=8.8.8.8
-server=8.8.4.4
-domain-needed
-bogus-priv
+# Configuración mínima para HostBerry (DHCP/DNS en ap0 via /etc/dnsmasq.d)
+conf-dir=/etc/dnsmasq.d
 EOF
         chmod 644 "$DNSMASQ_CONFIG"
-        print_success "Archivo de configuración de dnsmasq creado"
     fi
     
 # Configurar wpa_supplicant para modo STA
@@ -1693,22 +1667,28 @@ EOF
     CAPTIVE_SCRIPT="${INSTALL_DIR}/scripts/captive-portal-setup.sh"
     CAPTIVE_SERVICE="/etc/systemd/system/hostberry-captive-portal.service"
     mkdir -p "${INSTALL_DIR}/scripts"
-    if [ ! -f "$CAPTIVE_SCRIPT" ]; then
-        print_info "Creando script de portal cautivo (HTTP 80 -> web Hostberry)..."
-        cat > "$CAPTIVE_SCRIPT" <<'CAPTIVE_EOF'
+    print_info "Creando/actualizando script de portal cautivo (IP en ap0, DHCP, HTTP -> web Hostberry)..."
+    cat > "$CAPTIVE_SCRIPT" <<'CAPTIVE_EOF'
 #!/bin/bash
-# Portal cautivo HostBerry: redirige tráfico HTTP (puerto 80) desde la red ap0 al puerto de la web
+# HostBerry: asegurar IP en ap0, reiniciar dnsmasq (DHCP) y redirigir HTTP al portal
+# Así los clientes reciben IP y al abrir el navegador ven la web de Hostberry
+
+# 1) Asegurar que ap0 tenga la IP del gateway (necesaria para DHCP)
+ip addr add 192.168.4.1/24 dev ap0 2>/dev/null || true
+
+# 2) Reiniciar dnsmasq para que enlace con ap0 y reparta IPs a los clientes
+systemctl restart dnsmasq 2>/dev/null || true
+
+# 3) Portal cautivo: redirigir HTTP (80) al puerto de la web
 CONFIG_FILE="/opt/hostberry/config.yaml"
 PORT=$(grep -E "^  port:" "$CONFIG_FILE" 2>/dev/null | awk '{print $2}' | tr -d '"' || echo "8000")
-# Evitar reglas duplicadas: borrar si existe y volver a añadir
 iptables -t nat -D PREROUTING -i ap0 -p tcp --dport 80 -j REDIRECT --to-ports "$PORT" 2>/dev/null || true
 iptables -t nat -A PREROUTING -i ap0 -p tcp --dport 80 -j REDIRECT --to-ports "$PORT"
 exit 0
 CAPTIVE_EOF
-        chmod 755 "$CAPTIVE_SCRIPT"
-        chown root:root "$CAPTIVE_SCRIPT"
-        print_success "Script de portal cautivo creado: $CAPTIVE_SCRIPT"
-    fi
+    chmod 755 "$CAPTIVE_SCRIPT"
+    chown root:root "$CAPTIVE_SCRIPT"
+    print_success "Script de portal cautivo actualizado: $CAPTIVE_SCRIPT"
     if [ ! -f "$CAPTIVE_SERVICE" ]; then
         print_info "Creando servicio systemd para portal cautivo..."
         cat > "$CAPTIVE_SERVICE" <<EOF
