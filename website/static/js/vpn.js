@@ -9,10 +9,6 @@
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  function escapeJsString(s) {
-    return String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  }
-
   async function loadConnections() {
     try {
       const resp = await api('/api/v1/vpn/connections');
@@ -27,12 +23,15 @@
           const type = escapeHtml(conn?.type ?? '');
           const statusText = conn?.status === 'connected' ? t('vpn.connected', 'Connected') : t('vpn.disconnected', 'Disconnected');
           const bandwidth = escapeHtml(conn?.bandwidth ?? '');
-          const safeName = escapeJsString(conn?.name ?? '');
           tr.innerHTML =
             '<td>' + name + '</td><td>' + type + '</td>' +
             '<td><span class="badge bg-' + (conn?.status === 'connected' ? 'success' : 'danger') + '">' + escapeHtml(statusText) + '</span></td>' +
             '<td>' + bandwidth + '</td>' +
-            '<td><button class="btn btn-sm btn-outline-primary" type="button" onclick="toggleConnection(\'' + safeName + '\')"><i class="bi bi-' + (conn?.status === 'connected' ? 'pause' : 'play') + '"></i></button></td>';
+            '<td><button class="btn btn-sm btn-outline-primary" type="button"><i class="bi bi-' + (conn?.status === 'connected' ? 'pause' : 'play') + '"></i></button></td>';
+          const toggleBtn = tr.querySelector('button');
+          if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => toggleConnection(conn?.name ?? ''));
+          }
           tbody.appendChild(tr);
         });
       }

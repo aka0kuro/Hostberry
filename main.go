@@ -58,7 +58,6 @@ type SecurityConfig struct {
 	RateLimitRPS int    `yaml:"rate_limit_rps"`
 }
 
-
 var appConfig Config
 
 func generateRandomSecret() string {
@@ -73,7 +72,6 @@ func main() {
 	if err := loadConfig(); err != nil {
 		LogTfatal("logs.config_load_error", err)
 	}
-
 
 	if err := InitI18n("locales"); err != nil {
 		LogTf("logs.i18n_init_warning", err)
@@ -98,7 +96,7 @@ func main() {
 		// Esperar menos tiempo (5 segundos es suficiente)
 		LogTf("logs.wifi_auto_wait")
 		time.Sleep(5 * time.Second)
-		
+
 		// Intentar detectar interfaz (menos intentos, más rápido)
 		var interfaceName string
 		for attempt := 0; attempt < 3; attempt++ {
@@ -116,7 +114,7 @@ func main() {
 				time.Sleep(2 * time.Second)
 			}
 		}
-		
+
 		if interfaceName != "" {
 			LogTf("logs.wifi_auto_start", interfaceName)
 			autoConnectToLastNetwork(interfaceName)
@@ -240,7 +238,6 @@ func createApp() *fiber.App {
 		MaxAge:           3600,
 	}))
 
-
 	app.Use(loggingMiddleware)
 
 	app.Use(LanguageMiddleware)
@@ -338,6 +335,9 @@ func setupRoutes(app *fiber.App) {
 			system.Get("/services", systemServicesHandler)
 			system.Post("/backup", systemBackupHandler)
 			system.Post("/config", systemConfigHandler)
+			system.Post("/updates/execute", systemUpdatesExecuteHandler)
+			system.Post("/updates/project", systemUpdatesProjectHandler)
+			system.Post("/notifications/test-email", systemNotificationsTestEmailHandler)
 			system.Post("/restart", systemRestartHandler)
 			system.Post("/shutdown", systemShutdownHandler)
 		}
@@ -359,6 +359,7 @@ func setupRoutes(app *fiber.App) {
 			wifi.Post("/scan", wifiScanHandler)
 			wifi.Get("/interfaces", wifiInterfacesHandler)
 			wifi.Post("/connect", wifiConnectHandler)
+			wifi.Post("/disconnect", wifiLegacyDisconnectHandler)
 			wifi.Get("/networks", wifiNetworksHandler)
 			wifi.Get("/clients", wifiClientsHandler)
 			wifi.Post("/toggle", wifiToggleHandler)
@@ -382,14 +383,14 @@ func setupRoutes(app *fiber.App) {
 
 		hostapd := api.Group("/hostapd", requireAuth)
 		{
-		hostapd.Get("/access-points", hostapdAccessPointsHandler)
-		hostapd.Get("/clients", hostapdClientsHandler)
-		hostapd.Get("/config", hostapdGetConfigHandler)
-		hostapd.Get("/diagnostics", hostapdDiagnosticsHandler)
-		hostapd.Post("/create-ap0", hostapdCreateAp0Handler)
-		hostapd.Post("/toggle", hostapdToggleHandler)
-		hostapd.Post("/restart", hostapdRestartHandler)
-		hostapd.Post("/config", hostapdConfigHandler)
+			hostapd.Get("/access-points", hostapdAccessPointsHandler)
+			hostapd.Get("/clients", hostapdClientsHandler)
+			hostapd.Get("/config", hostapdGetConfigHandler)
+			hostapd.Get("/diagnostics", hostapdDiagnosticsHandler)
+			hostapd.Post("/create-ap0", hostapdCreateAp0Handler)
+			hostapd.Post("/toggle", hostapdToggleHandler)
+			hostapd.Post("/restart", hostapdRestartHandler)
+			hostapd.Post("/config", hostapdConfigHandler)
 		}
 
 		help := api.Group("/help", requireAuth)
@@ -413,8 +414,14 @@ func setupRoutes(app *fiber.App) {
 		adblock := api.Group("/adblock", requireAuth)
 		{
 			adblock.Get("/status", adblockStatusHandler)
+			adblock.Get("/lists", adblockListsHandler)
+			adblock.Get("/domains", adblockDomainsHandler)
 			adblock.Post("/enable", adblockEnableHandler)
 			adblock.Post("/disable", adblockDisableHandler)
+			adblock.Post("/update", adblockUpdateHandler)
+			adblock.Post("/lists/:name/toggle", adblockToggleListHandler)
+			adblock.Post("/domains/:name/toggle", adblockToggleDomainHandler)
+			adblock.Post("/config", adblockConfigHandler)
 
 			// DNSCrypt (sub-sección de AdBlock)
 			dnscrypt := adblock.Group("/dnscrypt")
@@ -505,20 +512,23 @@ func systemStatsHandler(c *fiber.Ctx) error {
 }
 
 func systemRestartHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
-	
+
 	result := systemRestart(user.Username)
 	if success, ok := result["success"].(bool); ok && success {
 		InsertLog("INFO", fmt.Sprintf("Sistema reiniciado por usuario %s", user.Username), "system", &userID)
 		return c.JSON(result)
 	}
-	
+
 	if err, ok := result["error"].(string); ok {
 		InsertLog("ERROR", fmt.Sprintf("Error reiniciando sistema: %s (usuario: %s)", err, user.Username), "system", &userID)
 		return c.Status(500).JSON(fiber.Map{"error": err})
 	}
-	
+
 	return c.JSON(result)
 }
 
@@ -570,7 +580,7 @@ func wifiInterfacesHandler(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"success":   true,
+		"success":    true,
 		"interfaces": interfaces,
 	})
 }
@@ -583,7 +593,7 @@ func wifiScanHandler(c *fiber.Ctx) error {
 			"error": "No autenticado. Por favor, inicia sesión nuevamente.",
 		})
 	}
-	
+
 	user, ok := userInterface.(*User)
 	if !ok || user == nil {
 		LogT("logs.user_invalid")
@@ -591,7 +601,7 @@ func wifiScanHandler(c *fiber.Ctx) error {
 			"error": "Usuario no encontrado. Por favor, inicia sesión nuevamente.",
 		})
 	}
-	
+
 	interfaceName := c.Query("interface", "")
 	if interfaceName == "" {
 		var req struct {

@@ -95,3 +95,41 @@ func ValidateSSID(ssid string) error {
 	}
 	return nil
 }
+
+const maxConfigSize = 64 * 1024 // 64 KB
+
+// ValidateWireGuardConfig valida tamaño y estructura básica para evitar payloads maliciosos
+func ValidateWireGuardConfig(config string) error {
+	if len(config) == 0 {
+		return fiber.NewError(400, "Configuración requerida")
+	}
+	if len(config) > maxConfigSize {
+		return fiber.NewError(400, "Configuración demasiado grande")
+	}
+	if strings.Contains(config, "\x00") {
+		return fiber.NewError(400, "Configuración contiene bytes nulos inválidos")
+	}
+	lower := strings.ToLower(config)
+	if !strings.Contains(lower, "[interface]") && !strings.Contains(lower, "privatekey") {
+		return fiber.NewError(400, "Configuración WireGuard inválida: debe contener [Interface] y PrivateKey")
+	}
+	return nil
+}
+
+// ValidateVPNConfig valida tamaño y estructura básica para configs OpenVPN
+func ValidateVPNConfig(config string) error {
+	if len(config) == 0 {
+		return fiber.NewError(400, "Configuración requerida")
+	}
+	if len(config) > maxConfigSize {
+		return fiber.NewError(400, "Configuración demasiado grande")
+	}
+	if strings.Contains(config, "\x00") {
+		return fiber.NewError(400, "Configuración contiene bytes nulos inválidos")
+	}
+	lower := strings.ToLower(config)
+	if !strings.Contains(lower, "client") && !strings.Contains(lower, "dev ") && !strings.Contains(lower, "remote ") {
+		return fiber.NewError(400, "Configuración OpenVPN inválida: debe parecer un config cliente válido")
+	}
+	return nil
+}

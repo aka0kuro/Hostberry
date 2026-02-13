@@ -61,6 +61,19 @@ func connectVPN(config, vpnType, user string) map[string]interface{} {
 		result["error"] = "Configuración requerida"
 		return result
 	}
+	if vpnType == "wireguard" {
+		if err := ValidateWireGuardConfig(config); err != nil {
+			result["success"] = false
+			result["error"] = err.Error()
+			return result
+		}
+	} else {
+		if err := ValidateVPNConfig(config); err != nil {
+			result["success"] = false
+			result["error"] = err.Error()
+			return result
+		}
+	}
 
 	if vpnType == "" {
 		vpnType = "openvpn"
@@ -164,9 +177,9 @@ func getWireGuardStatus() map[string]interface{} {
 func configureWireGuard(config, user string) map[string]interface{} {
 	result := make(map[string]interface{})
 
-	if config == "" {
+	if err := ValidateWireGuardConfig(config); err != nil {
 		result["success"] = false
-		result["error"] = "Configuración requerida"
+		result["error"] = err.Error()
 		return result
 	}
 

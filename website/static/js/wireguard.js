@@ -9,10 +9,6 @@
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  function escapeJsString(s) {
-    return String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  }
-
   async function loadConfig() {
     try {
       const resp = await api('/api/v1/wireguard/config');
@@ -40,12 +36,15 @@
           const status = escapeHtml(iface?.status ?? '');
           const address = escapeHtml(iface?.address ?? '');
           const peers = escapeHtml(iface?.peers_count ?? '');
-          const safeName = escapeJsString(iface?.name ?? '');
           tr.innerHTML =
             '<td>' + name + '</td>' +
             '<td><span class="badge bg-' + (iface?.status === 'up' ? 'success' : 'danger') + '">' + status + '</span></td>' +
             '<td>' + address + '</td><td>' + peers + '</td>' +
-            '<td><button class="btn btn-sm btn-outline-primary" type="button" onclick="configureInterface(\'' + safeName + '\')"><i class="bi bi-gear"></i></button></td>';
+            '<td><button class="btn btn-sm btn-outline-primary" type="button"><i class="bi bi-gear"></i></button></td>';
+          const configBtn = tr.querySelector('button');
+          if (configBtn) {
+            configBtn.addEventListener('click', () => configureInterface(iface?.name ?? ''));
+          }
           tbody.appendChild(tr);
         });
       }

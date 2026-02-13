@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -33,7 +35,7 @@ func (rl *RateLimiter) Allow(key string) bool {
 	defer rl.mu.Unlock()
 
 	now := time.Now()
-	
+
 	cutoff := now.Add(-rl.window)
 	validReqs := []time.Time{}
 	for _, reqTime := range rl.requests[key] {
@@ -87,7 +89,16 @@ func rateLimitMiddleware(c *fiber.Ctx) error {
 
 	key := c.IP()
 	if userID := c.Locals("user_id"); userID != nil {
-		key = "user_" + string(rune(userID.(int)))
+		switch v := userID.(type) {
+		case int:
+			key = "user_" + strconv.Itoa(v)
+		case int64:
+			key = "user_" + strconv.FormatInt(v, 10)
+		case float64:
+			key = "user_" + strconv.FormatInt(int64(v), 10)
+		default:
+			key = "user_" + fmt.Sprintf("%v", v)
+		}
 	}
 
 	if !globalRateLimiter.Allow(key) {

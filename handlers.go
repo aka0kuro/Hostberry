@@ -68,7 +68,10 @@ func loginAPIHandler(c *fiber.Ctx) error {
 }
 
 func logoutAPIHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 	InsertLog("INFO", fmt.Sprintf("Usuario %s cerró sesión", user.Username), "auth", &userID)
 
@@ -86,7 +89,10 @@ func logoutAPIHandler(c *fiber.Ctx) error {
 }
 
 func meHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	return c.JSON(fiber.Map{
 		"id":       user.ID,
 		"username": user.Username,
@@ -99,7 +105,10 @@ func meHandler(c *fiber.Ctx) error {
 }
 
 func changePasswordAPIHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 
 	var req struct {
 		CurrentPassword string `json:"current_password"`
@@ -222,7 +231,10 @@ func firstLoginChangeAPIHandler(c *fiber.Ctx) error {
 }
 
 func updateProfileAPIHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 
 	var req struct {
 		Email     string `json:"email"`
@@ -251,7 +263,10 @@ func updateProfileAPIHandler(c *fiber.Ctx) error {
 }
 
 func updatePreferencesAPIHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 
 	var req struct {
 		EmailNotifications bool `json:"email_notifications"`
@@ -287,7 +302,10 @@ func systemInfoHandler(c *fiber.Ctx) error {
 }
 
 func systemShutdownHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	result := systemShutdown(user.Username)
@@ -683,7 +701,10 @@ func wifiConnectHandler(c *fiber.Ctx) error {
 		})
 	}
 
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	country := req.Country
@@ -752,7 +773,10 @@ func vpnConnectHandler(c *fiber.Ctx) error {
 		})
 	}
 
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	result := connectVPN(req.Config, req.Type, user.Username)
@@ -919,11 +943,14 @@ func wireguardConfigHandler(c *fiber.Ctx) error {
 			"error": "Datos inválidos",
 		})
 	}
-	if strings.TrimSpace(req.Config) == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "config requerido (texto completo wg0.conf)"})
+	if err := ValidateWireGuardConfig(req.Config); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	result := configureWireGuard(req.Config, user.Username)
@@ -946,7 +973,10 @@ func adblockStatusHandler(c *fiber.Ctx) error {
 }
 
 func adblockEnableHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	result := enableAdBlock(user.Username)
@@ -964,7 +994,10 @@ func adblockEnableHandler(c *fiber.Ctx) error {
 }
 
 func adblockDisableHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	result := disableAdBlock(user.Username)
@@ -988,7 +1021,10 @@ func dnscryptStatusHandler(c *fiber.Ctx) error {
 }
 
 func dnscryptInstallHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	result := installDNSCrypt(user.Username)
@@ -1015,7 +1051,10 @@ func dnscryptConfigureHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Datos inválidos"})
 	}
 
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	if req.ServerName == "" {
@@ -1037,7 +1076,10 @@ func dnscryptConfigureHandler(c *fiber.Ctx) error {
 }
 
 func dnscryptEnableHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	result := enableDNSCrypt(user.Username)
@@ -1055,7 +1097,10 @@ func dnscryptEnableHandler(c *fiber.Ctx) error {
 }
 
 func dnscryptDisableHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	result := disableDNSCrypt(user.Username)
@@ -1079,7 +1124,10 @@ func torStatusHandler(c *fiber.Ctx) error {
 }
 
 func torInstallHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	result := installTor(user.Username)
@@ -1109,7 +1157,10 @@ func torConfigureHandler(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Datos inválidos"})
 	}
 
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	if req.SocksPort == 0 {
@@ -1134,7 +1185,10 @@ func torConfigureHandler(c *fiber.Ctx) error {
 }
 
 func torEnableHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	result := enableTor(user.Username)
@@ -1152,7 +1206,10 @@ func torEnableHandler(c *fiber.Ctx) error {
 }
 
 func torDisableHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	result := disableTor(user.Username)
@@ -1245,7 +1302,10 @@ func hostapdPageHandler(c *fiber.Ctx) error {
 }
 
 func profilePageHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Redirect("/login")
+	}
 	logs, _, _ := GetLogs("all", 10, 0)
 	type activity struct {
 		Action      string

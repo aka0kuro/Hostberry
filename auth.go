@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,18 +18,18 @@ type Claims struct {
 }
 
 type User struct {
-	ID       int    `gorm:"primaryKey"`
-	Username string `gorm:"unique;not null"`
-	Password string `gorm:"not null"`
-	Email    string
+	ID        int    `gorm:"primaryKey"`
+	Username  string `gorm:"unique;not null"`
+	Password  string `gorm:"not null"`
+	Email     string
 	FirstName string
 	LastName  string
 	Role      string `gorm:"default:admin"`
 	Timezone  string `gorm:"default:UTC"`
 
-	LastLogin      *time.Time
-	LoginCount     int  `gorm:"default:0"`
-	FailedAttempts int  `gorm:"default:0"`
+	LastLogin          *time.Time
+	LoginCount         int  `gorm:"default:0"`
+	FailedAttempts     int  `gorm:"default:0"`
 	EmailNotifications bool `gorm:"default:false"`
 	SystemAlerts       bool `gorm:"default:false"`
 	SecurityAlerts     bool `gorm:"default:false"`
@@ -36,14 +37,14 @@ type User struct {
 	DataCollection     bool `gorm:"default:false"`
 	Analytics          bool `gorm:"default:false"`
 
-	IsActive bool   `gorm:"default:true"`
+	IsActive  bool `gorm:"default:true"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
 func GenerateToken(user *User) (string, error) {
 	expirationTime := time.Now().Add(time.Duration(appConfig.Security.TokenExpiry) * time.Minute)
-	
+
 	claims := &Claims{
 		Username: user.Username,
 		UserID:   user.ID,
@@ -63,9 +64,9 @@ func ValidateToken(tokenString string) (*Claims, error) {
 	if tokenString == "" {
 		return nil, errors.New("token vacío")
 	}
-	
+
 	claims := &Claims{}
-	
+
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("método de firma inválido")
@@ -118,15 +119,36 @@ func CheckPassword(password, hash string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(normalized), []byte(password)) == nil
 }
 
+func getMaxLoginAttempts() int {
+	defaultAttempts := 3
+	raw, err := GetConfig("max_login_attempts")
+	if err != nil {
+		return defaultAttempts
+	}
+	v, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || v <= 0 || v > 20 {
+		return defaultAttempts
+	}
+	return v
+}
+
 func Login(username, password string) (*User, string, error) {
 	var user User
 	if err := db.Where("username = ? AND is_active = ?", username, true).First(&user).Error; err != nil {
 		return nil, "", errors.New("usuario o contraseña incorrectos")
 	}
 
+	maxAttempts := getMaxLoginAttempts()
+	if user.FailedAttempts >= maxAttempts {
+		return nil, "", fmt.Errorf("demasiados intentos fallidos. Intenta nuevamente más tarde")
+	}
+
 	if !CheckPassword(password, user.Password) {
 		user.FailedAttempts++
 		_ = db.Save(&user).Error
+		if user.FailedAttempts >= maxAttempts {
+			return nil, "", fmt.Errorf("demasiados intentos fallidos. Intenta nuevamente más tarde")
+		}
 		return nil, "", errors.New("usuario o contraseña incorrectos")
 	}
 
@@ -155,11 +177,20 @@ func Register(username, password, email string) (*User, error) {
 	if username == "" {
 		return nil, errors.New("el nombre de usuario no puede estar vacío")
 	}
-	
+	if err := ValidateUsername(username); err != nil {
+		return nil, err
+	}
+
 	if password == "" {
 		return nil, errors.New("la contraseña no puede estar vacía")
 	}
-	
+	if err := ValidatePassword(password); err != nil {
+		return nil, err
+	}
+	if err := ValidateEmail(email); err != nil {
+		return nil, err
+	}
+
 	var existingUser User
 	if err := db.Where("username = ?", username).First(&existingUser).Error; err == nil {
 		return nil, errors.New("el usuario ya existe")

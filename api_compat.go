@@ -8,13 +8,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
-
 
 func systemActivityHandler(c *fiber.Ctx) error {
 	limitStr := c.Query("limit", "10")
@@ -50,13 +50,47 @@ func systemNetworkHandler(c *fiber.Ctx) error {
 }
 
 func systemUpdatesHandler(c *fiber.Ctx) error {
-	return c.JSON(fiber.Map{"available": false})
+	commands := []string{
+		"apt list --upgradable 2>/dev/null | tail -n +2 | cut -d/ -f1",
+		"apt-get -s upgrade 2>/dev/null | awk '/^Inst /{print $2}'",
+	}
+
+	pkgSet := make(map[string]struct{})
+	for _, cmdText := range commands {
+		out, err := exec.Command("sh", "-c", cmdText).Output()
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+			pkg := strings.TrimSpace(line)
+			if pkg == "" {
+				continue
+			}
+			pkgSet[pkg] = struct{}{}
+		}
+		if len(pkgSet) > 0 {
+			break
+		}
+	}
+
+	updates := make([]string, 0, len(pkgSet))
+	for pkg := range pkgSet {
+		updates = append(updates, pkg)
+	}
+	sort.Strings(updates)
+
+	return c.JSON(fiber.Map{
+		"success":           true,
+		"updates_available": len(updates) > 0,
+		"update_count":      len(updates),
+		"updates":           updates,
+		"available":         len(updates) > 0, // compatibilidad con clientes antiguos
+	})
 }
 
 func systemBackupHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": false, "message": "Backup no implementado aún"})
 }
-
 
 func networkRoutingHandler(c *fiber.Ctx) error {
 	out, err := exec.Command("sh", "-c", "ip route 2>/dev/null").CombinedOutput()
@@ -67,7 +101,7 @@ func networkRoutingHandler(c *fiber.Ctx) error {
 	var routes []fiber.Map
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 	LogTf("logs.api_processing_routes", len(lines))
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -79,7 +113,7 @@ func networkRoutingHandler(c *fiber.Ctx) error {
 		}
 		route := fiber.Map{"raw": line}
 		route["destination"] = parts[0]
-		
+
 		for i := 0; i < len(parts)-1; i++ {
 			if parts[i] == "via" && i+1 < len(parts) {
 				route["gateway"] = parts[i+1]
@@ -91,22 +125,22 @@ func networkRoutingHandler(c *fiber.Ctx) error {
 				route["metric"] = parts[i+1]
 			}
 		}
-		
+
 		if _, hasGateway := route["gateway"]; !hasGateway {
 			route["gateway"] = "*"
 		}
-		
+
 		if _, hasInterface := route["interface"]; !hasInterface {
 			route["interface"] = "-"
 		}
-		
+
 		if _, hasMetric := route["metric"]; !hasMetric {
 			route["metric"] = "0"
 		}
-		
+
 		routes = append(routes, route)
 	}
-	
+
 	LogTf("logs.api_returning_routes", len(routes))
 	return c.JSON(routes)
 }
@@ -215,7 +249,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 
 	errors := []string{}
 	applied := []string{}
-	
+
 	if req.Hostname != "" {
 		if len(req.Hostname) > 64 || len(req.Hostname) < 1 {
 			errors = append(errors, "Hostname must be between 1 and 64 characters")
@@ -227,7 +261,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 				hostnameApplied := false
 				var lastError error
 				var lastOutput string
-				
+
 				if !hostnameApplied {
 					cmd := fmt.Sprintf("sudo hostnamectl set-hostname %s", req.Hostname)
 					if out, err := executeCommand(cmd); err == nil {
@@ -255,51 +289,57 @@ func networkConfigHandler(c *fiber.Ctx) error {
 						lastOutput = out
 					}
 				}
-				
+
 				if !hostnameApplied {
 					hostnameFile := "/etc/hostname"
-					writeCmdStr := fmt.Sprintf("echo '%s' > %s", req.Hostname, hostnameFile)
-					if out, err := executeCommand("sudo " + writeCmdStr); err == nil {
-						if content, err := os.ReadFile(hostnameFile); err == nil {
-							writtenHostname := strings.TrimSpace(string(content))
-							if writtenHostname == req.Hostname {
-								applyCmdStr := fmt.Sprintf("sudo hostname %s", req.Hostname)
-								if applyOut, err := executeCommand(applyCmdStr); err == nil {
-									verifyCmd := exec.Command("hostname")
-									if verifyOut, err := verifyCmd.Output(); err == nil {
-										currentHostname := strings.TrimSpace(string(verifyOut))
-										if currentHostname == req.Hostname {
-											hostnameApplied = true
-											LogTf("logs.api_hostname_file_set", req.Hostname)
-											_ = applyOut
-										} else {
-											LogTf("logs.api_hostname_file_verify_failed", req.Hostname, currentHostname)
-											lastError = fmt.Errorf("verification failed: got %s", currentHostname)
-											lastOutput = applyOut
+					tmpHostname := "/tmp/hostname_hostberry_" + fmt.Sprintf("%d", time.Now().Unix())
+					if wErr := os.WriteFile(tmpHostname, []byte(req.Hostname+"\n"), 0644); wErr == nil {
+						defer os.Remove(tmpHostname)
+						cpCmd := exec.Command("sh", "-c", fmt.Sprintf("sudo cp -f %s %s", tmpHostname, hostnameFile))
+						cpOut, cpErr := cpCmd.CombinedOutput()
+						out := strings.TrimSpace(string(cpOut))
+						if cpErr == nil {
+							if content, err := os.ReadFile(hostnameFile); err == nil {
+								writtenHostname := strings.TrimSpace(string(content))
+								if writtenHostname == req.Hostname {
+									applyCmdStr := fmt.Sprintf("sudo hostname %s", req.Hostname)
+									if applyOut, applyErr := executeCommand(applyCmdStr); applyErr == nil {
+										verifyCmd := exec.Command("hostname")
+										if verifyOut, err := verifyCmd.Output(); err == nil {
+											currentHostname := strings.TrimSpace(string(verifyOut))
+											if currentHostname == req.Hostname {
+												hostnameApplied = true
+												LogTf("logs.api_hostname_file_set", req.Hostname)
+												_ = applyOut
+											} else {
+												LogTf("logs.api_hostname_file_verify_failed", req.Hostname, currentHostname)
+												lastError = fmt.Errorf("verification failed: got %s", currentHostname)
+												lastOutput = applyOut
+											}
 										}
+									} else {
+										LogTf("logs.api_hostname_apply_failed", applyErr, applyOut)
+										lastError = applyErr
+										lastOutput = applyOut
 									}
 								} else {
-									LogTf("logs.api_hostname_apply_failed", err, applyOut)
-									lastError = err
-									lastOutput = applyOut
+									LogTf("logs.api_hostname_write_mismatch", req.Hostname, writtenHostname)
+									lastError = fmt.Errorf("written hostname mismatch")
+									lastOutput = out
 								}
 							} else {
-								LogTf("logs.api_hostname_write_mismatch", req.Hostname, writtenHostname)
-								lastError = fmt.Errorf("written hostname mismatch")
+								LogTf("logs.api_hostname_read_failed", err)
+								lastError = err
 								lastOutput = out
 							}
 						} else {
-							LogTf("logs.api_hostname_read_failed", err)
-							lastError = err
+							LogTf("logs.api_hostname_write_failed", cpErr, out)
+							lastError = cpErr
 							lastOutput = out
 						}
-					} else {
-						LogTf("logs.api_hostname_write_failed", err, out)
-						lastError = err
-						lastOutput = out
 					}
 				}
-				
+
 				if !hostnameApplied {
 					cmd := fmt.Sprintf("sudo hostname %s", req.Hostname)
 					if out, err := executeCommand(cmd); err == nil {
@@ -327,48 +367,48 @@ func networkConfigHandler(c *fiber.Ctx) error {
 						lastOutput = out
 					}
 				}
-				
+
 				if hostnameApplied {
 					hostsFile := "/etc/hosts"
 					tmpFile := "/tmp/hosts_hostberry_" + fmt.Sprintf("%d", time.Now().Unix())
-					
+
 					LogTf("logs.api_hosts_creating", req.Hostname)
-					
+
 					newContent := "# See `man hosts` for details.\n"
 					newContent += "#\n"
 					newContent += "# By default, systemd-resolved or libnss-myhostname will resolve\n"
 					newContent += "# localhost and the system hostname if they're not specified here.\n"
-					
+
 					if req.Hostname != "" {
 						newContent += fmt.Sprintf("127.0.0.1\tlocalhost\t%s\n", req.Hostname)
 					} else {
 						newContent += "127.0.0.1\tlocalhost\n"
 					}
-					
+
 					newContent += "::1\t\tlocalhost\n"
-					
+
 					if err := os.WriteFile(tmpFile, []byte(newContent), 0644); err != nil {
 						LogTf("logs.api_hosts_temp_error", err)
 					} else {
 						log.Printf("Created new hosts file in /tmp: %s", tmpFile)
 						log.Printf("File content:\n%s", newContent)
-						
+
 						if _, err := os.Stat(tmpFile); os.IsNotExist(err) {
 							log.Printf("Error: Temp file does not exist after creation")
 						} else {
 							log.Printf("Temp file verified: exists and readable")
-							
+
 							copySuccess := false
 							cpPath := "/bin/cp"
 							if _, err := os.Stat(cpPath); os.IsNotExist(err) {
 								cpPath = "/usr/bin/cp"
 							}
-							
+
 							log.Printf("Attempting to copy with cp: %s -f %s %s", cpPath, tmpFile, hostsFile)
 							cpCmd := exec.Command("sudo", cpPath, "-f", tmpFile, hostsFile)
 							cpCmd.Env = append(os.Environ(), "SUDO_ASKPASS=/bin/false")
 							cpOut, cpErr := cpCmd.CombinedOutput()
-							
+
 							time.Sleep(200 * time.Millisecond) // Pausa para asegurar que el archivo se escribió
 							if content, err := os.ReadFile(hostsFile); err == nil {
 								if strings.Contains(string(content), req.Hostname) {
@@ -381,7 +421,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 										log.Printf("cp command executed but hostname not found in /etc/hosts")
 									}
 									log.Printf("Current /etc/hosts content:\n%s", string(content))
-									
+
 									if strings.Contains(string(cpOut), "Read-only file system") || strings.Contains(string(cpOut), "Read-only") {
 										log.Printf("Warning: /etc/hosts appears to be on a read-only file system")
 										log.Printf("Attempting to remount /etc as read-write...")
@@ -412,7 +452,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 									log.Printf("cp command executed but could not read /etc/hosts: %v", err)
 								}
 							}
-							
+
 							if !copySuccess {
 								log.Printf("Trying alternative method: cat with tee")
 								catCmd := exec.Command("sh", "-c", fmt.Sprintf("sudo cat %s | sudo tee %s > /dev/null", tmpFile, hostsFile))
@@ -433,7 +473,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 									}
 								}
 							}
-							
+
 							if !copySuccess {
 								log.Printf("Trying sh -c method with direct redirection")
 								writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat %s > %s", tmpFile, hostsFile))
@@ -454,7 +494,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 									}
 								}
 							}
-							
+
 							if copySuccess {
 								chmodPath := "/bin/chmod"
 								if _, err := os.Stat(chmodPath); os.IsNotExist(err) {
@@ -466,7 +506,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 								} else {
 									log.Printf("Permissions set correctly")
 								}
-								
+
 								if content, err := os.ReadFile(hostsFile); err == nil {
 									if strings.Contains(string(content), req.Hostname) {
 										log.Printf("Final verification: hostname %s successfully updated in /etc/hosts", req.Hostname)
@@ -479,10 +519,10 @@ func networkConfigHandler(c *fiber.Ctx) error {
 								log.Printf("Error: All copy methods failed. /etc/hosts was not updated.")
 							}
 						}
-						
+
 						os.Remove(tmpFile)
 					}
-					
+
 					applied = append(applied, fmt.Sprintf("Hostname set to %s and /etc/hosts updated", req.Hostname))
 				} else {
 					errorMsg := fmt.Sprintf("Failed to set hostname: tried hostnamectl, /etc/hostname, and hostname command")
@@ -502,7 +542,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
-	
+
 	dnsServers := []string{}
 	if req.DNS1 != "" {
 		ipRegex := regexp.MustCompile(`^([0-9]{1,3}\.){3}[0-9]{1,3}$`)
@@ -512,7 +552,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 			dnsServers = append(dnsServers, req.DNS1)
 		}
 	}
-	
+
 	if req.DNS2 != "" {
 		ipRegex := regexp.MustCompile(`^([0-9]{1,3}\.){3}[0-9]{1,3}$`)
 		if !ipRegex.MatchString(req.DNS2) {
@@ -521,11 +561,11 @@ func networkConfigHandler(c *fiber.Ctx) error {
 			dnsServers = append(dnsServers, req.DNS2)
 		}
 	}
-	
+
 	if len(dnsServers) > 0 {
 		dnsApplied := false
 		dnsStr := strings.Join(dnsServers, " ")
-		
+
 		if !dnsApplied {
 			connCmd := exec.Command("sh", "-c", "nmcli -t -f NAME connection show --active 2>/dev/null | head -1")
 			if connOut, err := connCmd.Output(); err == nil {
@@ -544,7 +584,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
-		
+
 		if !dnsApplied {
 			resolvedConf := "/etc/systemd/resolved.conf"
 			if _, err := os.Stat(resolvedConf); err == nil {
@@ -553,7 +593,7 @@ func networkConfigHandler(c *fiber.Ctx) error {
 					lines := strings.Split(string(content), "\n")
 					updated := false
 					newLines := []string{}
-					
+
 					for _, line := range lines {
 						trimmed := strings.TrimSpace(line)
 						if strings.HasPrefix(trimmed, "DNS=") {
@@ -566,11 +606,11 @@ func networkConfigHandler(c *fiber.Ctx) error {
 							newLines = append(newLines, line)
 						}
 					}
-					
+
 					if !updated {
 						newLines = append(newLines, "DNS="+strings.Join(dnsServers, " "))
 					}
-					
+
 					newContent := strings.Join(newLines, "\n")
 					writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", resolvedConf))
 					writeCmd.Stdin = strings.NewReader(newContent)
@@ -583,27 +623,27 @@ func networkConfigHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
-		
+
 		if !dnsApplied {
 			resolvConf := "/etc/resolv.conf"
 			executeCommand(fmt.Sprintf("sudo cp %s %s.backup 2>/dev/null || true", resolvConf, resolvConf))
-			
+
 			content, err := os.ReadFile(resolvConf)
 			if err == nil {
 				lines := strings.Split(string(content), "\n")
 				newLines := []string{}
-				
+
 				for _, line := range lines {
 					trimmed := strings.TrimSpace(line)
 					if !strings.HasPrefix(trimmed, "nameserver") {
 						newLines = append(newLines, line)
 					}
 				}
-				
+
 				for _, dns := range dnsServers {
 					newLines = append(newLines, "nameserver "+dns)
 				}
-				
+
 				newContent := strings.Join(newLines, "\n")
 				writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", resolvConf))
 				writeCmd.Stdin = strings.NewReader(newContent)
@@ -616,19 +656,19 @@ func networkConfigHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
-		
+
 		if !dnsApplied {
 			errors = append(errors, fmt.Sprintf("Failed to set DNS: tried NetworkManager, systemd-resolved, and /etc/resolv.conf"))
 		}
 	}
-	
+
 	if req.Gateway != "" {
 		ipRegex := regexp.MustCompile(`^([0-9]{1,3}\.){3}[0-9]{1,3}$`)
 		if !ipRegex.MatchString(req.Gateway) {
 			errors = append(errors, "Invalid Gateway format")
 		} else {
 			gatewayApplied := false
-			
+
 			if !gatewayApplied {
 				connCmd := exec.Command("sh", "-c", "nmcli -t -f NAME connection show --active 2>/dev/null | head -1")
 				if connOut, err := connCmd.Output(); err == nil {
@@ -650,14 +690,14 @@ func networkConfigHandler(c *fiber.Ctx) error {
 					}
 				}
 			}
-			
+
 			if !gatewayApplied {
 				ifaceCmd := exec.Command("sh", "-c", "ip route | grep default | awk '{print $5}' | head -1")
 				iface := ""
 				if ifaceOut, err := ifaceCmd.Output(); err == nil {
 					iface = strings.TrimSpace(string(ifaceOut))
 				}
-				
+
 				if iface != "" {
 					executeCommand("sudo ip route del default 2>/dev/null || true")
 					cmd := fmt.Sprintf("sudo ip route add default via %s dev %s 2>&1", req.Gateway, iface)
@@ -680,14 +720,14 @@ func networkConfigHandler(c *fiber.Ctx) error {
 					}
 				}
 			}
-			
+
 			if !gatewayApplied {
 				ifaceCmd := exec.Command("sh", "-c", "route -n | grep '^0.0.0.0' | awk '{print $8}' | head -1")
 				iface := ""
 				if ifaceOut, err := ifaceCmd.Output(); err == nil {
 					iface = strings.TrimSpace(string(ifaceOut))
 				}
-				
+
 				if iface != "" {
 					executeCommand("sudo route del default 2>/dev/null || true")
 					cmd := fmt.Sprintf("sudo route add default gw %s %s 2>&1", req.Gateway, iface)
@@ -700,13 +740,13 @@ func networkConfigHandler(c *fiber.Ctx) error {
 					}
 				}
 			}
-			
+
 			if !gatewayApplied {
 				errors = append(errors, fmt.Sprintf("Failed to set gateway: tried NetworkManager, ip route, and route command"))
 			}
 		}
 	}
-	
+
 	if len(errors) > 0 {
 		errorMsg := strings.Join(errors, "; ")
 		if len(applied) > 0 {
@@ -722,13 +762,12 @@ func networkConfigHandler(c *fiber.Ctx) error {
 	if len(applied) > 0 {
 		message = strings.Join(applied, "; ")
 	}
-	
+
 	return c.JSON(fiber.Map{
 		"success": true,
 		"message": message,
 	})
 }
-
 
 func wifiNetworksHandler(c *fiber.Ctx) error {
 	interfaceName := c.Query("interface", DefaultWiFiInterface)
@@ -744,32 +783,34 @@ func wifiClientsHandler(c *fiber.Ctx) error {
 }
 
 func wifiToggleHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	interfaceName := c.Query("interface", DefaultWiFiInterface)
 	rfkillCheck := exec.Command("sh", "-c", "sudo rfkill list wifi 2>/dev/null | grep -i 'soft blocked'")
 	rfkillOut, _ := rfkillCheck.Output()
 	isBlocked := strings.Contains(strings.ToLower(string(rfkillOut)), "yes")
-	
+
 	result := toggleWiFi(interfaceName, isBlocked)
-	
+
 	if success, ok := result["success"].(bool); ok && success {
 		InsertLog("INFO", fmt.Sprintf("WiFi toggle exitoso (usuario: %s)", user.Username), "wifi", &userID)
 		return c.JSON(result)
 	}
-	
+
 	if errorMsg, ok := result["error"].(string); ok && errorMsg != "" {
 		InsertLog("ERROR", fmt.Sprintf("Error en WiFi toggle (usuario: %s): %s", user.Username, errorMsg), "wifi", &userID)
 		return c.Status(500).JSON(fiber.Map{"success": false, "error": errorMsg})
 	}
-	
 
 	rfkillOut, rfkillErr := execCommand("rfkill list wifi 2>/dev/null | grep -i 'wifi' | head -1").CombinedOutput()
 	if rfkillErr == nil && strings.Contains(strings.ToLower(string(rfkillOut)), "wifi") {
 		statusOut, _ := execCommand("rfkill list wifi 2>/dev/null | grep -i 'soft blocked'").CombinedOutput()
 		isBlocked := strings.Contains(strings.ToLower(string(statusOut)), "yes")
-		
+
 		var rfkillCmd string
 		var wasEnabled bool
 		if isBlocked {
@@ -779,12 +820,12 @@ func wifiToggleHandler(c *fiber.Ctx) error {
 			rfkillCmd = "rfkill block wifi"
 			wasEnabled = true
 		}
-		
+
 		_, rfkillToggleErr := execCommand(rfkillCmd + " 2>/dev/null").CombinedOutput()
 		if rfkillToggleErr == nil {
 			if !wasEnabled {
 				time.Sleep(1 * time.Second)
-				
+
 				ifaceCmd := exec.Command("sh", "-c", "ip -o link show | awk -F': ' '{print $2}' | grep -E '^wlan|^wl' | head -1")
 				ifaceOut, ifaceErr := ifaceCmd.Output()
 				if ifaceErr == nil {
@@ -805,18 +846,18 @@ func wifiToggleHandler(c *fiber.Ctx) error {
 	if ipErr == nil {
 		iface = strings.TrimSpace(string(ipOut))
 	}
-	
+
 	if iface == "" {
 		iwOut, iwErr := execCommand("iwconfig 2>/dev/null | grep -i 'wlan' | head -1 | awk '{print $1}'").CombinedOutput()
 		if iwErr == nil {
 			iface = strings.TrimSpace(string(iwOut))
 		}
 	}
-	
+
 	if iface != "" {
 		statusOut, _ := exec.Command("sh", "-c", fmt.Sprintf("ip link show %s 2>/dev/null | grep -i 'state'", iface)).CombinedOutput()
 		isDown := strings.Contains(strings.ToLower(string(statusOut)), "down") || strings.Contains(strings.ToLower(string(statusOut)), "disabled")
-		
+
 		if isDown {
 			execCommand("rfkill unblock wifi 2>/dev/null").Run()
 			execCommand(fmt.Sprintf("ip link set %s up 2>/dev/null", iface)).Run()
@@ -838,7 +879,10 @@ func wifiToggleHandler(c *fiber.Ctx) error {
 }
 
 func wifiUnblockHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	success := false
@@ -885,7 +929,7 @@ func wifiUnblockHandler(c *fiber.Ctx) error {
 
 	if success {
 		time.Sleep(1 * time.Second)
-		
+
 		InsertLog("INFO", fmt.Sprintf("WiFi desbloqueado exitosamente usando %s (usuario: %s)", method, user.Username), "wifi", &userID)
 		return c.JSON(fiber.Map{"success": true, "message": "WiFi desbloqueado exitosamente"})
 	}
@@ -894,7 +938,7 @@ func wifiUnblockHandler(c *fiber.Ctx) error {
 	if lastError != nil {
 		errorDetails += fmt.Sprintf(" Último error: %v", lastError)
 	}
-	
+
 	availableCmds := []string{}
 	if exec.Command("sh", "-c", "command -v rfkill 2>/dev/null").Run() == nil {
 		availableCmds = append(availableCmds, "rfkill")
@@ -902,19 +946,22 @@ func wifiUnblockHandler(c *fiber.Ctx) error {
 	if exec.Command("sh", "-c", "command -v nmcli 2>/dev/null").Run() == nil {
 		availableCmds = append(availableCmds, "nmcli")
 	}
-	
+
 	if len(availableCmds) == 0 {
 		errorDetails += " No se encontraron comandos rfkill ni nmcli instalados."
 	} else {
 		errorDetails += fmt.Sprintf(" Comandos disponibles: %s. Verifica permisos sudo (NOPASSWD) ejecutando: sudo fix_wifi_permissions.sh", strings.Join(availableCmds, ", "))
 	}
-	
+
 	InsertLog("ERROR", fmt.Sprintf("Error desbloqueando WiFi (usuario: %s): %s", user.Username, errorDetails), "wifi", &userID)
 	return c.Status(500).JSON(fiber.Map{"error": errorDetails})
 }
 
 func wifiSoftwareSwitchHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	rfkillCheck := exec.Command("sh", "-c", "command -v rfkill 2>/dev/null")
@@ -967,9 +1014,12 @@ func wifiSoftwareSwitchHandler(c *fiber.Ctx) error {
 }
 
 func wifiConfigHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
-	
+
 	var req struct {
 		SSID     string `json:"ssid"`
 		Password string `json:"password"`
@@ -979,31 +1029,31 @@ func wifiConfigHandler(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Datos inválidos"})
 	}
-	
+
 	if req.Region != "" {
 		if len(req.Region) != 2 {
 			return c.Status(400).JSON(fiber.Map{"error": "Código de región inválido. Debe ser de 2 letras (ej: US, ES, GB)"})
 		}
-		
+
 		req.Region = strings.ToUpper(req.Region)
-		
+
 		iwCheck := exec.Command("sh", "-c", "command -v iw 2>/dev/null")
 		if iwCheck.Run() == nil {
 			cmd := exec.Command("sh", "-c", fmt.Sprintf("sudo iw reg set %s 2>&1", req.Region))
 			out, err := cmd.CombinedOutput()
 			output := strings.TrimSpace(string(out))
-			
+
 			if err == nil {
 				verifyCmd := exec.Command("sh", "-c", "iw reg get 2>&1")
 				verifyOut, _ := verifyCmd.CombinedOutput()
 				verifyOutput := strings.TrimSpace(string(verifyOut))
-				
+
 				if strings.Contains(verifyOutput, req.Region) || output == "" {
 					InsertLog("INFO", fmt.Sprintf("Región WiFi cambiada a %s usando iw (usuario: %s)", req.Region, user.Username), "wifi", &userID)
 					return c.JSON(fiber.Map{"success": true, "message": "Región WiFi cambiada exitosamente a " + req.Region})
 				}
 			}
-			
+
 			crdaCmd := exec.Command("sh", "-c", fmt.Sprintf("echo 'REGDOMAIN=%s' | sudo tee /etc/default/crda >/dev/null 2>&1", req.Region))
 			if crdaCmd.Run() == nil {
 				InsertLog("INFO", fmt.Sprintf("Región WiFi configurada a %s en crda (usuario: %s)", req.Region, user.Username), "wifi", &userID)
@@ -1012,35 +1062,34 @@ func wifiConfigHandler(c *fiber.Ctx) error {
 				exec.Command("sh", "-c", "sudo nmcli radio wifi on 2>/dev/null").Run()
 				return c.JSON(fiber.Map{"success": true, "message": "Región WiFi configurada exitosamente. WiFi reiniciado para aplicar cambios."})
 			}
-			
+
 			regdomCmd := exec.Command("sh", "-c", fmt.Sprintf("echo '%s' | sudo tee /etc/conf.d/wireless-regdom >/dev/null 2>&1", req.Region))
 			if regdomCmd.Run() == nil {
 				InsertLog("INFO", fmt.Sprintf("Región WiFi configurada a %s en wireless-regdom (usuario: %s)", req.Region, user.Username), "wifi", &userID)
 				return c.JSON(fiber.Map{"success": true, "message": "Región WiFi configurada. Reinicia WiFi o el sistema para aplicar cambios."})
 			}
 		}
-		
+
 		crdaCmd2 := exec.Command("sh", "-c", fmt.Sprintf("echo 'REGDOMAIN=%s' | sudo tee /etc/default/crda >/dev/null 2>&1", req.Region))
 		if crdaCmd2.Run() == nil {
 			InsertLog("INFO", fmt.Sprintf("Región WiFi configurada a %s (usuario: %s)", req.Region, user.Username), "wifi", &userID)
 			return c.JSON(fiber.Map{"success": true, "message": "Región WiFi configurada. Reinicia WiFi para aplicar cambios."})
 		}
-		
+
 		errorMsg := fmt.Sprintf("No se pudo cambiar la región WiFi automáticamente. Verifica que 'iw' esté instalado (sudo apt-get install iw) y que tengas permisos sudo configurados. Puedes configurarlo manualmente ejecutando: sudo iw reg set %s", req.Region)
 		InsertLog("ERROR", fmt.Sprintf("Error cambiando región WiFi a %s (usuario: %s): %s", req.Region, user.Username, errorMsg), "wifi", &userID)
 		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
 	}
-	
+
 	if req.SSID != "" {
 		c.Request().Header.SetContentType(fiber.MIMEApplicationJSON)
 		body, _ := json.Marshal(fiber.Map{"ssid": req.SSID, "password": req.Password})
 		c.Request().SetBody(body)
 		return wifiConnectHandler(c)
 	}
-	
+
 	return c.Status(400).JSON(fiber.Map{"error": "Se requiere ssid o region"})
 }
-
 
 func vpnConnectionsHandler(c *fiber.Ctx) error {
 	result := getVPNStatus()
@@ -1057,10 +1106,14 @@ func vpnConnectionsHandler(c *fiber.Ctx) error {
 	return c.JSON(conns)
 }
 
-func vpnServersHandler(c *fiber.Ctx) error  { return c.JSON([]fiber.Map{}) }
-func vpnClientsHandler(c *fiber.Ctx) error  { return c.JSON([]fiber.Map{}) }
-func vpnToggleHandler(c *fiber.Ctx) error   { return c.Status(501).JSON(fiber.Map{"error": "VPN toggle no implementado"}) }
-func vpnConfigHandler(c *fiber.Ctx) error   { return c.Status(501).JSON(fiber.Map{"error": "VPN config no implementado"}) }
+func vpnServersHandler(c *fiber.Ctx) error { return c.JSON([]fiber.Map{}) }
+func vpnClientsHandler(c *fiber.Ctx) error { return c.JSON([]fiber.Map{}) }
+func vpnToggleHandler(c *fiber.Ctx) error {
+	return c.Status(501).JSON(fiber.Map{"error": "VPN toggle no implementado"})
+}
+func vpnConfigHandler(c *fiber.Ctx) error {
+	return c.Status(501).JSON(fiber.Map{"error": "VPN config no implementado"})
+}
 func vpnConnectionToggleHandler(c *fiber.Ctx) error {
 	return c.Status(501).JSON(fiber.Map{"error": "VPN connection toggle no implementado"})
 }
@@ -1068,19 +1121,18 @@ func vpnCertificatesGenerateHandler(c *fiber.Ctx) error {
 	return c.Status(501).JSON(fiber.Map{"error": "VPN certificates no implementado"})
 }
 
-
 func hostapdAccessPointsHandler(c *fiber.Ctx) error {
 	var aps []fiber.Map
-	
+
 	hostapdActive := false
 	hostapdTransmitting := false // Verificar si realmente está transmitiendo
-	
+
 	systemctlOut, _ := exec.Command("sh", "-c", "systemctl is-active hostapd 2>/dev/null").CombinedOutput()
 	systemctlStatus := strings.TrimSpace(string(systemctlOut))
 	if systemctlStatus == "active" {
 		hostapdActive = true
 	}
-	
+
 	if !hostapdActive {
 		pgrepOut, _ := exec.Command("sh", "-c", "pgrep hostapd > /dev/null 2>&1 && echo active || echo inactive").CombinedOutput()
 		pgrepStatus := strings.TrimSpace(string(pgrepOut))
@@ -1088,7 +1140,7 @@ func hostapdAccessPointsHandler(c *fiber.Ctx) error {
 			hostapdActive = true
 		}
 	}
-	
+
 	if hostapdActive {
 		interfaceName := "ap0" // default para modo AP+STA
 		if configContent, err := os.ReadFile("/etc/hostapd/hostapd.conf"); err == nil {
@@ -1104,13 +1156,13 @@ func hostapdAccessPointsHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
-		
+
 		iwOut, _ := exec.Command("sh", "-c", fmt.Sprintf("iw dev %s info 2>/dev/null | grep -i 'type AP' || iwconfig %s 2>/dev/null | grep -i 'mode:master' || echo ''", interfaceName, interfaceName)).CombinedOutput()
 		iwStatus := strings.TrimSpace(string(iwOut))
 		if iwStatus != "" {
 			hostapdTransmitting = true
 		}
-		
+
 		if !hostapdTransmitting {
 			cliStatusOut, _ := exec.Command("sh", "-c", fmt.Sprintf("hostapd_cli -i %s status 2>/dev/null | grep -i 'state=ENABLED' || echo ''", interfaceName)).CombinedOutput()
 			cliStatus := strings.TrimSpace(string(cliStatusOut))
@@ -1118,7 +1170,7 @@ func hostapdAccessPointsHandler(c *fiber.Ctx) error {
 				hostapdTransmitting = true
 			}
 		}
-		
+
 		if !hostapdTransmitting {
 			journalOut, _ := exec.Command("sh", "-c", "sudo journalctl -u hostapd -n 30 --no-pager 2>/dev/null | tail -20").CombinedOutput()
 			journalLogs := strings.ToLower(string(journalOut))
@@ -1130,10 +1182,10 @@ func hostapdAccessPointsHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
-	
+
 	configPath := "/etc/hostapd/hostapd.conf"
 	config := make(map[string]string)
-	
+
 	if configContent, err := os.ReadFile(configPath); err == nil {
 		lines := strings.Split(string(configContent), "\n")
 		for _, line := range lines {
@@ -1149,23 +1201,23 @@ func hostapdAccessPointsHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
-	
+
 	if hostapdActive || len(config) > 0 {
 		ssid := config["ssid"]
 		if ssid == "" {
 			ssid = "hostberry-ap" // Valor por defecto
 		}
-		
+
 		interfaceName := config["interface"]
 		if interfaceName == "" {
 			interfaceName = DefaultWiFiInterface
 		}
-		
+
 		channel := config["channel"]
 		if channel == "" {
 			channel = "6" // Valor por defecto
 		}
-		
+
 		security := "WPA2"
 		if config["auth_algs"] == "0" {
 			security = "Open"
@@ -1174,7 +1226,7 @@ func hostapdAccessPointsHandler(c *fiber.Ctx) error {
 		} else if config["wpa"] == "2" {
 			security = "WPA2"
 		}
-		
+
 		clientsCount := 0
 		if hostapdActive {
 			cliOut, err := exec.Command("sh", "-c", fmt.Sprintf("hostapd_cli -i %s all_sta 2>/dev/null | grep -c '^sta=' || echo 0", interfaceName)).CombinedOutput()
@@ -1184,18 +1236,18 @@ func hostapdAccessPointsHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
-		
+
 		actuallyActive := hostapdActive && hostapdTransmitting
-		
+
 		aps = append(aps, fiber.Map{
-			"name":          interfaceName,
-			"ssid":          ssid,
-			"interface":     interfaceName,
-			"channel":       channel,
-			"security":      security,
-			"enabled":       actuallyActive, // Solo true si realmente está transmitiendo
-			"active":        actuallyActive, // Solo true si realmente está transmitiendo
-			"status":        func() string {
+			"name":      interfaceName,
+			"ssid":      ssid,
+			"interface": interfaceName,
+			"channel":   channel,
+			"security":  security,
+			"enabled":   actuallyActive, // Solo true si realmente está transmitiendo
+			"active":    actuallyActive, // Solo true si realmente está transmitiendo
+			"status": func() string {
 				if actuallyActive {
 					return "active"
 				} else if hostapdActive {
@@ -1203,21 +1255,21 @@ func hostapdAccessPointsHandler(c *fiber.Ctx) error {
 				}
 				return "inactive"
 			}(),
-			"transmitting":  hostapdTransmitting, // Nuevo campo para diagnóstico
-			"service_running": hostapdActive,     // Servicio corriendo (pero puede no transmitir)
-			"clients_count": clientsCount,
+			"transmitting":    hostapdTransmitting, // Nuevo campo para diagnóstico
+			"service_running": hostapdActive,       // Servicio corriendo (pero puede no transmitir)
+			"clients_count":   clientsCount,
 		})
 	}
-	
+
 	return c.JSON(aps)
 }
 
 func hostapdClientsHandler(c *fiber.Ctx) error {
 	var clients []fiber.Map
-	
+
 	hostapdOut, _ := exec.Command("sh", "-c", "systemctl is-active hostapd 2>/dev/null || pgrep hostapd > /dev/null && echo active || echo inactive").CombinedOutput()
 	hostapdStatus := strings.TrimSpace(string(hostapdOut))
-	
+
 	if hostapdStatus == "active" {
 		cliOut, err := exec.Command("hostapd_cli", "-i", "wlan0", "all_sta").CombinedOutput()
 		if err == nil && len(cliOut) > 0 {
@@ -1236,20 +1288,20 @@ func hostapdClientsHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
-	
+
 	return c.JSON(clients)
 }
 
 func hostapdCreateAp0Handler(c *fiber.Ctx) error {
 	phyInterface := "wlan0"
-	
+
 	interfacesResp, _ := executeCommand("ip link show | grep -E '^[0-9]+: wlan' | awk -F: '{print $2}' | awk '{print $1}' | head -1")
 	if strings.TrimSpace(interfacesResp) != "" {
 		phyInterface = strings.TrimSpace(interfacesResp)
 	}
-	
+
 	log.Printf("Creating ap0 interface from %s", phyInterface)
-	
+
 	ap0CheckCmd := "ip link show ap0 2>/dev/null"
 	ap0Exists := false
 	if out, err := executeCommand(ap0CheckCmd); err == nil && strings.TrimSpace(out) != "" {
@@ -1261,58 +1313,58 @@ func hostapdCreateAp0Handler(c *fiber.Ctx) error {
 			"exists":  true,
 		})
 	}
-	
+
 	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null || true", phyInterface))
 	time.Sleep(500 * time.Millisecond)
-	
+
 	phyName := ""
 	phyCmd2 := fmt.Sprintf("cat /sys/class/net/%s/phy80211/name 2>/dev/null", phyInterface)
 	phyOut2, _ := executeCommand(phyCmd2)
 	phyName = strings.TrimSpace(phyOut2)
-	
+
 	if phyName == "" {
 		phyCmd := fmt.Sprintf("iw dev %s info 2>/dev/null | grep 'wiphy' | awk '{print $2}'", phyInterface)
 		phyOut, _ := executeCommand(phyCmd)
 		phyName = strings.TrimSpace(phyOut)
 	}
-	
+
 	if phyName == "" {
 		phyCmd3 := "iw list 2>/dev/null | grep 'Wiphy' | head -1 | awk '{print $2}'"
 		phyOut3, _ := executeCommand(phyCmd3)
 		phyName = strings.TrimSpace(phyOut3)
 	}
-	
+
 	if phyName == "" {
 		phyName = "phy0"
 		log.Printf("Warning: Could not detect phy name, using default: %s", phyName)
 	}
-	
+
 	log.Printf("Detected phy name: %s for interface %s", phyName, phyInterface)
-	
+
 	delOut, _ := executeCommand("sudo iw dev ap0 del 2>/dev/null || true")
 	if delOut != "" {
 		log.Printf("Removed existing ap0 interface (if it existed): %s", strings.TrimSpace(delOut))
 	}
 	time.Sleep(1 * time.Second)
-	
+
 	createApCmd := fmt.Sprintf("sudo iw phy %s interface add ap0 type __ap 2>&1", phyName)
 	log.Printf("Executing: %s", createApCmd)
 	createOut, createErr := executeCommand(createApCmd)
 	if createOut != "" {
 		log.Printf("Command output: %s", strings.TrimSpace(createOut))
 	}
-	
+
 	if createErr != nil {
 		log.Printf("Error creating ap0 with phy %s: %s", phyName, strings.TrimSpace(createOut))
 		log.Printf("Trying alternative method: using interface %s directly...", phyInterface)
-		
+
 		createApCmd2 := fmt.Sprintf("sudo iw dev %s interface add ap0 type __ap 2>&1", phyInterface)
 		log.Printf("Executing: %s", createApCmd2)
 		createOut2, createErr2 := executeCommand(createApCmd2)
 		if createOut2 != "" {
 			log.Printf("Method 1 output: %s", strings.TrimSpace(createOut2))
 		}
-		
+
 		if createErr2 != nil {
 			log.Printf("Error with alternative method: %s", strings.TrimSpace(createOut2))
 			return c.Status(500).JSON(fiber.Map{
@@ -1327,10 +1379,10 @@ func hostapdCreateAp0Handler(c *fiber.Ctx) error {
 		log.Printf("Successfully created ap0 interface using phy %s", phyName)
 		ap0Exists = true
 	}
-	
+
 	if ap0Exists {
 		time.Sleep(2 * time.Second)
-		
+
 		verified := false
 		for i := 0; i < 5; i++ {
 			verifyCmd := "ip link show ap0 2>/dev/null"
@@ -1340,13 +1392,13 @@ func hostapdCreateAp0Handler(c *fiber.Ctx) error {
 				verified = true
 				break
 			}
-			
+
 			if i < 4 {
 				log.Printf("Verification attempt %d failed, retrying...", i+1)
 				time.Sleep(1 * time.Second)
 			}
 		}
-		
+
 		if !verified {
 			log.Printf("ERROR: Interface ap0 was NOT created successfully after all attempts")
 			return c.Status(500).JSON(fiber.Map{
@@ -1363,7 +1415,7 @@ func hostapdCreateAp0Handler(c *fiber.Ctx) error {
 			})
 		}
 	}
-	
+
 	return c.Status(500).JSON(fiber.Map{
 		"success": false,
 		"error":   "Failed to create ap0 interface",
@@ -1372,48 +1424,48 @@ func hostapdCreateAp0Handler(c *fiber.Ctx) error {
 
 func hostapdToggleHandler(c *fiber.Ctx) error {
 	log.Printf("HostAPD toggle request received")
-	
+
 	hostapdOut, _ := exec.Command("sh", "-c", "systemctl is-active hostapd 2>/dev/null || pgrep hostapd > /dev/null && echo active || echo inactive").CombinedOutput()
 	hostapdStatus := strings.TrimSpace(string(hostapdOut))
 	isActive := hostapdStatus == "active"
-	
+
 	log.Printf("Current HostAPD status: %s (isActive: %v)", hostapdStatus, isActive)
-	
+
 	var cmdStr string
 	var enableCmd string
 	var action string
-	
+
 	if isActive {
 		action = "disable"
 		executeCommand("sudo systemctl stop dnsmasq 2>/dev/null || true")
 		cmdStr = "sudo systemctl stop hostapd"
 		enableCmd = "sudo systemctl disable hostapd 2>/dev/null || true"
-		
+
 	} else {
 		action = "enable"
-		
+
 		configPath := "/etc/hostapd/hostapd.conf"
 		if _, err := os.Stat(configPath); os.IsNotExist(err) {
 			log.Printf("HostAPD configuration file not found: %s", configPath)
 			return c.Status(400).JSON(fiber.Map{
-				"error":         "HostAPD configuration not found. Please configure HostAPD first using the configuration form below.",
-				"success":       false,
+				"error":          "HostAPD configuration not found. Please configure HostAPD first using the configuration form below.",
+				"success":        false,
 				"config_missing": true,
-				"config_path":   configPath,
+				"config_path":    configPath,
 			})
 		}
-		
+
 		configContent, err := os.ReadFile(configPath)
 		if err != nil || len(configContent) == 0 {
 			log.Printf("HostAPD configuration file is empty or unreadable: %s", configPath)
 			return c.Status(400).JSON(fiber.Map{
-				"error":         "HostAPD configuration file is empty or invalid. Please configure HostAPD first using the configuration form below.",
-				"success":       false,
+				"error":          "HostAPD configuration file is empty or invalid. Please configure HostAPD first using the configuration form below.",
+				"success":        false,
 				"config_missing": true,
-				"config_path":   configPath,
+				"config_path":    configPath,
 			})
 		}
-		
+
 		ap0CheckCmd := "ip link show ap0 2>/dev/null"
 		ap0Exists := false
 		if out, err := executeCommand(ap0CheckCmd); err == nil && strings.TrimSpace(out) != "" {
@@ -1431,38 +1483,38 @@ func hostapdToggleHandler(c *fiber.Ctx) error {
 					}
 				}
 			}
-			
+
 			executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null || true", phyInterface))
 			time.Sleep(500 * time.Millisecond)
-			
+
 			phyName := ""
-			
+
 			phyCmd := fmt.Sprintf("iw dev %s info 2>/dev/null | grep 'wiphy' | awk '{print $2}'", phyInterface)
 			phyOut, _ := executeCommand(phyCmd)
 			phyName = strings.TrimSpace(phyOut)
-			
+
 			if phyName == "" {
 				phyCmd2 := fmt.Sprintf("cat /sys/class/net/%s/phy80211/name 2>/dev/null", phyInterface)
 				phyOut2, _ := executeCommand(phyCmd2)
 				phyName = strings.TrimSpace(phyOut2)
 			}
-			
+
 			if phyName == "" {
 				phyCmd3 := "iw list 2>/dev/null | grep -A 1 'Wiphy' | tail -1 | awk '{print $2}'"
 				phyOut3, _ := executeCommand(phyCmd3)
 				phyName = strings.TrimSpace(phyOut3)
 			}
-			
+
 			if phyName == "" {
 				phyName = "phy0"
 				log.Printf("Warning: Could not detect phy name, using default: %s", phyName)
 			}
-			
+
 			log.Printf("Creating ap0 interface using phy %s from interface %s...", phyName, phyInterface)
-			
+
 			executeCommand("sudo iw dev ap0 del 2>/dev/null || true")
 			time.Sleep(1 * time.Second)
-			
+
 			createApCmd := fmt.Sprintf("sudo iw phy %s interface add ap0 type __ap", phyName)
 			createOut, createErr := executeCommand(createApCmd)
 			if createErr != nil {
@@ -1479,7 +1531,7 @@ func hostapdToggleHandler(c *fiber.Ctx) error {
 				log.Printf("Successfully created ap0 interface using phy %s", phyName)
 				ap0Exists = true
 			}
-			
+
 			if ap0Exists {
 				verifyCmd := "ip link show ap0 2>/dev/null"
 				verifyOut, verifyErr := executeCommand(verifyCmd)
@@ -1492,14 +1544,14 @@ func hostapdToggleHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
-		
+
 		maskedCheck, _ := exec.Command("sh", "-c", "systemctl is-enabled hostapd 2>&1").CombinedOutput()
 		maskedStatus := strings.TrimSpace(string(maskedCheck))
 		if strings.Contains(maskedStatus, "masked") {
 			log.Printf("HostAPD service is masked, unmasking...")
 			executeCommand("sudo systemctl unmask hostapd 2>/dev/null || true")
 		}
-		
+
 		configLines := strings.Split(string(configContent), "\n")
 		var interfaceName, gatewayIP string
 		for _, line := range configLines {
@@ -1511,53 +1563,53 @@ func hostapdToggleHandler(c *fiber.Ctx) error {
 				interfaceName = strings.TrimPrefix(line, "interface=")
 			}
 		}
-		
+
 		if interfaceName == "" {
 			log.Printf("HostAPD configuration file missing interface setting: %s", configPath)
 			return c.Status(400).JSON(fiber.Map{
-				"error":         "HostAPD configuration file is missing required 'interface' setting. Please configure HostAPD first using the configuration form below.",
-				"success":       false,
+				"error":          "HostAPD configuration file is missing required 'interface' setting. Please configure HostAPD first using the configuration form below.",
+				"success":        false,
 				"config_missing": true,
-				"config_path":   configPath,
+				"config_path":    configPath,
 			})
 		}
-		
+
 		if interfaceName != "" {
 			gatewayIP = "192.168.4.1"
-			
+
 			ipCheckCmd := fmt.Sprintf("ip addr show %s 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1", interfaceName)
 			ipOut, _ := exec.Command("sh", "-c", ipCheckCmd).CombinedOutput()
 			currentIP := strings.TrimSpace(string(ipOut))
-			
+
 			if currentIP == "" {
 				log.Printf("Configuring IP %s on interface %s", gatewayIP, interfaceName)
 				ipCmd := fmt.Sprintf("sudo ip addr add %s/24 dev %s 2>/dev/null || sudo ip addr replace %s/24 dev %s", gatewayIP, interfaceName, gatewayIP, interfaceName)
 				if out, err := executeCommand(ipCmd); err != nil {
 					log.Printf("Warning: Error setting IP on interface: %s", strings.TrimSpace(out))
 				}
-				
+
 				if out, err := executeCommand(fmt.Sprintf("sudo ip link set %s up", interfaceName)); err != nil {
 					log.Printf("Warning: Error bringing interface up: %s", strings.TrimSpace(out))
 				}
 			}
 		}
-		
+
 		executeCommand("sudo systemctl unmask hostapd 2>/dev/null || true")
 		executeCommand("sudo systemctl unmask dnsmasq 2>/dev/null || true")
-		
+
 		executeCommand("sudo systemctl daemon-reload 2>/dev/null || true")
-		
+
 		enableCmd = "sudo systemctl enable hostapd 2>/dev/null || true"
 		executeCommand("sudo systemctl enable dnsmasq 2>/dev/null || true")
-		
+
 		executeCommand(fmt.Sprintf("sudo chmod 644 %s 2>/dev/null || true", configPath))
-		
+
 		cmdStr = "sudo systemctl start hostapd"
 		executeCommand("sudo systemctl start dnsmasq 2>/dev/null || true")
 	}
-	
+
 	log.Printf("Action: %s, Command: %s", action, cmdStr)
-	
+
 	if enableCmd != "" {
 		if out, err := executeCommand(enableCmd); err != nil {
 			log.Printf("Warning: Error enabling/disabling hostapd: %s", strings.TrimSpace(out))
@@ -1565,11 +1617,11 @@ func hostapdToggleHandler(c *fiber.Ctx) error {
 			log.Printf("Enable/disable command executed successfully: %s", strings.TrimSpace(out))
 		}
 	}
-	
+
 	out, err := executeCommand(cmdStr)
 	if err != nil {
 		log.Printf("Error executing %s command: %s", action, strings.TrimSpace(out))
-		
+
 		var errorDetails string
 		if action == "enable" {
 			journalOut, _ := exec.Command("sh", "-c", "sudo journalctl -u hostapd -n 20 --no-pager 2>/dev/null | tail -10").CombinedOutput()
@@ -1579,7 +1631,7 @@ func hostapdToggleHandler(c *fiber.Ctx) error {
 				errorLines := []string{}
 				for _, line := range lines {
 					line = strings.TrimSpace(line)
-					if line != "" && (strings.Contains(strings.ToLower(line), "error") || 
+					if line != "" && (strings.Contains(strings.ToLower(line), "error") ||
 						strings.Contains(strings.ToLower(line), "failed") ||
 						strings.Contains(strings.ToLower(line), "fail")) {
 						errorLines = append(errorLines, line)
@@ -1598,36 +1650,36 @@ func hostapdToggleHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
-		
+
 		return c.Status(500).JSON(fiber.Map{
 			"error":   fmt.Sprintf("Failed to %s hostapd: %s%s", action, strings.TrimSpace(out), errorDetails),
 			"success": false,
 		})
 	}
-	
+
 	log.Printf("HostAPD %s command executed. Output: %s", action, strings.TrimSpace(out))
-	
+
 	if action == "enable" {
 		time.Sleep(1500 * time.Millisecond) // Más tiempo para que hostapd inicie
 	} else {
 		time.Sleep(500 * time.Millisecond)
 	}
-	
+
 	hostapdOut2, _ := exec.Command("sh", "-c", "systemctl is-active hostapd 2>/dev/null || pgrep hostapd > /dev/null && echo active || echo inactive").CombinedOutput()
 	hostapdStatus2 := strings.TrimSpace(string(hostapdOut2))
 	actuallyActive := hostapdStatus2 == "active"
-	
+
 	if action == "enable" && !actuallyActive {
 		log.Printf("HostAPD failed to start. Checking logs...")
 		enabledOut, _ := exec.Command("sh", "-c", "systemctl is-enabled hostapd 2>/dev/null || echo disabled").CombinedOutput()
 		enabledStatus := strings.TrimSpace(string(enabledOut))
-		
+
 		journalOut, _ := exec.Command("sh", "-c", "sudo journalctl -u hostapd -n 15 --no-pager 2>/dev/null | tail -8").CombinedOutput()
 		journalLogs := strings.TrimSpace(string(journalOut))
-		
+
 		statusOut, _ := exec.Command("sh", "-c", "sudo systemctl status hostapd --no-pager 2>/dev/null | head -20").CombinedOutput()
 		statusInfo := strings.TrimSpace(string(statusOut))
-		
+
 		var errorMsg string
 		if journalLogs != "" {
 			lines := strings.Split(journalLogs, "\n")
@@ -1636,7 +1688,7 @@ func hostapdToggleHandler(c *fiber.Ctx) error {
 				line = strings.TrimSpace(line)
 				if line != "" {
 					lowerLine := strings.ToLower(line)
-					if strings.Contains(lowerLine, "error") || strings.Contains(lowerLine, "failed") || 
+					if strings.Contains(lowerLine, "error") || strings.Contains(lowerLine, "failed") ||
 						strings.Contains(lowerLine, "fail") || strings.Contains(lowerLine, "cannot") {
 						errorLines = append(errorLines, line)
 					}
@@ -1656,11 +1708,11 @@ func hostapdToggleHandler(c *fiber.Ctx) error {
 				errorMsg = strings.Join(lines[len(lines)-maxLines:], "; ")
 			}
 		}
-		
+
 		if errorMsg == "" && statusInfo != "" {
 			statusLines := strings.Split(statusInfo, "\n")
 			for _, line := range statusLines {
-				if strings.Contains(strings.ToLower(line), "active:") || 
+				if strings.Contains(strings.ToLower(line), "active:") ||
 					strings.Contains(strings.ToLower(line), "failed") ||
 					strings.Contains(strings.ToLower(line), "error") {
 					errorMsg = strings.TrimSpace(line)
@@ -1668,7 +1720,7 @@ func hostapdToggleHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
-		
+
 		if errorMsg != "" {
 			return c.Status(500).JSON(fiber.Map{
 				"error":   fmt.Sprintf("Failed to enable HostAPD. Service status: %s (enabled: %s). %s", hostapdStatus2, enabledStatus, errorMsg),
@@ -1685,9 +1737,9 @@ func hostapdToggleHandler(c *fiber.Ctx) error {
 			})
 		}
 	}
-	
+
 	log.Printf("HostAPD status after %s: %s (actuallyActive: %v)", action, hostapdStatus2, actuallyActive)
-	
+
 	return c.JSON(fiber.Map{
 		"success": true,
 		"output":  strings.TrimSpace(out),
@@ -1699,22 +1751,22 @@ func hostapdToggleHandler(c *fiber.Ctx) error {
 
 func hostapdRestartHandler(c *fiber.Ctx) error {
 	out1, err1 := executeCommand("sudo systemctl stop hostapd")
-	
+
 	time.Sleep(500 * time.Millisecond)
-	
+
 	out2, err2 := executeCommand("sudo systemctl start hostapd")
-	
+
 	if err1 != nil || err2 != nil {
 		return c.Status(500).JSON(fiber.Map{
-			"error":  "Error reiniciando HostAPD",
-			"stop":   strings.TrimSpace(out1),
+			"error":   "Error reiniciando HostAPD",
+			"stop":    strings.TrimSpace(out1),
 			"start":   strings.TrimSpace(out2),
 			"stopOk":  err1 == nil,
 			"startOk": err2 == nil,
 			"success": false,
 		})
 	}
-	
+
 	return c.JSON(fiber.Map{
 		"success": true,
 		"output":  "HostAPD restarted successfully",
@@ -1723,17 +1775,17 @@ func hostapdRestartHandler(c *fiber.Ctx) error {
 
 func hostapdDiagnosticsHandler(c *fiber.Ctx) error {
 	diagnostics := make(map[string]interface{})
-	
+
 	systemctlOut, _ := exec.Command("sh", "-c", "systemctl is-active hostapd 2>/dev/null").CombinedOutput()
 	systemctlStatus := strings.TrimSpace(string(systemctlOut))
 	pgrepOut, _ := exec.Command("sh", "-c", "pgrep hostapd > /dev/null 2>&1 && echo active || echo inactive").CombinedOutput()
 	pgrepStatus := strings.TrimSpace(string(pgrepOut))
-	
+
 	serviceRunning := systemctlStatus == "active" || pgrepStatus == "active"
 	diagnostics["service_running"] = serviceRunning
 	diagnostics["systemctl_status"] = systemctlStatus
 	diagnostics["process_running"] = pgrepStatus == "active"
-	
+
 	interfaceName := "wlan0"
 	configPath := "/etc/hostapd/hostapd.conf"
 	if configContent, err := os.ReadFile(configPath); err == nil {
@@ -1750,11 +1802,11 @@ func hostapdDiagnosticsHandler(c *fiber.Ctx) error {
 		}
 	}
 	diagnostics["interface"] = interfaceName
-	
+
 	iwOut, _ := exec.Command("sh", "-c", fmt.Sprintf("iw dev %s info 2>/dev/null | grep -i 'type AP' || iwconfig %s 2>/dev/null | grep -i 'mode:master' || echo ''", interfaceName, interfaceName)).CombinedOutput()
 	iwStatus := strings.TrimSpace(string(iwOut))
 	transmitting := iwStatus != ""
-	
+
 	if !transmitting && serviceRunning {
 		cliStatusOut, _ := exec.Command("sh", "-c", fmt.Sprintf("hostapd_cli -i %s status 2>/dev/null | grep -i 'state=ENABLED' || echo ''", interfaceName)).CombinedOutput()
 		cliStatus := strings.TrimSpace(string(cliStatusOut))
@@ -1762,14 +1814,14 @@ func hostapdDiagnosticsHandler(c *fiber.Ctx) error {
 			transmitting = true
 		}
 	}
-	
+
 	diagnostics["transmitting"] = transmitting
 	diagnostics["interface_in_ap_mode"] = iwStatus != ""
-	
+
 	journalOut, _ := exec.Command("sh", "-c", "sudo journalctl -u hostapd -n 50 --no-pager 2>/dev/null | tail -30").CombinedOutput()
 	journalLogs := string(journalOut)
 	diagnostics["recent_logs"] = journalLogs
-	
+
 	errors := []string{}
 	journalLower := strings.ToLower(journalLogs)
 	if strings.Contains(journalLower, "could not configure driver") {
@@ -1787,18 +1839,18 @@ func hostapdDiagnosticsHandler(c *fiber.Ctx) error {
 	if strings.Contains(journalLower, "could not set channel") {
 		errors = append(errors, "Channel configuration error")
 	}
-	
+
 	diagnostics["errors"] = errors
 	diagnostics["has_errors"] = len(errors) > 0
-	
+
 	ipOut, _ := exec.Command("sh", "-c", fmt.Sprintf("ip addr show %s 2>/dev/null | grep -i 'state UP' || echo ''", interfaceName)).CombinedOutput()
 	interfaceUp := strings.Contains(strings.ToLower(string(ipOut)), "state up")
 	diagnostics["interface_up"] = interfaceUp
-	
+
 	dnsmasqOut, _ := exec.Command("sh", "-c", "systemctl is-active dnsmasq 2>/dev/null || echo inactive").CombinedOutput()
 	dnsmasqStatus := strings.TrimSpace(string(dnsmasqOut))
 	diagnostics["dnsmasq_running"] = dnsmasqStatus == "active"
-	
+
 	diagnostics["status"] = func() string {
 		if !serviceRunning {
 			return "service_stopped"
@@ -1808,13 +1860,13 @@ func hostapdDiagnosticsHandler(c *fiber.Ctx) error {
 		}
 		return "ok"
 	}()
-	
+
 	return c.JSON(diagnostics)
 }
 
 func hostapdGetConfigHandler(c *fiber.Ctx) error {
 	configPath := "/etc/hostapd/hostapd.conf"
-	
+
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return c.JSON(fiber.Map{
 			"success": false,
@@ -1822,7 +1874,7 @@ func hostapdGetConfigHandler(c *fiber.Ctx) error {
 			"config":  nil,
 		})
 	}
-	
+
 	configContent, err := os.ReadFile(configPath)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
@@ -1831,7 +1883,7 @@ func hostapdGetConfigHandler(c *fiber.Ctx) error {
 			"config":  nil,
 		})
 	}
-	
+
 	config := make(map[string]string)
 	lines := strings.Split(string(configContent), "\n")
 	for _, line := range lines {
@@ -1846,12 +1898,12 @@ func hostapdGetConfigHandler(c *fiber.Ctx) error {
 			config[key] = value
 		}
 	}
-	
+
 	interfaceForDisplay := config["interface"]
 	if interfaceForDisplay == "ap0" {
 		interfaceForDisplay = "wlan0"
 	}
-	
+
 	result := fiber.Map{
 		"success": true,
 		"config": fiber.Map{
@@ -1861,7 +1913,7 @@ func hostapdGetConfigHandler(c *fiber.Ctx) error {
 			"password":  config["wpa_passphrase"], // Devolver la contraseña para que el usuario pueda verla/editarla
 		},
 	}
-	
+
 	if config["auth_algs"] == "0" {
 		result["config"].(fiber.Map)["security"] = "open"
 	} else if strings.Contains(config["wpa_key_mgmt"], "SHA256") {
@@ -1871,7 +1923,7 @@ func hostapdGetConfigHandler(c *fiber.Ctx) error {
 	} else {
 		result["config"].(fiber.Map)["security"] = "wpa2" // Por defecto
 	}
-	
+
 	dnsmasqPath := "/etc/dnsmasq.conf"
 	if dnsmasqContent, err := os.ReadFile(dnsmasqPath); err == nil {
 		dnsmasqLines := strings.Split(string(dnsmasqContent), "\n")
@@ -1893,7 +1945,7 @@ func hostapdGetConfigHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
-	
+
 	configMap := result["config"].(fiber.Map)
 	if configMap["gateway"] == nil || configMap["gateway"] == "" {
 		configMap["gateway"] = "192.168.4.1"
@@ -1910,7 +1962,7 @@ func hostapdGetConfigHandler(c *fiber.Ctx) error {
 	if configMap["channel"] == nil || configMap["channel"] == "" {
 		configMap["channel"] = "6"
 	}
-	
+
 	countryCode := config["country_code"]
 	if countryCode == "" {
 		countryCode = config["country"] // Algunas configuraciones usan "country" en lugar de "country_code"
@@ -1919,7 +1971,7 @@ func hostapdGetConfigHandler(c *fiber.Ctx) error {
 		countryCode = DefaultCountryCode
 	}
 	configMap["country"] = countryCode
-	
+
 	return c.JSON(result)
 }
 
@@ -1936,21 +1988,21 @@ func hostapdConfigHandler(c *fiber.Ctx) error {
 		LeaseTime      string `json:"lease_time"`
 		Country        string `json:"country"`
 	}
-	
+
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{
 			"error":   "Invalid request body",
 			"success": false,
 		})
 	}
-	
+
 	if req.Interface == "" || req.SSID == "" || req.Channel < 1 || req.Channel > 13 {
 		return c.Status(400).JSON(fiber.Map{
 			"error":   "Missing required fields: interface, ssid, channel",
 			"success": false,
 		})
 	}
-	
+
 	if req.Gateway == "" {
 		req.Gateway = "192.168.4.1"
 	}
@@ -1966,47 +2018,47 @@ func hostapdConfigHandler(c *fiber.Ctx) error {
 	if req.Country == "" {
 		req.Country = DefaultCountryCode
 	}
-	
+
 	if len(req.Country) != 2 {
 		req.Country = "US"
 	}
 	req.Country = strings.ToUpper(req.Country)
-	
+
 	if req.Security != "wpa2" && req.Security != "wpa3" && req.Security != "open" {
 		req.Security = "wpa2"
 	}
-	
+
 	apInterface := "ap0"
 	phyInterface := req.Interface // wlan0 o la interfaz física
-	
+
 	log.Printf("Configuring AP+STA mode: creating virtual interface %s from %s", apInterface, phyInterface)
-	
+
 	executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null || true", phyInterface))
 	time.Sleep(500 * time.Millisecond)
-	
+
 	phyName := ""
 	phyCmd2 := fmt.Sprintf("cat /sys/class/net/%s/phy80211/name 2>/dev/null", phyInterface)
 	phyOut2, _ := executeCommand(phyCmd2)
 	phyName = strings.TrimSpace(phyOut2)
-	
+
 	if phyName == "" {
 		phyCmd := fmt.Sprintf("iw dev %s info 2>/dev/null | grep 'wiphy' | awk '{print $2}'", phyInterface)
 		phyOut, _ := executeCommand(phyCmd)
 		phyName = strings.TrimSpace(phyOut)
 	}
-	
+
 	if phyName == "" {
 		phyCmd3 := fmt.Sprintf("iw phy | grep -B 5 '%s' | grep 'Wiphy' | awk '{print $2}' | head -1", phyInterface)
 		phyOut3, _ := executeCommand(phyCmd3)
 		phyName = strings.TrimSpace(phyOut3)
 	}
-	
+
 	if phyName == "" {
 		phyCmd4 := "iw list 2>/dev/null | grep 'Wiphy' | head -1 | awk '{print $2}'"
 		phyOut4, _ := executeCommand(phyCmd4)
 		phyName = strings.TrimSpace(phyOut4)
 	}
-	
+
 	if phyName == "" {
 		if strings.HasPrefix(phyInterface, "wlan") {
 			if numStr := strings.TrimPrefix(phyInterface, "wlan"); numStr != "" {
@@ -2015,14 +2067,14 @@ func hostapdConfigHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
-	
+
 	if phyName == "" {
 		phyName = "phy0"
 		log.Printf("Warning: Could not detect phy name, using default: %s", phyName)
 	}
-	
+
 	log.Printf("Detected phy name: %s for interface %s", phyName, phyInterface)
-	
+
 	macAddress := ""
 	macCmd := exec.Command("sh", "-c", fmt.Sprintf("cat /sys/class/net/%s/address 2>/dev/null", phyInterface))
 	if macOut, err := macCmd.Output(); err == nil {
@@ -2032,13 +2084,13 @@ func hostapdConfigHandler(c *fiber.Ctx) error {
 		log.Printf("Warning: Could not get MAC address for %s", phyInterface)
 		macAddress = "00:00:00:00:00:00" // Valor por defecto
 	}
-	
+
 	log.Printf("Using phy: %s (MAC: %s) for virtual interface creation from %s", phyName, macAddress, phyInterface)
-	
+
 	if apInterface == "ap0" {
 		log.Printf("Creating udev rule for automatic ap0 interface creation (TheWalrus method - Raspberry Pi 3 B+)")
 		udevRulePath := "/etc/udev/rules.d/70-persistent-net.rules"
-		
+
 		checkCmd := exec.Command("sh", "-c", fmt.Sprintf("grep -q 'ap0' %s 2>/dev/null && echo 'exists' || echo 'not_exists'", udevRulePath))
 		checkOut, _ := checkCmd.Output()
 		if strings.TrimSpace(string(checkOut)) != "exists" {
@@ -2047,7 +2099,7 @@ SUBSYSTEM=="ieee80211", ACTION=="add|change", ATTR{macaddress}=="%s", KERNEL=="%
 RUN+="/sbin/iw phy %s interface add ap0 type __ap", \
 RUN+="/bin/ip link set ap0 address %s"
 `, macAddress, phyName, phyName, macAddress)
-			
+
 			tmpUdevFile := "/tmp/70-persistent-net.rules.tmp"
 			if err := os.WriteFile(tmpUdevFile, []byte(udevRuleContent), 0644); err == nil {
 				if _, err := os.Stat(udevRulePath); err == nil {
@@ -2067,7 +2119,7 @@ RUN+="/bin/ip link set ap0 address %s"
 			log.Printf("udev rule for ap0 already exists")
 		}
 	}
-	
+
 	checkApCmd := fmt.Sprintf("ip link show %s 2>/dev/null", apInterface)
 	apExists := false
 	checkOut, checkErr := executeCommand(checkApCmd)
@@ -2076,18 +2128,18 @@ RUN+="/bin/ip link set ap0 address %s"
 		log.Printf("Interface %s already exists, reusing it", apInterface)
 		executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null || true", apInterface))
 	}
-	
+
 	if !apExists {
 		log.Printf("Interface %s does not exist, creating it...", apInterface)
-		
+
 		delOut, delErr := executeCommand(fmt.Sprintf("sudo iw dev %s del 2>/dev/null || true", apInterface))
 		if delErr == nil {
 			log.Printf("Removed existing %s interface (if it existed): %s", apInterface, strings.TrimSpace(delOut))
 		}
 		time.Sleep(1 * time.Second)
-		
+
 		log.Printf("Creating virtual interface %s using phy %s...", apInterface, phyName)
-		
+
 		phyExistsCmd := fmt.Sprintf("iw phy %s info 2>/dev/null", phyName)
 		phyExistsOut, phyExistsErr := executeCommand(phyExistsCmd)
 		if phyExistsErr != nil || strings.TrimSpace(phyExistsOut) == "" {
@@ -2095,7 +2147,7 @@ RUN+="/bin/ip link set ap0 address %s"
 		} else {
 			log.Printf("phy %s exists and is accessible", phyName)
 		}
-		
+
 		phyCheckCmd := fmt.Sprintf("iw phy %s info 2>/dev/null | grep -i 'AP'", phyName)
 		phyCheckOut, _ := executeCommand(phyCheckCmd)
 		if strings.TrimSpace(phyCheckOut) == "" {
@@ -2103,7 +2155,7 @@ RUN+="/bin/ip link set ap0 address %s"
 		} else {
 			log.Printf("phy %s supports AP mode: %s", phyName, strings.TrimSpace(phyCheckOut))
 		}
-		
+
 		iwInfoCmd := fmt.Sprintf("iw dev %s info 2>/dev/null", phyInterface)
 		iwInfoOut, _ := executeCommand(iwInfoCmd)
 		if strings.Contains(iwInfoOut, "type AP") {
@@ -2111,44 +2163,44 @@ RUN+="/bin/ip link set ap0 address %s"
 			executeCommand(fmt.Sprintf("sudo iw dev %s set type managed 2>/dev/null", phyInterface))
 			time.Sleep(1 * time.Second)
 		}
-		
+
 		executeCommand(fmt.Sprintf("sudo ip link set %s up 2>/dev/null || true", phyInterface))
 		time.Sleep(500 * time.Millisecond)
-		
+
 		createApCmd := fmt.Sprintf("sudo iw phy %s interface add %s type __ap 2>&1", phyName, apInterface)
 		log.Printf("Executing: %s", createApCmd)
 		createOut, createErr := executeCommand(createApCmd)
 		if createOut != "" {
 			log.Printf("Command output: %s", strings.TrimSpace(createOut))
 		}
-		
+
 		if createErr != nil {
 			log.Printf("Error creating virtual interface %s with phy %s: %s", apInterface, phyName, strings.TrimSpace(createOut))
 			log.Printf("Error details: %v", createErr)
 			log.Printf("Trying alternative method 1: using interface %s directly...", phyInterface)
-			
+
 			createApCmd2 := fmt.Sprintf("sudo iw dev %s interface add %s type __ap 2>&1", phyInterface, apInterface)
 			log.Printf("Executing: %s", createApCmd2)
 			createOut2, createErr2 := executeCommand(createApCmd2)
 			if createOut2 != "" {
 				log.Printf("Method 1 output: %s", strings.TrimSpace(createOut2))
 			}
-			
+
 			if createErr2 != nil {
 				log.Printf("Error with alternative method 1: %s", strings.TrimSpace(createOut2))
 				log.Printf("Trying alternative method 2: using iw phy without sudo...")
-				
+
 				createApCmd3 := fmt.Sprintf("iw phy %s interface add %s type __ap 2>&1", phyName, apInterface)
 				log.Printf("Executing: %s", createApCmd3)
 				createOut3, createErr3 := executeCommand(createApCmd3)
 				if createOut3 != "" {
 					log.Printf("Method 2 output: %s", strings.TrimSpace(createOut3))
 				}
-				
+
 				if createErr3 != nil {
 					log.Printf("Error with alternative method 2: %s", strings.TrimSpace(createOut3))
 					log.Printf("Trying alternative method 3: using mac80211_hwsim if available...")
-					
+
 					phyListCmd := "iw phy 2>/dev/null | grep 'Wiphy' | awk '{print $2}'"
 					phyListOut, _ := executeCommand(phyListCmd)
 					log.Printf("Available phys: %s", strings.TrimSpace(phyListOut))
@@ -2195,10 +2247,10 @@ RUN+="/bin/ip link set ap0 address %s"
 			log.Printf("Successfully created interface %s using phy %s", apInterface, phyName)
 			apExists = true
 		}
-		
+
 		if apExists && apInterface == "ap0" {
 			time.Sleep(2 * time.Second)
-			
+
 			verified := false
 			for i := 0; i < 5; i++ {
 				verifyCmd := fmt.Sprintf("ip link show %s 2>/dev/null", apInterface)
@@ -2208,7 +2260,7 @@ RUN+="/bin/ip link set ap0 address %s"
 					verified = true
 					break
 				}
-				
+
 				lsCmd := fmt.Sprintf("ls /sys/class/net/ 2>/dev/null | grep -q '^%s$' && echo 'exists'", apInterface)
 				lsOut, _ := executeCommand(lsCmd)
 				if strings.TrimSpace(lsOut) == "exists" {
@@ -2216,7 +2268,7 @@ RUN+="/bin/ip link set ap0 address %s"
 					verified = true
 					break
 				}
-				
+
 				iwListCmd := fmt.Sprintf("iw dev 2>/dev/null | grep -q 'Interface %s' && echo 'exists'", apInterface)
 				iwListOut, _ := executeCommand(iwListCmd)
 				if strings.TrimSpace(iwListOut) == "exists" {
@@ -2224,20 +2276,20 @@ RUN+="/bin/ip link set ap0 address %s"
 					verified = true
 					break
 				}
-				
+
 				if i < 4 {
 					log.Printf("Verification attempt %d failed, retrying...", i+1)
 					time.Sleep(1 * time.Second)
 				}
 			}
-			
+
 			if !verified {
 				log.Printf("ERROR: Interface %s was NOT created successfully after all attempts", apInterface)
 				log.Printf("Diagnostics:")
 				log.Printf("  - phy name: %s", phyName)
 				log.Printf("  - physical interface: %s", phyInterface)
 				log.Printf("  - MAC address: %s", macAddress)
-				
+
 				log.Printf("Attempting manual creation as last resort...")
 				manualCmd := fmt.Sprintf("sudo iw phy %s interface add %s type __ap 2>&1; sleep 1; ip link show %s 2>&1", phyName, apInterface, apInterface)
 				manualOut, _ := executeCommand(manualCmd)
@@ -2247,12 +2299,12 @@ RUN+="/bin/ip link set ap0 address %s"
 			}
 		}
 	}
-	
+
 	ipCmd := fmt.Sprintf("sudo ip addr add %s/24 dev %s 2>/dev/null || sudo ip addr replace %s/24 dev %s", req.Gateway, apInterface, req.Gateway, apInterface)
 	if out, err := executeCommand(ipCmd); err != nil {
 		log.Printf("Warning: Error setting IP on interface %s: %s", apInterface, strings.TrimSpace(out))
 	}
-	
+
 	if out, err := executeCommand(fmt.Sprintf("sudo ip link set %s up", apInterface)); err != nil {
 		log.Printf("Warning: Error bringing interface %s up: %s", apInterface, strings.TrimSpace(out))
 	} else {
@@ -2262,11 +2314,11 @@ RUN+="/bin/ip link set ap0 address %s"
 			log.Printf("Interface %s verified: %s", apInterface, strings.TrimSpace(checkOut))
 		}
 	}
-	
+
 	configPath := "/etc/hostapd/hostapd.conf"
-	
+
 	executeCommand("sudo mkdir -p /etc/hostapd 2>/dev/null || true")
-	
+
 	configContent := fmt.Sprintf(`interface=%s
 driver=nl80211
 ssid=%s
@@ -2274,7 +2326,7 @@ hw_mode=g
 channel=%d
 country_code=%s
 `, apInterface, req.SSID, req.Channel, req.Country)
-	
+
 	if req.Security == "open" {
 		configContent += "auth_algs=0\n"
 	} else if req.Security == "wpa2" {
@@ -2304,7 +2356,7 @@ wpa_pairwise=CCMP
 rsn_pairwise=CCMP
 `, req.Password)
 	}
-	
+
 	tmpFile := "/tmp/hostapd.conf.tmp"
 	log.Printf("Creating temporary config file: %s", tmpFile)
 	if err := os.WriteFile(tmpFile, []byte(configContent), 0644); err != nil {
@@ -2314,7 +2366,7 @@ rsn_pairwise=CCMP
 			"success": false,
 		})
 	}
-	
+
 	if _, err := os.Stat(tmpFile); os.IsNotExist(err) {
 		log.Printf("Temporary file was not created: %s", tmpFile)
 		return c.Status(500).JSON(fiber.Map{
@@ -2322,9 +2374,9 @@ rsn_pairwise=CCMP
 			"success": false,
 		})
 	}
-	
+
 	log.Printf("Temporary file created successfully, size: %d bytes", len(configContent))
-	
+
 	if _, err := os.Stat(tmpFile); os.IsNotExist(err) {
 		log.Printf("Temporary file does not exist before copy: %s", tmpFile)
 		return c.Status(500).JSON(fiber.Map{
@@ -2332,7 +2384,7 @@ rsn_pairwise=CCMP
 			"success": false,
 		})
 	}
-	
+
 	if fileInfo, err := os.Stat(tmpFile); err == nil {
 		log.Printf("Temporary file exists, size: %d bytes, mode: %v", fileInfo.Size(), fileInfo.Mode())
 	} else {
@@ -2342,7 +2394,7 @@ rsn_pairwise=CCMP
 			"success": false,
 		})
 	}
-	
+
 	log.Printf("Ensuring /etc/hostapd directory exists...")
 	if out, err := executeCommand("sudo mkdir -p /etc/hostapd"); err != nil {
 		log.Printf("Warning: Error creating /etc/hostapd directory: %v, output: %s", err, out)
@@ -2350,7 +2402,7 @@ rsn_pairwise=CCMP
 	if out, err := executeCommand("sudo chmod 755 /etc/hostapd"); err != nil {
 		log.Printf("Warning: Error setting permissions on /etc/hostapd: %v, output: %s", err, out)
 	}
-	
+
 	if _, err := os.Stat("/etc/hostapd"); os.IsNotExist(err) {
 		log.Printf("Error: /etc/hostapd directory does not exist after creation attempt")
 		return c.Status(500).JSON(fiber.Map{
@@ -2358,9 +2410,9 @@ rsn_pairwise=CCMP
 			"success": false,
 		})
 	}
-	
+
 	os.Chmod(tmpFile, 0644)
-	
+
 	cmdStr := fmt.Sprintf("sudo cp %s %s", tmpFile, configPath)
 	log.Printf("Executing: %s", cmdStr)
 	out, err := executeCommand(cmdStr)
@@ -2377,13 +2429,13 @@ rsn_pairwise=CCMP
 		})
 	}
 	log.Printf("File copied successfully, output: '%s'", strings.TrimSpace(out))
-	
+
 	chmodCmd := fmt.Sprintf("sudo chmod 644 %s", configPath)
 	log.Printf("Setting permissions: %s", chmodCmd)
 	if out, err := executeCommand(chmodCmd); err != nil {
 		log.Printf("Warning: Error setting permissions: %v, output: %s", err, strings.TrimSpace(out))
 	}
-	
+
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		os.Remove(tmpFile)
 		log.Printf("Config file was not created at: %s", configPath)
@@ -2392,14 +2444,14 @@ rsn_pairwise=CCMP
 			"success": false,
 		})
 	}
-	
+
 	log.Printf("HostAPD config file created successfully at: %s", configPath)
-	
+
 	os.Remove(tmpFile)
-	
+
 	dnsmasqConfigPath := "/etc/dnsmasq.conf"
 	executeCommand(fmt.Sprintf("sudo cp %s %s.backup 2>/dev/null || true", dnsmasqConfigPath, dnsmasqConfigPath))
-	
+
 	dnsmasqContent := fmt.Sprintf(`# Configuración de dnsmasq para modo AP+STA según método TheWalrus (Raspberry Pi 3 B+)
 # Solo servir DHCP en ap0, no en wlan0 (que es STA)
 interface=%s
@@ -2413,7 +2465,7 @@ dhcp-range=%s,%s,255.255.255.0,%s
 dhcp-option=3,%s
 dhcp-option=6,%s
 `, apInterface, phyInterface, req.DHCPRangeStart, req.DHCPRangeEnd, req.LeaseTime, req.Gateway, req.Gateway)
-	
+
 	tmpDnsmasqFile := "/tmp/dnsmasq.conf.tmp"
 	if err := os.WriteFile(tmpDnsmasqFile, []byte(dnsmasqContent), 0644); err != nil {
 		log.Printf("Error creating temporary dnsmasq config file: %v", err)
@@ -2422,7 +2474,7 @@ dhcp-option=6,%s
 			"success": false,
 		})
 	}
-	
+
 	os.Chmod(tmpDnsmasqFile, 0644)
 	cmdStr2 := fmt.Sprintf("sudo cp %s %s && sudo chmod 644 %s", tmpDnsmasqFile, dnsmasqConfigPath, dnsmasqConfigPath)
 	if out, err := executeCommand(cmdStr2); err != nil {
@@ -2433,37 +2485,37 @@ dhcp-option=6,%s
 			"success": false,
 		})
 	}
-	
+
 	os.Remove(tmpDnsmasqFile)
-	
+
 	executeCommand("echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward > /dev/null")
 	executeCommand("sudo sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1")
-	
+
 	sysctlCheckCmd := "grep -q '^net.ipv4.ip_forward=1' /etc/sysctl.conf || echo 'net.ipv4.ip_forward=1' | sudo tee -a /etc/sysctl.conf > /dev/null"
 	executeCommand(sysctlCheckCmd)
-	
+
 	mainInterface := "eth0"
 	if out, _ := executeCommand("ip route | grep default | awk '{print $5}' | head -1"); strings.TrimSpace(out) != "" {
 		mainInterface = strings.TrimSpace(out)
 	}
-	
+
 	apIPBegin := req.Gateway
 	if lastDot := strings.LastIndex(req.Gateway, "."); lastDot > 0 {
 		apIPBegin = req.Gateway[:lastDot]
 	}
-	
+
 	if mainInterface != "" && mainInterface != apInterface {
 		executeCommand(fmt.Sprintf("sudo iptables -t nat -D POSTROUTING -s %s.0/24 ! -d %s.0/24 -j MASQUERADE 2>/dev/null || true", apIPBegin, apIPBegin))
 		executeCommand(fmt.Sprintf("sudo iptables -t nat -D POSTROUTING -o %s -j MASQUERADE 2>/dev/null || true", mainInterface))
 		executeCommand(fmt.Sprintf("sudo iptables -D FORWARD -i %s -o %s -j ACCEPT 2>/dev/null || true", apInterface, mainInterface))
 		executeCommand(fmt.Sprintf("sudo iptables -D FORWARD -i %s -o %s -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true", mainInterface, apInterface))
-		
+
 		executeCommand(fmt.Sprintf("sudo iptables -t nat -A POSTROUTING -s %s.0/24 ! -d %s.0/24 -j MASQUERADE", apIPBegin, apIPBegin))
 		executeCommand(fmt.Sprintf("sudo iptables -t nat -A POSTROUTING -o %s -j MASQUERADE", mainInterface))
 		executeCommand(fmt.Sprintf("sudo iptables -A FORWARD -i %s -o %s -j ACCEPT", apInterface, mainInterface))
 		executeCommand(fmt.Sprintf("sudo iptables -A FORWARD -i %s -o %s -m state --state RELATED,ESTABLISHED -j ACCEPT", mainInterface, apInterface))
 	}
-	
+
 	overrideDir := "/etc/systemd/system/hostapd.service.d"
 	executeCommand(fmt.Sprintf("sudo mkdir -p %s 2>/dev/null || true", overrideDir))
 	overrideContent := fmt.Sprintf(`[Service]
@@ -2486,7 +2538,7 @@ Type=forking
 		}
 		os.Remove(tmpOverrideFile)
 	}
-	
+
 	manageAp0Script := `#!/bin/bash
 # check if hostapd service success to start or not
 # in our case, it cannot start when /var/run/hostapd/ap0 exist
@@ -2515,7 +2567,7 @@ fi
 		os.Remove(tmpManageAp0)
 		log.Printf("Created manage-ap0-iface.sh script")
 	}
-	
+
 	overridePath := fmt.Sprintf("%s/override.conf", overrideDir)
 	overrideContentWithPreStart := fmt.Sprintf(`[Service]
 ExecStart=
@@ -2536,9 +2588,9 @@ TimeoutStopSec=10
 		}
 		os.Remove(tmpOverrideFile2)
 	}
-	
+
 	executeCommand("sudo systemctl daemon-reload")
-	
+
 	apIPBeginForScript := req.Gateway
 	if lastDot := strings.LastIndex(req.Gateway, "."); lastDot > 0 {
 		apIPBeginForScript = req.Gateway[:lastDot]
@@ -2563,14 +2615,14 @@ wpa_cli -i %s reconfigure 2>/dev/null || true
 		os.Remove(tmpRpiWifi)
 		log.Printf("Created rpi-wifi.sh script")
 	}
-	
+
 	executeCommand("sudo systemctl enable hostapd 2>/dev/null || true")
 	executeCommand("sudo systemctl enable dnsmasq 2>/dev/null || true")
-	
+
 	if out, err := executeCommand("sudo systemctl restart dnsmasq"); err != nil {
 		log.Printf("Warning: Error restarting dnsmasq: %s", strings.TrimSpace(out))
 	}
-	
+
 	if apInterface == "ap0" {
 		ap0CheckCmd := "ip link show ap0 2>/dev/null"
 		ap0CheckOut, ap0CheckErr := executeCommand(ap0CheckCmd)
@@ -2592,17 +2644,17 @@ wpa_cli -i %s reconfigure 2>/dev/null || true
 			}
 		}
 	}
-	
+
 	executeCommand("sudo rm -rf /var/run/hostapd/ap0 2>/dev/null || true")
 	executeCommand("sudo rm -f /run/hostapd.pid 2>/dev/null || true")
-	
+
 	if out, err := executeCommand("sudo systemctl restart hostapd"); err != nil {
 		return c.Status(500).JSON(fiber.Map{
 			"error":   fmt.Sprintf("Configuration saved but failed to restart hostapd: %s", strings.TrimSpace(out)),
 			"success": false,
 		})
 	}
-	
+
 	time.Sleep(2 * time.Second)
 	hostapdStatusCmd := "systemctl is-active hostapd 2>/dev/null"
 	hostapdStatusOut, _ := executeCommand(hostapdStatusCmd)
@@ -2611,28 +2663,32 @@ wpa_cli -i %s reconfigure 2>/dev/null || true
 		pgrepOut, _ := executeCommand("pgrep hostapd 2>/dev/null && echo 'running' || echo 'not running'")
 		log.Printf("hostapd process check: %s", strings.TrimSpace(pgrepOut))
 	}
-	
+
 	return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Configuration saved and services restarted",
 	})
 }
 
-
 func helpContactHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 	InsertLog("INFO", "Contacto/help recibido", "help", &userID)
 	return c.JSON(fiber.Map{"success": true})
 }
-
 
 func translationsHandler(c *fiber.Ctx) error {
 	lang := c.Params("lang", "en")
 	if lang != "en" && lang != "es" {
 		lang = "en"
 	}
-	path := filepath.Join("locales", lang+".json")
+	path := filepath.Clean(filepath.Join("locales", lang+".json"))
+	if !strings.HasPrefix(path, "locales"+string(filepath.Separator)) && path != "locales" {
+		return c.Status(400).JSON(fiber.Map{"error": "idioma no permitido"})
+	}
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -2644,7 +2700,6 @@ func translationsHandler(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
-
 func wifiStatusHandler(c *fiber.Ctx) error {
 	return wifiLegacyStatusHandler(c)
 }
@@ -2653,7 +2708,7 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 	var enabled bool = false
 	var hardBlocked bool = false
 	var softBlocked bool = false
-	
+
 	wifiCheck := execCommand("nmcli -t -f WIFI g 2>/dev/null")
 	wifiOut, err := wifiCheck.Output()
 	if err == nil {
@@ -2664,7 +2719,7 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 			enabled = false
 		}
 	}
-	
+
 	rfkillOut, _ := execCommand("rfkill list wifi 2>/dev/null").CombinedOutput()
 	rfkillStr := strings.ToLower(filterSudoErrors(rfkillOut))
 	if strings.Contains(rfkillStr, "hard blocked: yes") {
@@ -2689,18 +2744,18 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
-	
+
 	ssid := ""
 	connected := false
 	iface := "wlan0"
-	
+
 	ipIfaceCmd := exec.Command("sh", "-c", "ip -o link show | awk -F': ' '{print $2}' | grep -E '^wlan|^wl' | head -1")
 	if ipIfaceOut, err := ipIfaceCmd.Output(); err == nil {
 		if ipIfaceStr := strings.TrimSpace(string(ipIfaceOut)); ipIfaceStr != "" {
 			iface = ipIfaceStr
 		}
 	}
-	
+
 	wpaStatusCmd := exec.Command("sh", "-c", fmt.Sprintf("sudo wpa_cli -i %s status 2>/dev/null", iface))
 	wpaStatusOut, wpaErr := wpaStatusCmd.CombinedOutput()
 	if wpaErr == nil && len(wpaStatusOut) > 0 {
@@ -2718,7 +2773,7 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
-	
+
 	if !connected || ssid == "" {
 		iwLinkCmd := exec.Command("sh", "-c", fmt.Sprintf("iw dev %s link 2>/dev/null", iface))
 		iwLinkOut, iwErr := iwLinkCmd.CombinedOutput()
@@ -2737,7 +2792,7 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
-	
+
 	if !connected || ssid == "" {
 		iwOut, _ := execCommand("iwconfig 2>/dev/null | grep -i 'essid' | grep -v 'off/any' | head -1").CombinedOutput()
 		iwStr := filterSudoErrors(iwOut)
@@ -2751,7 +2806,7 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
-	
+
 	reallyConnected := false
 	if connected && ssid != "" {
 		// Verificar si wpa_state es COMPLETED (autenticado)
@@ -2762,7 +2817,7 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 				wpaStateCompleted = true
 			}
 		}
-		
+
 		ipCheckCmd := exec.Command("sh", "-c", fmt.Sprintf("ip addr show %s 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1", iface))
 		ipOut, ipErr := ipCheckCmd.Output()
 		if ipErr == nil {
@@ -2793,13 +2848,13 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 			log.Printf("WiFi autenticado (wpa_state=COMPLETED): SSID=%s", ssid)
 		}
 	}
-	
+
 	var connectionInfo fiber.Map = nil
 	if reallyConnected && ssid != "" {
 		connectionInfo = fiber.Map{
 			"ssid": ssid,
 		}
-		
+
 		iface := "wlan0"
 		ipIfaceCmd := exec.Command("sh", "-c", "ip -o link show | awk -F': ' '{print $2}' | grep -E '^wlan|^wl' | head -1")
 		if ipIfaceOut, err := ipIfaceCmd.Output(); err == nil {
@@ -2807,7 +2862,7 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 				iface = ipIfaceStr
 			}
 		}
-		
+
 		wpaStatusCmd := exec.Command("sh", "-c", fmt.Sprintf("sudo wpa_cli -i %s status 2>/dev/null", iface))
 		wpaStatusOut, wpaErr := wpaStatusCmd.CombinedOutput()
 		if wpaErr == nil && len(wpaStatusOut) > 0 {
@@ -2886,7 +2941,7 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 		} else {
 			log.Printf("wpa_cli failed or returned empty for %s: %v", iface, wpaErr)
 		}
-		
+
 		if connectionInfo["signal"] == nil || connectionInfo["signal"] == "" || connectionInfo["signal"] == "0" ||
 			connectionInfo["channel"] == nil || connectionInfo["channel"] == "" ||
 			connectionInfo["security"] == nil || connectionInfo["security"] == "" {
@@ -2977,7 +3032,7 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 				log.Printf("iw link command failed or returned empty: %v, output: %s", iwErr, string(iwLinkOut))
 			}
 		}
-		
+
 		if connectionInfo["signal"] == nil || connectionInfo["signal"] == "" || connectionInfo["signal"] == "0" {
 			log.Printf("Trying /proc/net/wireless for signal on %s", iface)
 			wirelessCmd := exec.Command("sh", "-c", fmt.Sprintf("cat /proc/net/wireless 2>/dev/null | grep %s", iface))
@@ -2997,7 +3052,7 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
-		
+
 		if (connectionInfo["signal"] == nil || connectionInfo["signal"] == "" || connectionInfo["signal"] == "0") ||
 			(connectionInfo["channel"] == nil || connectionInfo["channel"] == "") {
 			log.Printf("Trying iwconfig as last resort for interface %s", iface)
@@ -3036,7 +3091,7 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
-		
+
 		if (connectionInfo["signal"] == nil || connectionInfo["signal"] == "" || connectionInfo["signal"] == "0") ||
 			(connectionInfo["channel"] == nil || connectionInfo["channel"] == "") {
 			log.Printf("Trying iw dev %s station dump as additional method", iface)
@@ -3045,7 +3100,7 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 			if iwStationErr == nil && len(iwStationOut) > 0 {
 				iwStationStr := string(iwStationOut)
 				log.Printf("iw station dump output: %s", iwStationStr)
-				if (connectionInfo["signal"] == nil || connectionInfo["signal"] == "" || connectionInfo["signal"] == "0") {
+				if connectionInfo["signal"] == nil || connectionInfo["signal"] == "" || connectionInfo["signal"] == "0" {
 					lines := strings.Split(iwStationStr, "\n")
 					for _, line := range lines {
 						line = strings.TrimSpace(line)
@@ -3069,7 +3124,7 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
-		
+
 		if connectionInfo["signal"] == nil || connectionInfo["signal"] == "" || connectionInfo["signal"] == "0" {
 			log.Printf("Warning: Could not determine signal strength for %s after all methods", iface)
 			delete(connectionInfo, "signal")
@@ -3082,21 +3137,20 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 			log.Printf("Warning: Could not determine security for %s, defaulting to WPA2", iface)
 			connectionInfo["security"] = "WPA2" // Valor por defecto común
 		}
-		
-		
+
 		if iface != "" {
 			ipCmd := exec.Command("sh", "-c", fmt.Sprintf("ip addr show %s 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1 | head -1", iface))
 			ipOut, _ := ipCmd.Output()
 			if ipStr := strings.TrimSpace(string(ipOut)); ipStr != "" {
 				connectionInfo["ip"] = ipStr
 			}
-			
+
 			macCmd := exec.Command("sh", "-c", fmt.Sprintf("cat /sys/class/net/%s/address 2>/dev/null", iface))
 			macOut, _ := macCmd.Output()
 			if macStr := strings.TrimSpace(string(macOut)); macStr != "" {
 				connectionInfo["mac"] = macStr
 			}
-			
+
 			speedCmd := exec.Command("sh", "-c", fmt.Sprintf("cat /sys/class/net/%s/speed 2>/dev/null", iface))
 			speedOut, _ := speedCmd.Output()
 			if speedStr := strings.TrimSpace(string(speedOut)); speedStr != "" && speedStr != "-1" {
@@ -3104,7 +3158,7 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
-	
+
 	if !connected && enabled {
 		ifaceCmd := execCommand("nmcli -t -f DEVICE,TYPE dev status 2>/dev/null | grep wifi | head -1 | cut -d: -f1")
 		if ifaceOut, err := ifaceCmd.Output(); err == nil {
@@ -3121,48 +3175,48 @@ func wifiLegacyStatusHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
-	
+
 	return c.JSON(fiber.Map{
-		"enabled":          enabled,
-		"connected":        reallyConnected,
+		"enabled":            enabled,
+		"connected":          reallyConnected,
 		"current_connection": ssid,
-		"ssid":             ssid,
-		"hard_blocked":     hardBlocked,
-		"soft_blocked":     softBlocked,
-		"connection_info":  connectionInfo,
+		"ssid":               ssid,
+		"hard_blocked":       hardBlocked,
+		"soft_blocked":       softBlocked,
+		"connection_info":    connectionInfo,
 	})
 }
 
 func wifiLegacyStoredNetworksHandler(c *fiber.Ctx) error {
 	var networks []fiber.Map
 	var lastConnected []string
-	
+
 	interfaceName := "wlan0"
-	
+
 	listCmd := exec.Command("sh", "-c", fmt.Sprintf("sudo wpa_cli -i %s list_networks 2>/dev/null", interfaceName))
 	listOut, err := listCmd.CombinedOutput()
-	
+
 	if err == nil && len(listOut) > 0 {
 		lines := strings.Split(string(listOut), "\n")
 		for i, line := range lines {
 			if i == 0 || strings.TrimSpace(line) == "" {
 				continue // Saltar encabezado y líneas vacías
 			}
-			
+
 			fields := strings.Fields(line)
 			if len(fields) >= 2 {
 				networkID := fields[0]
 				ssid := fields[1]
-				
+
 				if ssid != "" && ssid != "--" {
 					ssid = strings.Trim(ssid, "\"")
-					
+
 					network := fiber.Map{
 						"id":     networkID,
 						"ssid":   ssid,
 						"status": "saved",
 					}
-					
+
 					enabledCmd := exec.Command("sh", "-c", fmt.Sprintf("sudo wpa_cli -i %s get_network %s disabled 2>/dev/null", interfaceName, networkID))
 					enabledOut, _ := enabledCmd.CombinedOutput()
 					if strings.TrimSpace(string(enabledOut)) == "0" {
@@ -3171,13 +3225,13 @@ func wifiLegacyStoredNetworksHandler(c *fiber.Ctx) error {
 					} else {
 						network["enabled"] = false
 					}
-					
+
 					networks = append(networks, network)
 				}
 			}
 		}
 	}
-	
+
 	return c.JSON(fiber.Map{
 		"success":        true,
 		"networks":       networks,
@@ -3198,7 +3252,7 @@ func wifiLegacyScanHandler(c *fiber.Ctx) error {
 			"error":   "No autenticado. Por favor, inicia sesión nuevamente.",
 		})
 	}
-	
+
 	user, ok := userInterface.(*User)
 	if !ok || user == nil {
 		log.Printf("ERROR: Usuario inválido en wifiLegacyScanHandler")
@@ -3207,7 +3261,7 @@ func wifiLegacyScanHandler(c *fiber.Ctx) error {
 			"error":   "Usuario no encontrado. Por favor, inicia sesión nuevamente.",
 		})
 	}
-	
+
 	interfaceName := c.Query("interface", DefaultWiFiInterface)
 	result := scanWiFiNetworks(interfaceName)
 	if networks, ok := result["networks"]; ok {
@@ -3217,12 +3271,15 @@ func wifiLegacyScanHandler(c *fiber.Ctx) error {
 }
 
 func wifiLegacyDisconnectHandler(c *fiber.Ctx) error {
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 
 	activeConnCmd := execCommand("nmcli -t -f NAME,TYPE,DEVICE connection show --active | grep -i wifi")
 	activeConnOut, err := activeConnCmd.Output()
-	
+
 	var connectionName string
 	if err == nil && len(activeConnOut) > 0 {
 		lines := strings.Split(strings.TrimSpace(string(activeConnOut)), "\n")
@@ -3237,36 +3294,36 @@ func wifiLegacyDisconnectHandler(c *fiber.Ctx) error {
 	if connectionName != "" {
 		disconnectCmd := execCommand(fmt.Sprintf("nmcli connection down '%s'", connectionName))
 		disconnectOut, disconnectErr := disconnectCmd.CombinedOutput()
-		
+
 		if disconnectErr == nil {
 			InsertLog("INFO", fmt.Sprintf("WiFi desconectado: %s (usuario: %s)", connectionName, user.Username), "wifi", &userID)
 			return c.JSON(fiber.Map{"success": true, "message": "Disconnected from " + connectionName})
 		}
-		
+
 		log.Printf("Error desconectando conexión %s: %s, intentando desconectar dispositivo", connectionName, string(disconnectOut))
 	}
 
 	wifiDeviceCmd := execCommand("nmcli -t -f DEVICE,TYPE device status | grep -i wifi | head -1 | cut -d: -f1")
 	wifiDeviceOut, err := wifiDeviceCmd.Output()
-	
+
 	if err == nil && len(wifiDeviceOut) > 0 {
 		deviceName := strings.TrimSpace(string(wifiDeviceOut))
 		if deviceName != "" {
 			deviceDisconnectCmd := execCommand(fmt.Sprintf("nmcli device disconnect '%s'", deviceName))
 			deviceDisconnectOut, deviceDisconnectErr := deviceDisconnectCmd.CombinedOutput()
-			
+
 			if deviceDisconnectErr == nil {
 				InsertLog("INFO", fmt.Sprintf("Dispositivo WiFi desconectado: %s (usuario: %s)", deviceName, user.Username), "wifi", &userID)
 				return c.JSON(fiber.Map{"success": true, "message": "Disconnected from WiFi device " + deviceName})
 			}
-			
+
 			log.Printf("Error desconectando dispositivo %s: %s", deviceName, string(deviceDisconnectOut))
 		}
 	}
 
 	networkingOffCmd := execCommand("nmcli networking off")
 	networkingOffOut, networkingOffErr := networkingOffCmd.CombinedOutput()
-	
+
 	if networkingOffErr != nil {
 		errorMsg := fmt.Sprintf("Error desconectando WiFi: %s", strings.TrimSpace(string(networkingOffOut)))
 		InsertLog("ERROR", fmt.Sprintf("Error en desconexión WiFi (usuario: %s): %s", user.Username, errorMsg), "wifi", &userID)
@@ -3274,10 +3331,10 @@ func wifiLegacyDisconnectHandler(c *fiber.Ctx) error {
 	}
 
 	time.Sleep(1 * time.Second)
-	
+
 	networkingOnCmd := execCommand("nmcli networking on")
 	networkingOnOut, networkingOnErr := networkingOnCmd.CombinedOutput()
-	
+
 	if networkingOnErr != nil {
 		errorMsg := fmt.Sprintf("Error reactivando networking: %s", strings.TrimSpace(string(networkingOnOut)))
 		InsertLog("ERROR", fmt.Sprintf("Error reactivando networking (usuario: %s): %s", user.Username, errorMsg), "wifi", &userID)
@@ -3287,7 +3344,6 @@ func wifiLegacyDisconnectHandler(c *fiber.Ctx) error {
 	InsertLog("INFO", fmt.Sprintf("WiFi desconectado mediante fallback (usuario: %s)", user.Username), "wifi", &userID)
 	return c.JSON(fiber.Map{"success": true, "message": "Disconnected from WiFi"})
 }
-
 
 func strconvAtoiSafe(s string) (int, error) {
 	n := 0
@@ -3315,4 +3371,3 @@ func mapBoolStatus(v string) string {
 	}
 	return "disconnected"
 }
-

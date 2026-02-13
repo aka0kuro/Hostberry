@@ -19,7 +19,10 @@ func systemConfigHandler(c *fiber.Ctx) error {
 		})
 	}
 
-	user := c.Locals("user").(*User)
+	user, ok := GetUser(c)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	}
 	userID := user.ID
 	
 	updatedKeys := []string{}

@@ -113,6 +113,17 @@ func requireAuth(c *fiber.Ctx) error {
 	return c.Next()
 }
 
+// GetUser obtiene el usuario autenticado de forma segura (evita panic por type assertion).
+// Solo debe usarse en rutas protegidas por requireAuth. Si ok es false, el handler debe responder 401.
+func GetUser(c *fiber.Ctx) (*User, bool) {
+	u := c.Locals("user")
+	if u == nil {
+		return nil, false
+	}
+	user, ok := u.(*User)
+	return user, ok && user != nil
+}
+
 
 func loggingMiddleware(c *fiber.Ctx) error {
 	start := time.Now()
