@@ -1277,10 +1277,9 @@ EOF
 create_hostapd_default_config() {
     print_info "Creando configuración por defecto de HostAPD..."
     
-    # Valores por defecto (red "hostberry" + portal cautivo hacia la web de Hostberry)
+    # Valores por defecto (red "hostberry" abierta + portal cautivo hacia la web de Hostberry)
     HOSTAPD_INTERFACE="wlan0"
     HOSTAPD_SSID="hostberry"
-    HOSTAPD_PASSWORD="hostberry12"
     HOSTAPD_CHANNEL="6"
     HOSTAPD_GATEWAY="192.168.4.1"
     HOSTAPD_DHCP_START="192.168.4.2"
@@ -1405,17 +1404,13 @@ EOF
         
         cat > "$HOSTAPD_CONFIG" <<EOF
 # Configuración de HostAPD para modo AP+STA según método TheWalrus (Raspberry Pi 3 B+)
-# Interfaz virtual ap0 para AP, wlan0 para STA
+# Red abierta (sin contraseña) - portal cautivo hacia la web de Hostberry
 interface=${AP_INTERFACE}
 driver=nl80211
 ssid=${HOSTAPD_SSID}
 hw_mode=g
 channel=${HOSTAPD_CHANNEL}
-wpa=2
-wpa_passphrase=${HOSTAPD_PASSWORD}
-wpa_key_mgmt=WPA-PSK
-wpa_pairwise=TKIP
-rsn_pairwise=CCMP
+auth_algs=1
 # Asegurar que wlan0 esté en modo managed (no AP)
 # Esto se hace automáticamente cuando wpa_supplicant se ejecuta en wlan0
 EOF
@@ -1423,11 +1418,27 @@ EOF
         print_success "Archivo de configuración de HostAPD creado con valores por defecto"
         print_info "  - Interfaz AP: $AP_INTERFACE"
         print_info "  - Interfaz STA: $HOSTAPD_INTERFACE (para wpa_supplicant)"
-        print_info "  - SSID: $HOSTAPD_SSID"
-        print_info "  - Contraseña: $HOSTAPD_PASSWORD"
+        print_info "  - SSID: $HOSTAPD_SSID (red abierta, sin contraseña)"
         print_info "  - Gateway: $HOSTAPD_GATEWAY"
     else
-        print_info "Archivo de configuración de HostAPD ya existe, no se sobrescribe"
+        print_info "Archivo de configuración de HostAPD ya existe"
+        # Actualizar SSID a hostberry
+        if grep -q "ssid=hostberry-ap" "$HOSTAPD_CONFIG" 2>/dev/null || grep -q "^ssid=.*" "$HOSTAPD_CONFIG" 2>/dev/null; then
+            sed -i "s/^ssid=.*/ssid=${HOSTAPD_SSID}/" "$HOSTAPD_CONFIG" 2>/dev/null || true
+            print_info "  SSID actualizado a: ${HOSTAPD_SSID}"
+        fi
+        # Red abierta: quitar WPA y asegurar auth_algs=1
+        sed -i '/^wpa=/d' "$HOSTAPD_CONFIG" 2>/dev/null || true
+        sed -i '/^wpa_passphrase=/d' "$HOSTAPD_CONFIG" 2>/dev/null || true
+        sed -i '/^wpa_key_mgmt=/d' "$HOSTAPD_CONFIG" 2>/dev/null || true
+        sed -i '/^wpa_pairwise=/d' "$HOSTAPD_CONFIG" 2>/dev/null || true
+        sed -i '/^rsn_pairwise=/d' "$HOSTAPD_CONFIG" 2>/dev/null || true
+        if ! grep -q "^auth_algs=" "$HOSTAPD_CONFIG" 2>/dev/null; then
+            sed -i "/^channel=/a auth_algs=1" "$HOSTAPD_CONFIG" 2>/dev/null || true
+        else
+            sed -i "s/^auth_algs=.*/auth_algs=1/" "$HOSTAPD_CONFIG" 2>/dev/null || true
+        fi
+        print_info "  Red configurada como abierta (sin contraseña)"
     fi
     
     # Crear archivo de configuración de dnsmasq si no existe o hacer backup
@@ -1617,14 +1628,30 @@ EOF
     # Recargar systemd para aplicar cambios
     systemctl daemon-reload 2>/dev/null || true
     
+    # dnsmasq debe arrancar después de hostapd para que ap0 exista y tenga IP (así asigna DHCP)
+    DNSMASQ_OVERRIDE_DIR="/etc/systemd/system/dnsmasq.service.d"
+    DNSMASQ_OVERRIDE_FILE="${DNSMASQ_OVERRIDE_DIR}/hostberry.conf"
+    if [ ! -f "$DNSMASQ_OVERRIDE_FILE" ] || ! grep -q "After=.*hostapd" "$DNSMASQ_OVERRIDE_FILE" 2>/dev/null; then
+        print_info "Configurando dnsmasq para arrancar después de hostapd (DHCP en ap0)..."
+        mkdir -p "$DNSMASQ_OVERRIDE_DIR"
+        cat > "$DNSMASQ_OVERRIDE_FILE" <<EOF
+[Unit]
+After=network.target hostapd.service create-ap0.service
+EOF
+        chmod 644 "$DNSMASQ_OVERRIDE_FILE"
+        print_success "Override de dnsmasq creado"
+    fi
+    
     # Habilitar e iniciar hostapd y dnsmasq para que el AP "hostberry" esté disponible
     print_info "Habilitando e iniciando hostapd y dnsmasq..."
     systemctl enable hostapd 2>/dev/null || true
     systemctl enable dnsmasq 2>/dev/null || true
+    systemctl daemon-reload 2>/dev/null || true
     systemctl start hostapd 2>/dev/null || true
-    # Asegurar que ap0 tenga la IP del gateway (por si create-ap0 no la asignó)
+    sleep 2
+    # Asegurar que ap0 tenga la IP del gateway (imprescindible para DHCP)
     ip addr add "${HOSTAPD_GATEWAY}/24" dev ap0 2>/dev/null || true
-    systemctl start dnsmasq 2>/dev/null || true
+    systemctl restart dnsmasq 2>/dev/null || true
     sleep 1
     if systemctl is-active --quiet hostapd 2>/dev/null; then
         print_success "hostapd iniciado (red hostberry disponible en ap0)"
