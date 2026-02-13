@@ -281,19 +281,21 @@
         }
 
         if(resp && resp.ok){
-          let successMessage = t('auth.credentials_updated', 'Credenciales actualizadas. Vuelve a iniciar sesión.');
+          let successMessage = t('auth.credentials_updated_redirect', 'Credenciales actualizadas. Redirigiendo al dashboard.');
           if (data && typeof data === 'object' && data !== null && typeof data.message === 'string') {
             successMessage = data.message;
           } else if (typeof data === 'string') {
             successMessage = data;
           }
           if (typeof successMessage !== 'string') {
-            successMessage = t('auth.credentials_updated', 'Credenciales actualizadas. Vuelve a iniciar sesión.');
+            successMessage = t('auth.credentials_updated_redirect', 'Credenciales actualizadas. Redirigiendo al dashboard.');
           }
           showSuccess(successMessage);
-          localStorage.removeItem('access_token');
+          if (data && typeof data === 'object' && data !== null && typeof data.access_token === 'string') {
+            localStorage.setItem('access_token', data.access_token);
+          }
           setTimeout(function(){
-            window.location.href = `/login?lang=${encodeURIComponent(currentLang)}`;
+            window.location.href = `/setup-wizard?lang=${encodeURIComponent(currentLang)}`;
           }, 1200);
           return;
         }

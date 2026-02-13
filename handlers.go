@@ -238,9 +238,32 @@ func firstLoginChangeAPIHandler(c *fiber.Ctx) error {
 
 	userID := user.ID
 	InsertLog("INFO", "Usuario cambió credenciales en primer login: "+user.Username, "auth", &userID)
-	
+
+	// Generar nuevo token con las credenciales actualizadas y dejar al usuario logueado
+	newToken, err := GenerateToken(&user)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Error generando sesión",
+		})
+	}
+	cookieExpiry := time.Duration(appConfig.Security.TokenExpiry) * time.Minute
+	c.Cookie(&fiber.Cookie{
+		Name:     "access_token",
+		Value:    newToken,
+		Path:     "/",
+		HTTPOnly: true,
+		SameSite: "Lax",
+		MaxAge:   int(cookieExpiry.Seconds()),
+	})
+
 	return c.JSON(fiber.Map{
-		"message": "Credenciales actualizadas. Por favor, inicia sesión nuevamente.",
+		"message":      T(c, "auth.credentials_updated_redirect", "Credenciales actualizadas. Redirigiendo al dashboard."),
+		"access_token": newToken,
+		"user": fiber.Map{
+			"id":       user.ID,
+			"username": user.Username,
+			"email":    user.Email,
+		},
 	})
 }
 
@@ -1208,6 +1231,12 @@ func updatePageHandler(c *fiber.Ctx) error {
 func firstLoginPageHandler(c *fiber.Ctx) error {
 	return renderTemplate(c, "first_login", fiber.Map{
 		"Title": T(c, "auth.first_login", "First Login"),
+	})
+}
+
+func setupWizardPageHandler(c *fiber.Ctx) error {
+	return renderTemplate(c, "setup_wizard", fiber.Map{
+		"Title": T(c, "setup_wizard.title", "Configuración inicial"),
 	})
 }
 

@@ -307,6 +307,7 @@ func setupRoutes(app *fiber.App) {
 		protected.Get("/adblock", adblockPageHandler)
 		protected.Get("/tor", torPageHandler)
 		protected.Get("/hostapd", hostapdPageHandler)
+		protected.Get("/setup-wizard", setupWizardPageHandler)
 		protected.Get("/profile", profilePageHandler)
 		protected.Get("/system", systemPageHandler)
 		protected.Get("/monitoring", monitoringPageHandler)
