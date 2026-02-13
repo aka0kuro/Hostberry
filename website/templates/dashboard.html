@@ -7,7 +7,7 @@
                 {{ call .t "dashboard.title" "Control Panel" }}
             </h1>
             <p class="dashboard-subtitle">{{ call .t "dashboard.welcome" "Welcome to HostBerry" }}</p>
-            <div class="header-time">
+            <div class="dashboard-time">
                 <i class="bi bi-clock me-1"></i>
                 <span id="dashboard-time">--:--:--</span>
             </div>
@@ -135,7 +135,7 @@
     </div>
 
     <!-- Main Content Grid -->
-    <div class="row dashboard-grid">
+    <div class="row dashboard-grid g-3 g-md-4">
         <!-- System Information -->
         <div class="col-12 mb-4">
             <div class="dashboard-card">
@@ -273,6 +273,7 @@
     </div>
 </div>
 
+{{/*
 <style>
 .dashboard-page {
     padding: 0;
@@ -852,5 +853,6 @@ body.light-theme .health-text {
     }
 }
 </style>
+*/}}
 
-<script src="/static/js/dashboard.js"></script>
+<script defer src="/static/js/dashboard.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>

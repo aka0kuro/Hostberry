@@ -65,6 +65,8 @@
     "critical": "Crítico",
     "app_description": "HostBerry - Sistema de gestión de red para Raspberry Pi",
     "change_theme": "Cambiar tema",
+    "switch_to_light_theme": "Cambiar a tema claro",
+    "switch_to_dark_theme": "Cambiar a tema oscuro",
     "show_password": "Mostrar contraseña",
     "hide_password": "Ocultar contraseña"
   },
@@ -1227,6 +1229,7 @@
     "invalid_string": "No es un texto válido",
     "invalid_integer": "No es un número válido",
     "unknown_error": "Error desconocido",
+    "unblock_failed": "Error al desbloquear IP",
     "monitoring_stats": "No se pudieron actualizar las estadísticas de monitoreo",
     "hardware_error": "Error de hardware",
     "software_error": "Error de software",
@@ -1568,6 +1571,8 @@
   },
   "security": {
     "access_denied": "Acceso denegado",
+    "unblock_confirm": "¿Estás seguro de que deseas desbloquear la IP {ip}?",
+    "unblocked": "IP desbloqueada",
     "backup_created": "Backup creado exitosamente",
     "backup_info_retrieved": "Información de backup obtenida",
     "backups_listed": "Backups listados exitosamente",

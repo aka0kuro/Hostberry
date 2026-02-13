@@ -314,5 +314,4 @@
     </div>
 </div>
 
-<link href="/static/css/wifi.css" rel="stylesheet">
-<script defer src="/static/js/wifi_page.js"></script>
+<script defer src="/static/js/wifi_page.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>

@@ -10,18 +10,11 @@
     return value.toFixed(digits);
   }
 
-  function formatUptime(seconds){
-    if(!Number.isFinite(seconds) || seconds < 0) return '--';
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return `${days}d ${hours}h ${minutes}m`;
-  }
-
-  function formatBytes(bytes){
-    if(!Number.isFinite(bytes)) return '0 MB';
-    const mb = bytes / (1024 * 1024);
-    return `${safeToFixed(mb, 1)} MB`;
+  const formatUptime = (s) => (HostBerry && HostBerry.formatUptime ? HostBerry.formatUptime(s) : (!Number.isFinite(s) || s < 0 ? '--' : `${Math.floor(s/86400)}d ${Math.floor((s%86400)/3600)}h ${Math.floor((s%3600)/60)}m`));
+  function formatBytes(bytes) {
+    if (HostBerry && HostBerry.formatBytes) return HostBerry.formatBytes(bytes, 1);
+    if (!Number.isFinite(bytes)) return '0 MB';
+    return `${safeToFixed(bytes / (1024 * 1024), 1)} MB`;
   }
 
   async function fetchJson(url){
@@ -137,6 +130,7 @@
 
   async function updateStats(){
     try{
+      if(updateStats._retryCount) updateStats._retryCount = 0;
       const [systemStatsResp, networkStatsResp] = await Promise.all([
         fetchJson('/api/v1/system/stats'),
         fetchJson(`/api/v1/system/network${selectedInterface ? `?interface=${encodeURIComponent(selectedInterface)}` : ''}`)
@@ -294,11 +288,14 @@
       setText('net-download', '--');
       setText('net-upload', '--');
       
-      // Intentar recargar después de un momento si el error persiste
-      setTimeout(() => {
-        console.log('Retrying monitoring stats...');
-        updateStats();
-      }, 5000);
+      // Reintentar hasta 3 veces (intervalo 5 s)
+      if(typeof updateStats._retryCount !== 'number') updateStats._retryCount = 0;
+      if(updateStats._retryCount < 3){
+        updateStats._retryCount++;
+        setTimeout(() => updateStats(), 5000);
+      } else {
+        updateStats._retryCount = 0;
+      }
     }
   }
 
@@ -407,8 +404,6 @@
   }
 
   document.addEventListener('DOMContentLoaded', initMonitoring);
-})();
-
 
   function populateInterfaceSelect(list){
     const select = document.getElementById('net-interface-select');
@@ -437,3 +432,4 @@
       select.dispatchEvent(new Event('change'));
     }
   }
+})();

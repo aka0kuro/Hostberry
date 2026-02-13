@@ -210,9 +210,10 @@
     </div>
 </div>
 
-<script src="/static/js/lib/chart.umd.min.js"></script>
-<script src="/static/js/network.js"></script>
+<script defer src="/static/js/lib/chart.umd.min.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>
+<script defer src="/static/js/network.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>
 
+{{/*
 <style>
 /* Network Page - Usando estética del Dashboard */
 .network-page {
@@ -403,3 +404,4 @@ body.light-theme .status-text {
     }
 }
 </style>
+*/}}

@@ -1,5 +1,27 @@
 // Dashboard JavaScript
 (function() {
+    const apiRequestFn = window.HostBerry && window.HostBerry.apiRequest
+        ? window.HostBerry.apiRequest
+        : async function(url) {
+            const token = localStorage.getItem('access_token');
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            return fetch(url, { headers: headers });
+        };
+
+    const formatUptime = (seconds) => {
+        if (window.HostBerry && window.HostBerry.formatUptime) {
+            return window.HostBerry.formatUptime(seconds);
+        }
+        if (!Number.isFinite(seconds) || seconds < 0) return '--';
+        const d = Math.floor(seconds / 86400);
+        const h = Math.floor((seconds % 86400) / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        if (d > 0) return d + 'd ' + h + 'h ' + m + 'm';
+        if (h > 0) return h + 'h ' + m + 'm';
+        return m + 'm';
+    };
+
     const setText = (id, value) => {
         const el = document.getElementById(id);
         if (el) el.textContent = value;
@@ -13,14 +35,9 @@
         }
     };
 
-    const formatUptime = (seconds) => {
-        if (!Number.isFinite(seconds) || seconds < 0) return '--';
-        const days = Math.floor(seconds / 86400);
-        const hours = Math.floor((seconds % 86400) / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        if (days > 0) return days + 'd ' + hours + 'h';
-        if (hours > 0) return hours + 'h ' + minutes + 'm';
-        return minutes + 'm';
+    const escapeHtml = (s) => {
+        const str = String(s ?? '');
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     };
 
     const updateTime = () => {
@@ -131,18 +148,6 @@
 
     async function loadServiceStatus() {
         try {
-            const apiRequestFn = window.HostBerry && window.HostBerry.apiRequest 
-                ? window.HostBerry.apiRequest 
-                : async function(url) {
-                    const token = localStorage.getItem('access_token');
-                    const headers = { 'Content-Type': 'application/json' };
-                    if (token) {
-                        headers['Authorization'] = 'Bearer ' + token;
-                    }
-                    return fetch(url, { headers: headers });
-                };
-            
-            // Cargar estado de servicios
             const servicesResp = await apiRequestFn('/api/v1/system/services');
             if (servicesResp && servicesResp.ok) {
                 const servicesData = await servicesResp.json();
@@ -157,24 +162,14 @@
                     updateServiceStatCard('hostapd', false);
                 }
                 
-                // dnsmasq (verificar si está activo como servicio)
+                // dnsmasq (usar datos ya obtenidos - adblock puede ser dnsmasq)
                 if (services.adblock && services.adblock.type === 'dnsmasq') {
-                    const dnsmasqActive = services.adblock.active === true;
-                    updateServiceStatCard('dnsmasq', dnsmasqActive);
+                    updateServiceStatCard('dnsmasq', services.adblock.active === true);
+                } else if (services.dnsmasq) {
+                    const dm = services.dnsmasq;
+                    updateServiceStatCard('dnsmasq', dm.active === true || dm.status === 'active');
                 } else {
-                    // Verificar directamente el servicio dnsmasq
-                    try {
-                        const dnsmasqCheck = await apiRequestFn('/api/v1/system/services');
-                        if (dnsmasqCheck && dnsmasqCheck.ok) {
-                            const dnsmasqData = await dnsmasqCheck.json();
-                            const dnsmasqServiceActive = dnsmasqData.services && dnsmasqData.services.adblock && dnsmasqData.services.adblock.type === 'dnsmasq' && dnsmasqData.services.adblock.active;
-                            updateServiceStatCard('dnsmasq', dnsmasqServiceActive);
-                        } else {
-                            updateServiceStatCard('dnsmasq', false);
-                        }
-                    } catch (e) {
-                        updateServiceStatCard('dnsmasq', false);
-                    }
+                    updateServiceStatCard('dnsmasq', false);
                 }
             } else {
                 updateServiceStatCard('hostapd', false);
@@ -221,17 +216,6 @@
 
     async function loadServices() {
         try {
-            const apiRequestFn = window.HostBerry && window.HostBerry.apiRequest 
-                ? window.HostBerry.apiRequest 
-                : async function(url) {
-                    const token = localStorage.getItem('access_token');
-                    const headers = { 'Content-Type': 'application/json' };
-                    if (token) {
-                        headers['Authorization'] = 'Bearer ' + token;
-                    }
-                    return fetch(url, { headers: headers });
-                };
-            
             const resp = await apiRequestFn('/api/v1/system/services');
             if (!resp.ok) throw new Error('Services request failed');
             
@@ -269,17 +253,6 @@
 
     async function fetchDashboardData() {
         try {
-            const apiRequestFn = window.HostBerry && window.HostBerry.apiRequest 
-                ? window.HostBerry.apiRequest 
-                : async function(url) {
-                    const token = localStorage.getItem('access_token');
-                    const headers = { 'Content-Type': 'application/json' };
-                    if (token) {
-                        headers['Authorization'] = 'Bearer ' + token;
-                    }
-                    return fetch(url, { headers: headers });
-                };
-            
             // Obtener stats e info en paralelo
             const [statsResp, infoResp] = await Promise.all([
                 apiRequestFn('/api/v1/system/stats'),
@@ -297,9 +270,6 @@
             
             const statsPayload = await statsResp.json();
             const infoPayload = infoResp.ok ? await infoResp.json() : {};
-            
-            console.log('Dashboard stats response:', statsPayload);
-            console.log('Dashboard info response:', infoPayload);
             
             // Manejar diferentes formatos de respuesta
             let stats = statsPayload;
@@ -364,17 +334,6 @@
         if (!container) return;
         
         try {
-            const apiRequestFn = window.HostBerry && window.HostBerry.apiRequest 
-                ? window.HostBerry.apiRequest 
-                : async function(url) {
-                    const token = localStorage.getItem('access_token');
-                    const headers = { 'Content-Type': 'application/json' };
-                    if (token) {
-                        headers['Authorization'] = 'Bearer ' + token;
-                    }
-                    return fetch(url, { headers: headers });
-                };
-            
             const resp = await apiRequestFn('/api/v1/system/activity?limit=10');
             
             if (!resp.ok) {
@@ -383,7 +342,6 @@
             }
             
             const activities = await resp.json();
-            console.log('Activity response:', activities);
             
             // El endpoint devuelve un array directamente, no envuelto
             const activitiesList = Array.isArray(activities) ? activities : (activities.activities || activities.data || []);
@@ -406,9 +364,9 @@
                            level === 'info' ? 'bi-info-circle' : 'bi-check-circle';
                 
                 const time = activity.timestamp ? new Date(activity.timestamp).toLocaleString() : '';
-                const message = activity.message || activity.description || activity.content || '';
-                const source = activity.source ? ' [' + activity.source + ']' : '';
-                const timeHtml = time ? '<div class="activity-time">' + time + '</div>' : '';
+                const message = escapeHtml(activity.message || activity.description || activity.content || '');
+                const source = activity.source ? ' [' + escapeHtml(activity.source) + ']' : '';
+                const timeHtml = time ? '<div class="activity-time">' + escapeHtml(time) + '</div>' : '';
                 
                 item.innerHTML = '<div class="activity-icon"><i class="bi ' + icon + '"></i></div><div class="activity-content"><div class="activity-text">' + message + source + '</div>' + timeHtml + '</div>';
                 container.appendChild(item);

@@ -62,6 +62,8 @@
     "critical": "Critical",
     "app_description": "HostBerry - Network Management System for Raspberry Pi",
     "change_theme": "Change theme",
+    "switch_to_light_theme": "Switch to light theme",
+    "switch_to_dark_theme": "Switch to dark theme",
     "show_password": "Show password",
     "hide_password": "Hide password"
   },
@@ -1229,6 +1231,7 @@
     "invalid_string": "Not a valid string",
     "invalid_integer": "Not a valid integer",
     "unknown_error": "Unknown error",
+    "unblock_failed": "Error unblocking IP",
     "monitoring_stats": "Unable to refresh monitoring stats",
     "hardware_error": "Hardware error",
     "software_error": "Software error",
@@ -1567,6 +1570,8 @@
     "service_permissions_set": "Service permissions configured for user {user}"
   },
   "security": {
+    "unblock_confirm": "Are you sure you want to unblock IP {ip}?",
+    "unblocked": "IP unblocked",
     "kicker": "Security overview",
     "title": "Security Command Center",
     "subtitle": "Monitor audit, rate limiting and backup posture in real time",

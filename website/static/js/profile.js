@@ -1,5 +1,12 @@
 // JS extraído desde templates/profile.html
 (function(){
+  const api = (url, opts) => {
+    if (window.HostBerry?.apiRequest) return window.HostBerry.apiRequest(url, opts);
+    const o = Object.assign({}, opts);
+    if (o.body && typeof o.body === 'object' && !(o.body instanceof FormData)) o.body = JSON.stringify(o.body);
+    return fetch(url, o);
+  };
+
   function bindForm(formId, toBody){
     const form = document.getElementById(formId);
     if(!form) return;
@@ -7,16 +14,10 @@
       e.preventDefault();
       const fd = new FormData(this);
       const data = toBody(fd);
+      const url = this.getAttribute('action') || form.dataset.action || window.location.pathname;
       try{
-        const resp = await fetch(this.getAttribute('action') || form.dataset.action || window.location.pathname, {
-          method: this.getAttribute('method') || 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-          },
-          body: JSON.stringify(data)
-        });
-        if(resp.ok){ HostBerry.showAlert('success', HostBerry.t('messages.changes_saved')); }
+        const resp = await api(url, { method: this.getAttribute('method') || 'POST', body: data });
+        if(resp?.ok){ HostBerry.showAlert('success', HostBerry.t('messages.changes_saved')); }
         else { HostBerry.showAlert('danger', HostBerry.t('errors.configuration_error')); }
       }catch(_e){ HostBerry.showAlert('danger', HostBerry.t('errors.network_error')); }
     });
@@ -37,12 +38,11 @@
       const confirmPassword = fd.get('confirm_password');
       if(newPassword !== confirmPassword){ HostBerry.showAlert('danger', HostBerry.t('auth.password_mismatch')); return; }
       try{
-        const resp = await fetch('/api/v1/auth/change-password', {
+        const resp = await api('/api/v1/auth/change-password', {
           method: 'POST',
-          headers: { 'Content-Type':'application/json', 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-          body: JSON.stringify({ current_password: fd.get('current_password'), new_password: newPassword })
+          body: { current_password: fd.get('current_password'), new_password: newPassword }
         });
-        if(resp.ok){ HostBerry.showAlert('success', HostBerry.t('auth.password_changed')); this.reset(); }
+        if(resp?.ok){ HostBerry.showAlert('success', HostBerry.t('auth.password_changed')); this.reset(); }
         else { HostBerry.showAlert('danger', HostBerry.t('errors.operation_failed')); }
       }catch(_e){ HostBerry.showAlert('danger', HostBerry.t('errors.network_error')); }
     });

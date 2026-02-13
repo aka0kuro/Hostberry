@@ -41,4 +41,4 @@
     </form>
 </div>
 
-<script defer src="/static/js/login.js"></script>
+<script defer src="/static/js/login.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>

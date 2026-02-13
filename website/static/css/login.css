@@ -1,275 +1,157 @@
-/* Estilos específicos de la página de login */
-body { background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); min-height: 100vh; display:flex; align-items:center; justify-content:center; margin:0; padding:0; }
-.login-container { background: rgba(255,255,255,.1); backdrop-filter: blur(10px); border-radius:20px; padding:2rem; box-shadow:0 8px 32px rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.2); max-width:320px; width:90%; }
-.login-header { text-align:center; margin-bottom:2rem; }
-.login-header h1 { color:#fff; font-size:2rem; font-weight:300; margin-bottom:.5rem; }
-.login-header p { color: rgba(255,255,255,.7); font-size:.9rem; }
-.logo-image { display:block; margin:0 auto 1rem auto; max-width:140px; height:auto; }
+/* HostBerry Auth (Login / First Login)
+   Se carga solo en `login` y `first_login` desde `base.html`.
+*/
 
-/* Estilos mejorados para los inputs */
-.form-control { 
-    background: rgba(255,255,255,.1); 
-    border: 2px solid rgba(255,255,255,.2); 
-    color: #fff; 
-    border-radius: 12px; 
-    padding: 14px 18px; 
-    font-size: 16px;
-    width: 100%;
-    box-sizing: border-box;
-    transition: all 0.3s ease;
-    margin-bottom: 1rem;
+body.hb-page-auth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2.5rem 1rem;
 }
 
-.form-control:focus { 
-    background: rgba(255,255,255,.15); 
-    border-color: #dc3545; 
-    color: #fff; 
-    box-shadow: 0 0 0 3px rgba(220, 53, 69, .25); 
-    outline: none;
-    transform: translateY(-1px);
+body.hb-page-auth .login-container {
+  width: min(420px, 92vw);
+  padding: 2rem 1.75rem;
+  border-radius: 18px;
+  background: var(--hb-surface);
+  border: 1px solid var(--hb-border);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.40);
 }
 
-.form-control::placeholder { 
-    color: rgba(255,255,255,.6); 
-    font-size: 14px;
+body.light-theme.hb-page-auth .login-container {
+  background: var(--hb-surface-2);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.14);
 }
 
-.form-label { 
-    color: rgba(255,255,255,.9); 
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 8px;
-    display: block;
+.login-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
 }
 
-/* Contenedor del campo de contraseña */
-.password-wrapper { 
-    position: relative; 
-    width: 100%; 
-    margin-bottom: 1rem;
+.logo-image {
+  display: block;
+  margin: 0 auto 1rem auto;
+  width: 132px;
+  height: auto;
+  filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.35));
 }
 
-.password-wrapper .form-control { 
-    padding-right: 50px; 
-    margin-bottom: 0;
+.login-header h1 {
+  margin: 0.25rem 0 0.25rem 0;
+  font-size: 1.85rem;
+  font-weight: 850;
+  letter-spacing: -0.02em;
 }
 
-.password-wrapper .password-toggle { 
-    position: absolute; 
-    right: 2px; 
-    top: 2px; 
-    height: calc(100% - 4px); 
-    width: 46px; 
-    border: 0; 
-    background: rgba(255,255,255,.1); 
-    color: #fff; 
-    border-radius: 10px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
+.login-header p {
+  margin: 0;
+  color: var(--hb-text-muted);
+  font-size: 0.95rem;
 }
 
-.password-wrapper .password-toggle:hover { 
-    background: rgba(255,255,255,.2); 
-    transform: scale(1.05);
+body.hb-page-auth .form-label {
+  color: var(--hb-text-light);
+  font-weight: 650;
+  margin-bottom: 0.5rem;
 }
 
-.btn-login { 
-    background: linear-gradient(135deg, #dc3545 0%, #8b0000 100%); 
-    border: none; 
-    border-radius: 12px; 
-    padding: 16px; 
-    font-weight: 600; 
-    color: #fff; 
-    width: 100%; 
-    transition: all .3s ease; 
-    font-size: 16px;
-    cursor: pointer;
-    margin-top: 1rem;
+body.hb-page-auth .form-control {
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--hb-border);
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--hb-text-light);
 }
 
-.btn-login:hover { 
-    background: linear-gradient(135deg, #c82333 0%, #721c24 100%); 
-    transform: translateY(-2px); 
-    box-shadow: 0 6px 20px rgba(220, 53, 69, .4); 
+body.light-theme.hb-page-auth .form-control {
+  background: rgba(255, 255, 255, 0.92);
 }
 
-.btn-login:active { 
-    transform: translateY(0); 
+body.hb-page-auth .form-control::placeholder {
+  color: rgba(246, 241, 232, 0.55);
 }
 
-.form-check { 
-    margin: 1rem 0; 
-    display: flex; 
-    align-items: center; 
-    gap: 8px;
+body.light-theme.hb-page-auth .form-control::placeholder {
+  color: rgba(36, 26, 18, 0.45);
 }
 
-.form-check-input { 
-    width: 18px; 
-    height: 18px; 
-    accent-color: #dc3545;
+/* Password wrapper */
+.password-wrapper {
+  position: relative;
+  width: 100%;
 }
 
-.form-check-label { 
-    color: rgba(255,255,255,.8); 
-    font-size: 14px;
-    cursor: pointer;
+body.hb-page-auth .password-wrapper .form-control {
+  padding-right: 3.2rem;
 }
 
-.form-check-input:checked { 
-    background-color: #dc3545; 
-    border-color: #dc3545; 
+.password-toggle {
+  position: absolute;
+  right: 0.4rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--hb-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
-/* Botón de tema más grande y visible */
-.theme-toggle { 
-    position: fixed; 
-    bottom: 30px; 
-    right: 30px; 
-    z-index: 1000; 
-    width: 50px; 
-    height: 50px; 
-    border-radius: 50%; 
-    border: none; 
-    box-shadow: 0 4px 15px rgba(0,0,0,.3); 
-    transition: all .3s ease; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    font-size: 1.4rem; 
-    cursor: pointer; 
-    background: linear-gradient(135deg, #dc3545 0%, #8b0000 100%); 
-    color: white; 
+.password-toggle:hover {
+  background: rgba(255, 244, 235, 0.08);
+  border-color: var(--hb-border);
+  color: var(--hb-text-light);
+  transform: translateY(-50%) scale(1.03);
 }
 
-.theme-toggle:hover { 
-    transform: scale(1.1); 
-    box-shadow: 0 6px 20px rgba(220,53,69,.4); 
+/* CTA */
+.btn-login {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.95rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(var(--hb-primary-rgb), 0.45);
+  background: linear-gradient(135deg, rgba(var(--hb-primary-rgb), 0.98) 0%, var(--hb-primary-dark) 100%);
+  color: #fff;
+  font-weight: 850;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  box-shadow: 0 14px 34px rgba(var(--hb-primary-rgb), 0.18);
 }
 
-.theme-toggle.light { 
-    background: linear-gradient(135deg, #0d6efd 0%, #007bff 100%); 
+.btn-login:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.02);
+  box-shadow: 0 16px 40px rgba(var(--hb-primary-rgb), 0.24);
 }
 
-.theme-toggle.dark { 
-    background: linear-gradient(135deg, #dc3545 0%, #8b0000 100%); 
+.btn-login:active {
+  transform: translateY(0);
 }
 
-/* Lang toggle */
-.lang-dropdown { 
-    position: fixed; 
-    top: 20px; 
-    right: 20px; 
-    z-index: 1000; 
+/* Remember me */
+body.hb-page-auth .form-check {
+  margin: 1rem 0 0.5rem 0;
+  gap: 0.6rem;
 }
 
-.lang-toggle { 
-    border: none; 
-    border-radius: 12px; 
-    padding: 10px 16px; 
-    background: linear-gradient(135deg, #dc3545 0%, #8b0000 100%); 
-    color: #fff; 
-    box-shadow: 0 4px 15px rgba(0,0,0,.3); 
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
+body.hb-page-auth .form-check-input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--hb-primary);
 }
 
-.lang-toggle:hover { 
-    filter: brightness(.95); 
-    box-shadow: 0 6px 20px rgba(220,53,69,.4); 
-    transform: translateY(-1px);
+body.hb-page-auth .form-check-label {
+  color: var(--hb-text-muted);
+  cursor: pointer;
 }
 
-/* Tema claro */
-body.light-theme { 
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
-}
-
-body.light-theme .login-container { 
-    background: rgba(255,255,255,.95); 
-    border: 1px solid rgba(0,0,0,.1); 
-    max-width: 320px; 
-}
-
-body.light-theme .btn-login { 
-    background: linear-gradient(135deg, #0d6efd 0%, #007bff 100%); 
-    color: #fff; 
-}
-
-body.light-theme .btn-login:hover { 
-    background: linear-gradient(135deg, #0b5ed7 0%, #0a58ca 100%); 
-    box-shadow: 0 6px 20px rgba(13,110,253,.4); 
-}
-
-body.light-theme .login-header h1 { 
-    color: #212529; 
-}
-
-body.light-theme .login-header p { 
-    color: #6c757d; 
-}
-
-body.light-theme .form-control { 
-    background: #fff; 
-    border: 2px solid #e9ecef; 
-    color: #212529; 
-}
-
-body.light-theme .form-control:focus { 
-    background: #fff; 
-    border-color: #0d6efd; 
-    color: #212529; 
-    box-shadow: 0 0 0 3px rgba(13,110,253,.25); 
-}
-
-body.light-theme .form-label { 
-    color: #212529; 
-}
-
-body.light-theme .form-check-label { 
-    color: #212529; 
-}
-
-body.light-theme .password-wrapper .password-toggle { 
-    background: #f8f9fa; 
-    color: #6c757d; 
-    border: 1px solid #e9ecef;
-}
-
-body.light-theme .password-wrapper .password-toggle:hover { 
-    background: #e9ecef; 
-    color: #495057;
-}
-
-/* Lang toggle azul en tema claro */
-body.light-theme .lang-toggle {
-    background: linear-gradient(135deg, #0d6efd 0%, #007bff 100%);
-    color: #fff;
-}
-
-body.light-theme .lang-toggle:hover {
-    filter: brightness(.97);
-    box-shadow: 0 6px 20px rgba(13,110,253,.35);
-}
-
-/* Responsive */
-@media (max-width: 480px) {
-    .login-container {
-        max-width: 90%;
-        padding: 1.5rem;
-    }
-    
-    .form-control {
-        padding: 12px 16px;
-        font-size: 16px; /* Evita zoom en iOS */
-    }
-    
-    .btn-login {
-        padding: 14px;
-    }
-}

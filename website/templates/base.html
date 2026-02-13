@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ call .t "common.app_name" "HostBerry" }}</title>
+    <meta name="color-scheme" content="dark light">
+    <title>{{ if .Title }}{{ .Title }} — {{ call .t "common.app_name" "HostBerry" }}{{ else }}{{ call .t "common.app_name" "HostBerry" }}{{ end }}</title>
     <meta name="description" content="{{ call .t "common.app_description" "HostBerry - Network Management System for Raspberry Pi" }}">
-    <link rel="icon" type="image/png" href="/static/hostberry.png">
-    <link rel="shortcut icon" type="image/png" href="/static/hostberry.png">
-    <link rel="apple-touch-icon" href="/static/hostberry.png">
+    <link rel="icon" type="image/png" href="/static/hostberry.png{{ if .last_update }}?v={{ .last_update }}{{ end }}">
+    <link rel="shortcut icon" type="image/png" href="/static/hostberry.png{{ if .last_update }}?v={{ .last_update }}{{ end }}">
+    <link rel="apple-touch-icon" href="/static/hostberry.png{{ if .last_update }}?v={{ .last_update }}{{ end }}">
     
     <!-- CSS offline HostBerry -->
-    <link href="/static/css/hostberry.css" rel="stylesheet">
-    <link href="/static/css/dashboard.css" rel="stylesheet">
+    <link href="/static/css/hostberry.css{{ if .last_update }}?v={{ .last_update }}{{ end }}" rel="stylesheet">
+    <link href="/static/css/dashboard.css{{ if .last_update }}?v={{ .last_update }}{{ end }}" rel="stylesheet">
     
     <!-- Prevenir layout shifts -->
     <style>
@@ -32,16 +33,23 @@
         }
     </style>
     
-    <!-- Cargamos CSS de todas las páginas para simplificar -->
-    <link href="/static/css/custom.css" rel="stylesheet">
-    <link href="/static/css/login.css" rel="stylesheet">
-    <link href="/static/css/first_login.css" rel="stylesheet">
+    <!-- CSS adicional (evitar cargar auth globalmente) -->
+    <link href="/static/css/custom.css{{ if .last_update }}?v={{ .last_update }}{{ end }}" rel="stylesheet">
+    {{ if or (eq .page "login") (eq .page "first_login") }}
+    <link href="/static/css/login.css{{ if .last_update }}?v={{ .last_update }}{{ end }}" rel="stylesheet">
+    {{ end }}
+    {{ if eq .page "first_login" }}
+    <link href="/static/css/first_login.css{{ if .last_update }}?v={{ .last_update }}{{ end }}" rel="stylesheet">
+    {{ end }}
+    {{ if eq .page "wifi" }}
+    <link href="/static/css/wifi.css{{ if .last_update }}?v={{ .last_update }}{{ end }}" rel="stylesheet">
+    {{ end }}
 
     <!-- JS base (defer): asegura que el DOM (incl. i18n-json) esté parseado antes de ejecutar -->
-    <script defer src="/static/js/common.js"></script>
-    <script defer src="/static/js/theme.js"></script>
+    <script defer src="/static/js/common.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>
+    <script defer src="/static/js/theme.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>
 </head>
-<body class="dark-theme {{ if eq .page "login" }}hb-page-login{{ end }}">
+<body class="dark-theme hb-page hb-page-{{ .page }}{{ if or (eq .page "login") (eq .page "first_login") }} hb-page-auth{{ end }}" data-page="{{ .page }}">
     {{ if and (ne .page "login") (ne .page "first_login") }}
     <!-- Sidebar vertical izquierdo -->
     <aside class="sidebar-nav">
@@ -55,67 +63,67 @@
         <nav class="sidebar-menu">
             <ul class="sidebar-nav-list">
                 <li class="nav-item">
-                    <a class="nav-link" href="/dashboard">
+                    <a class="nav-link{{ if eq .page "dashboard" }} active{{ end }}" href="/dashboard">
                         <i class="bi bi-speedometer2"></i>
                         <span>{{ call .t "navigation.dashboard" "Dashboard" }}</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/network">
+                    <a class="nav-link{{ if eq .page "network" }} active{{ end }}" href="/network">
                         <i class="bi bi-ethernet"></i>
                         <span>{{ call .t "navigation.network" "Network" }}</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/wifi">
+                    <a class="nav-link{{ if eq .page "wifi" }} active{{ end }}" href="/wifi">
                         <i class="bi bi-wifi"></i>
                         <span>{{ call .t "navigation.wifi" "WiFi" }}</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/hostapd">
+                    <a class="nav-link{{ if eq .page "hostapd" }} active{{ end }}" href="/hostapd">
                         <i class="bi bi-router"></i>
                         <span>{{ call .t "navigation.hostapd" "Hotspot" }}</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/vpn">
+                    <a class="nav-link{{ if eq .page "vpn" }} active{{ end }}" href="/vpn">
                         <i class="bi bi-shield-lock"></i>
                         <span>{{ call .t "navigation.vpn" "VPN" }}</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/wireguard">
+                    <a class="nav-link{{ if eq .page "wireguard" }} active{{ end }}" href="/wireguard">
                         <i class="bi bi-shield-check"></i>
                         <span>{{ call .t "navigation.wireguard" "WireGuard" }}</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/adblock">
+                    <a class="nav-link{{ if eq .page "adblock" }} active{{ end }}" href="/adblock">
                         <i class="bi bi-shield-x"></i>
                         <span>{{ call .t "navigation.adblock" "AdBlock" }}</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/tor">
+                    <a class="nav-link{{ if eq .page "tor" }} active{{ end }}" href="/tor">
                         <i class="bi bi-shield-lock-fill"></i>
                         <span>{{ call .t "navigation.tor" "Tor" }}</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/monitoring">
+                    <a class="nav-link{{ if eq .page "monitoring" }} active{{ end }}" href="/monitoring">
                         <i class="bi bi-graph-up"></i>
                         <span>{{ call .t "navigation.monitoring" "Monitoring" }}</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/system">
+                    <a class="nav-link{{ if eq .page "system" }} active{{ end }}" href="/system">
                         <i class="bi bi-cpu"></i>
                         <span>{{ call .t "navigation.system" "System" }}</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/settings">
+                    <a class="nav-link{{ if eq .page "settings" }} active{{ end }}" href="/settings">
                         <i class="bi bi-gear"></i>
                         <span>{{ call .t "navigation.settings" "Settings" }}</span>
                     </a>
@@ -126,7 +134,7 @@
         <div class="sidebar-footer">
             {{ if .current_user }}
             <div class="dropdown user-dropdown-sidebar">
-                <a class="nav-link user-profile-link dropdown-toggle" href="#" role="button" aria-expanded="false" onclick="event.preventDefault(); event.stopPropagation(); this.closest('.dropdown').classList.toggle('show');">
+                <a class="nav-link user-profile-link dropdown-toggle" href="#" role="button" aria-expanded="false">
                     <div class="user-avatar bg-white text-primary rounded-circle d-flex align-items-center justify-content-center">
                         <i class="bi bi-person-fill"></i>
                     </div>
@@ -135,16 +143,16 @@
                 </a>
                 <ul class="dropdown-menu sidebar-dropdown">
                     <li><div class="dropdown-header text-muted">{{ call .t "navigation.account" "Account" }}</div></li>
-                    <li><a class="dropdown-item text-danger" href="#" data-action="logout" onclick="event.preventDefault(); event.stopPropagation();">
+                    <li><a class="dropdown-item text-danger" href="#" data-action="logout">
                         <i class="bi bi-box-arrow-right me-2"></i>
                         {{ call .t "navigation.logout" "Logout" }}
                     </a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-warning" href="#" data-action="restart" onclick="event.preventDefault(); event.stopPropagation();">
+                    <li><a class="dropdown-item text-warning" href="#" data-action="restart">
                         <i class="bi bi-arrow-clockwise me-2"></i>
                         {{ call .t "system.restart" "Restart" }}
                     </a></li>
-                    <li><a class="dropdown-item text-danger" href="#" data-action="shutdown" onclick="event.preventDefault(); event.stopPropagation();">
+                    <li><a class="dropdown-item text-danger" href="#" data-action="shutdown">
                         <i class="bi bi-power me-2"></i>
                         {{ call .t "system.shutdown" "Shutdown" }}
                     </a></li>
@@ -161,36 +169,16 @@
     {{ end }}
 
     <div class="dropdown lang-dropdown">
-        <button class="btn lang-toggle dropdown-toggle" type="button" onclick="event.preventDefault(); event.stopPropagation(); this.closest('.dropdown').classList.toggle('show');" aria-expanded="false">
+        <button class="btn lang-toggle dropdown-toggle" type="button" aria-expanded="false">
             {{ if eq .language "es" }}ES{{ else }}EN{{ end }}
         </button>
         <ul class="dropdown-menu lang-dropdown-menu">
-            <li><a class="dropdown-item" href="?lang=es" onclick="setLanguageCookie('es')">🇪🇸 Español</a></li>
-            <li><a class="dropdown-item" href="?lang=en" onclick="setLanguageCookie('en')">🇺🇸 English</a></li>
+            <li><a class="dropdown-item" href="?lang=es">🇪🇸 Español</a></li>
+            <li><a class="dropdown-item" href="?lang=en">🇺🇸 English</a></li>
         </ul>
     </div>
-    
-    <script>
-    // Función para guardar el idioma en cookie
-    function setLanguageCookie(lang) {
-        // Guardar en cookie con expiración de 1 año
-        const expires = new Date();
-        expires.setFullYear(expires.getFullYear() + 1);
-        document.cookie = 'lang=' + lang + '; path=/; expires=' + expires.toUTCString() + '; SameSite=Lax';
-        // También guardar en localStorage como respaldo
-        localStorage.setItem('language', lang);
-    }
-    
-    // Cerrar dropdown de idioma al hacer clic fuera
-    document.addEventListener('click', function(event) {
-        const langDropdown = document.querySelector('.lang-dropdown');
-        if (langDropdown && !langDropdown.contains(event.target)) {
-            langDropdown.classList.remove('show');
-        }
-    });
-    </script>
 
-    <button id="theme-toggle" class="theme-toggle" type="button" title="{{ call .t "common.change_theme" "Change theme" }}" aria-label="{{ call .t "common.change_theme" "Change theme" }}" onclick="toggleTheme()"></button>
+    <button id="theme-toggle" class="theme-toggle" type="button" title="{{ call .t "common.change_theme" "Change theme" }}" aria-label="{{ call .t "common.change_theme" "Change theme" }}"></button>
 
     {{ if or (eq .page "login") (eq .page "first_login") }}
         {{embed}}
@@ -206,98 +194,8 @@
     <script id="i18n-json" type="application/json">{{ .translations_json }}</script>
     {{ end }}
 
-    {{ if .settings }}
-    <script>
-      // Settings globales provenientes del backend (DB): language/theme/timezone
-      window.HostBerryServerSettings = {{ json .settings }};
-    </script>
-    {{ end }}
-
     <!-- common.js/theme.js ahora cargan en <head> con defer -->
     
-    <!-- Toggle sidebar para móviles -->
-    {{ if and (ne .page "login") (ne .page "first_login") }}
-    <script>
-    (function() {
-        const sidebarToggle = document.querySelector('.sidebar-toggle');
-        const sidebar = document.querySelector('.sidebar-nav');
-        
-        if (sidebarToggle && sidebar) {
-            sidebarToggle.addEventListener('click', function() {
-                sidebar.classList.toggle('show');
-            });
-            
-            // Cerrar sidebar al hacer clic fuera en móviles
-            document.addEventListener('click', function(e) {
-                if (window.innerWidth <= 991) {
-                    if (sidebar.classList.contains('show') && 
-                        !sidebar.contains(e.target) && 
-                        !sidebarToggle.contains(e.target)) {
-                        sidebar.classList.remove('show');
-                    }
-                }
-            });
-        }
-    })();
-    </script>
-    {{ end }}
-    
-    <!-- Auto-refresh global cada 60 segundos -->
-    <script>
-    (function() {
-        let userActive = true;
-        let lastActivity = Date.now();
-        
-        // Detectar actividad del usuario
-        ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(function(event) {
-            document.addEventListener(event, function() {
-                userActive = true;
-                lastActivity = Date.now();
-            }, { passive: true });
-        });
-        
-        // Recargar la página cada 60 segundos si el usuario está inactivo
-        // Prevenir layout shift durante el reload
-        let refreshScheduled = false;
-        setInterval(function() {
-            if (refreshScheduled) return;
-            
-            const timeSinceActivity = Date.now() - lastActivity;
-            
-            // Solo recargar si:
-            // - No hay modales abiertos
-            // - No hay inputs/textarea con foco
-            // - El usuario ha estado inactivo por al menos 5 segundos
-            // - La página está completamente cargada
-            if (timeSinceActivity >= 5000 && 
-                !document.querySelector('.modal.show') && 
-                document.activeElement.tagName !== 'INPUT' &&
-                document.activeElement.tagName !== 'TEXTAREA' &&
-                document.activeElement.tagName !== 'SELECT' &&
-                document.readyState === 'complete') {
-                
-                refreshScheduled = true;
-                // Prevenir layout shift fijando la altura antes del reload
-                const currentHeight = Math.max(
-                    document.documentElement.scrollHeight,
-                    document.documentElement.clientHeight,
-                    document.body.scrollHeight,
-                    document.body.clientHeight
-                );
-                
-                // Fijar altura para evitar cambios visuales durante el reload
-                document.documentElement.style.minHeight = currentHeight + 'px';
-                document.body.style.minHeight = currentHeight + 'px';
-                document.documentElement.style.overflow = 'hidden';
-                
-                // Pequeño delay para que el navegador aplique los estilos antes del reload
-                setTimeout(function() {
-                    window.location.reload();
-                }, 50);
-            }
-        }, 60000); // 60 segundos = 60000 milisegundos
-    })();
-    </script>
     
 </body>
 </html>

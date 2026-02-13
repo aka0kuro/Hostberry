@@ -55,7 +55,6 @@
         let data;
         try {
           data = await resp.json();
-          console.log('Network interfaces response:', data);
         } catch (jsonError) {
           console.error('Error parsing JSON:', jsonError);
           if (container) {
@@ -75,8 +74,6 @@
         } else if (data.success !== false && data.interfaces) {
           interfaces = Array.isArray(data.interfaces) ? data.interfaces : [];
         }
-        
-        console.log('Parsed interfaces:', interfaces);
         
         if (interfaces.length > 0) {
           displayInterfaces(interfaces);
@@ -264,15 +261,11 @@
         throw new Error('No response from server');
       }
       
-      console.log('Routing table response status:', resp.status, 'ok:', resp.ok);
-      
       if (resp.ok) {
         let data;
         try {
           const text = await resp.text();
-          console.log('Routing table raw response:', text);
           data = JSON.parse(text);
-          console.log('Routing table parsed data:', data, 'type:', typeof data, 'isArray:', Array.isArray(data));
         } catch (jsonError) {
           console.error('Error parsing JSON:', jsonError);
           if (tbody) {
@@ -285,18 +278,11 @@
         let routes = [];
         if (Array.isArray(data)) {
           routes = data;
-          console.log('Using data as array, length:', routes.length);
         } else if (data.routes && Array.isArray(data.routes)) {
           routes = data.routes;
-          console.log('Using data.routes, length:', routes.length);
         } else if (data.data && Array.isArray(data.data)) {
           routes = data.data;
-          console.log('Using data.data, length:', routes.length);
-        } else {
-          console.warn('Unexpected data format:', data);
         }
-        
-        console.log('Final routes array:', routes, 'length:', routes.length);
         
         if (routes.length > 0) {
           displayRoutingTable(routes);
@@ -353,13 +339,11 @@
   const netTrafficHistory = { labels: [], download: [], upload: [] };
 
   function formatBytes(bytes) {
-    if (!bytes || bytes === 0 || !Number.isFinite(bytes) || bytes < 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    const sizeIndex = Math.max(0, Math.min(i, sizes.length - 1));
-    const value = bytes / Math.pow(k, sizeIndex);
-    return `${value.toFixed(1)} ${sizes[sizeIndex]}`;
+    if (HostBerry && HostBerry.formatBytes) return HostBerry.formatBytes(bytes, 1);
+    if (!bytes || !Number.isFinite(bytes) || bytes < 0) return '0 B';
+    const k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.max(0, Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1));
+    return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
   }
 
   function computeNetworkRates(current) {
@@ -377,18 +361,6 @@
     
     const bytesRecv = typeof current.bytes_recv === 'number' && !isNaN(current.bytes_recv) ? current.bytes_recv : 0;
     const bytesSent = typeof current.bytes_sent === 'number' && !isNaN(current.bytes_sent) ? current.bytes_sent : 0;
-    
-    // Log de depuración para wlan0
-    if (selectedTrafficInterface === 'wlan0' || current.interface === 'wlan0') {
-      console.log('computeNetworkRates for wlan0:', {
-        bytesRecv,
-        bytesSent,
-        interface: current.interface,
-        selectedInterface: selectedTrafficInterface,
-        hasSnapshot: !!lastTrafficSnapshot,
-        snapshotInterface: lastTrafficSnapshot?.interface
-      });
-    }
     
     if (lastTrafficSnapshot && current.interface && lastTrafficSnapshot.interface && current.interface !== lastTrafficSnapshot.interface) {
       lastTrafficSnapshot = null;
@@ -518,7 +490,6 @@
     
     try {
       const ctx = canvas.getContext('2d');
-      const ChartLib = typeof Chart !== 'undefined' ? Chart : window.Chart;
       // Ocultar mensaje de carga
       const chartLoading = document.getElementById('chart-loading');
       if (chartLoading) chartLoading.style.display = 'none';
@@ -659,16 +630,6 @@
       const sentErrs = parseInt(parts[11], 10) || 0;
       const sentDrop = parseInt(parts[12], 10) || 0;
       
-      // Log de depuración para wlan0
-      if (ifaceName === 'wlan0' || (interfaceName && ifaceName === interfaceName)) {
-        console.log(`Parsing interface ${ifaceName}:`, {
-          parts: parts.length,
-          recvBytes,
-          sentBytes,
-          line: trimmed.substring(0, 100)
-        });
-      }
-      
       interfaces.push(ifaceName);
       
       // Si se especificó una interfaz, solo usar esa
@@ -680,7 +641,6 @@
         packetsSent = sentPackets;
         errors = recvErrs + sentErrs;
         drop = recvDrop + sentDrop;
-        console.log(`✓ Found interface ${interfaceName}: recv=${recvBytes}, sent=${sentBytes}, packets_recv=${recvPackets}, packets_sent=${sentPackets}`);
         break; // Salir del loop cuando se encuentra la interfaz especificada
       } else if (!interfaceName) {
         // Si no se especificó interfaz, usar la primera no-loopback con tráfico
@@ -777,26 +737,10 @@
       // Si la respuesta tiene "raw", parsearla
       let parsedData = networkStatsRaw;
       if (networkStatsRaw.raw && typeof networkStatsRaw.raw === 'string') {
-        console.log(`Parsing /proc/net/dev for interface: ${selectedTrafficInterface || 'auto'}`);
         parsedData = parseProcNetDev(networkStatsRaw.raw, selectedTrafficInterface);
         if (!parsedData) {
           console.warn('Failed to parse /proc/net/dev');
           parsedData = networkStatsRaw;
-        } else if (selectedTrafficInterface) {
-          // Log para depuración cuando se selecciona una interfaz específica
-          console.log(`✓ Parsed data for ${selectedTrafficInterface}:`, {
-            interface: parsedData.interface,
-            bytes_recv: parsedData.bytes_recv,
-            bytes_sent: parsedData.bytes_sent,
-            found: parsedData.interface === selectedTrafficInterface,
-            hasData: (parsedData.bytes_recv > 0 || parsedData.bytes_sent > 0)
-          });
-          
-          // Si la interfaz fue encontrada pero tiene 0 bytes, podría ser que realmente no hay tráfico
-          if (parsedData.interface === selectedTrafficInterface && 
-              parsedData.bytes_recv === 0 && parsedData.bytes_sent === 0) {
-            console.warn(`⚠ Interface ${selectedTrafficInterface} found but has 0 traffic. This might be normal if there's no network activity.`);
-          }
         }
       }
       

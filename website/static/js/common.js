@@ -180,7 +180,7 @@
     // JSON body handling
     if(opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)){
       if(!headers.has('Content-Type')){
-      headers.set('Content-Type', 'application/json');
+        headers.set('Content-Type', 'application/json');
       }
       opts.body = JSON.stringify(opts.body);
     }
@@ -205,7 +205,7 @@
           // Verificar que realmente es un error de autenticación y no un error de red
           try {
             const errorData = await resp.clone().json().catch(() => ({}));
-            const errorMsg = errorData.error || '';
+            const errorMsg = String(errorData.error || '');
             const errorCode = errorData.code || '';
             
             // Si es "Usuario no encontrado", puede ser un problema temporal - no cerrar sesión
@@ -234,20 +234,7 @@
     return resp;
     } catch (e) {
       console.error('API Request failed:', e);
-      // Si es un error de red, NO cerrar la sesión - podría ser temporal
-      const isNetworkError = e.message && (
-        e.message.includes('Failed to fetch') ||
-        e.message.includes('NetworkError') ||
-        e.message.includes('ERR_INTERNET_DISCONNECTED') ||
-        e.message.includes('ERR_NETWORK_CHANGED') ||
-        e.message.includes('Network request failed')
-      );
-      
-      if(isNetworkError){
-        // Es un error de red, no de autenticación - lanzar el error para que el código lo maneje
-        // NO cerrar la sesión por errores de red
-        throw e;
-      }
+      // No cerrar sesión por errores de red - podría ser temporal
       throw e;
     }
   }
@@ -276,6 +263,34 @@
     }
   }
 
+  function formatUptime(seconds){
+    if (!Number.isFinite(seconds) || seconds < 0) return '--';
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (days > 0) return days + 'd ' + hours + 'h ' + minutes + 'm';
+    if (hours > 0) return hours + 'h ' + minutes + 'm';
+    return minutes + 'm';
+  }
+
+  function escapeHtml(text){
+    if (text == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+  }
+
+  function formatBytes(bytes, decimals){
+    if (bytes === 0) return '0 B';
+    if (!bytes || !Number.isFinite(bytes) || bytes < 0) return '0 B';
+    const k = 1024;
+    const dm = (decimals !== undefined && decimals >= 0) ? decimals : 2;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const sizeIndex = Math.max(0, Math.min(i, sizes.length - 1));
+    return parseFloat((bytes / Math.pow(k, sizeIndex)).toFixed(dm)) + ' ' + sizes[sizeIndex];
+  }
+
   // Export
   window.t = t;
   HostBerry.t = t;
@@ -283,6 +298,9 @@
   HostBerry.apiRequest = apiRequest;
   HostBerry.getServerTimezone = getServerTimezone;
   HostBerry.formatTime = formatTime;
+  HostBerry.formatUptime = formatUptime;
+  HostBerry.formatBytes = formatBytes;
+  HostBerry.escapeHtml = escapeHtml;
 
   // Verificar y mantener la sesión activa
   function setupSessionKeepAlive(){
@@ -311,7 +329,7 @@
           // Verificar que realmente es un error de autenticación y no de red
           try {
             const errorData = await resp.json().catch(() => ({}));
-            const errorMsg = (errorData.error || '').toLowerCase();
+            const errorMsg = String(errorData.error || '').toLowerCase();
             const errorCode = errorData.code || '';
             
             // Si es "Usuario no encontrado", puede ser un problema temporal - no cerrar sesión
@@ -367,24 +385,44 @@
     }, 2 * 60 * 1000); // Cada 2 minutos (verificar más frecuentemente para sesión de 1 hora)
   }
 
-  // Populate navbar username from API if logged in
+  function setupSidebarToggle(){
+    const sidebarToggle = document.querySelector('.sidebar-toggle');
+    const sidebar = document.querySelector('.sidebar-nav');
+    if(!sidebarToggle || !sidebar) return;
+
+    sidebarToggle.addEventListener('click', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      sidebar.classList.toggle('show');
+    });
+
+    // Cerrar sidebar al hacer clic fuera en móviles
+    document.addEventListener('click', function(e){
+      if(window.innerWidth > 991) return;
+      if(!sidebar.classList.contains('show')) return;
+      if(sidebar.contains(e.target) || sidebarToggle.contains(e.target)) return;
+      sidebar.classList.remove('show');
+    }, { passive: true });
+  }
+
   document.addEventListener('DOMContentLoaded', async function(){
-    // Configurar keep-alive de sesión
+    setupSidebarToggle();
     setupSessionKeepAlive();
     
-    try{
-      const el = document.getElementById('hb-current-username');
-      const token = localStorage.getItem('access_token');
-      if(!el || !token) return;
-
-      const resp = await apiRequest('/api/v1/auth/me');
-      if(!resp || !resp.ok) return;
-      const data = await resp.json();
-      if(data && data.username){
-        el.textContent = data.username;
+    const el = document.getElementById('hb-current-username');
+    const token = localStorage.getItem('access_token');
+    if(el && token){
+      try{
+        const resp = await apiRequest('/api/v1/auth/me');
+        if(resp && resp.ok){
+          const data = await resp.json();
+          if(data && data.username){
+            el.textContent = data.username;
+          }
+        }
+      }catch(_e){
+        // silent
       }
-    }catch(_e){
-      // silent
     }
 
     document.querySelectorAll('[data-action="logout"]').forEach(function(btn){

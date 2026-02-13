@@ -11,41 +11,6 @@
     login_success: __i18nEl ? __i18nEl.getAttribute('data-login-success') : 'Login successful'
   };
 
-  // Toggle tema
-  function toggleTheme(){
-    const body = document.body;
-    const themeToggle = document.getElementById('theme-toggle');
-    const emoji = document.getElementById('theme-emoji');
-    if(body.classList.contains('dark-theme')){
-      body.classList.remove('dark-theme');
-      body.classList.add('light-theme');
-      if(themeToggle){ themeToggle.classList.remove('dark'); themeToggle.classList.add('light'); }
-      if(emoji){ emoji.textContent = '🌙'; }
-      localStorage.setItem('theme','light');
-    } else {
-      body.classList.remove('light-theme');
-      body.classList.add('dark-theme');
-      if(themeToggle){ themeToggle.classList.remove('light'); themeToggle.classList.add('dark'); }
-      if(emoji){ emoji.textContent = '☀️'; }
-      localStorage.setItem('theme','dark');
-    }
-  }
-  window.toggleTheme = toggleTheme;
-
-  // Cargar tema guardado
-  document.addEventListener('DOMContentLoaded', function(){
-    const saved = localStorage.getItem('theme') || 'dark';
-    const body = document.body;
-    const themeToggle = document.getElementById('theme-toggle');
-    const emoji = document.getElementById('theme-emoji');
-    if(saved==='light'){
-      body.classList.remove('dark-theme');
-      body.classList.add('light-theme');
-      if(themeToggle){ themeToggle.classList.remove('dark'); themeToggle.classList.add('light'); }
-      if(emoji){ emoji.textContent = '🌙'; }
-    }
-  });
-
   // Toggle mostrar/ocultar contraseña (usa emoji de ojo)
   (function(){
     const btn = document.getElementById('toggle-password');
@@ -63,14 +28,18 @@
     });
   })();
 
-  // Alert helper
-  window.showAlert = function(type, message){
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-    alertDiv.style.cssText = 'top:20px; right:20px; z-index:9999; min-width:300px;';
-    alertDiv.innerHTML = `${message}`;
-    document.body.appendChild(alertDiv);
-    setTimeout(()=> alertDiv.remove(), 5000);
+  // Alert helper: usar HostBerry.showAlert si existe, si no fallback local (p. ej. login carga antes)
+  const showAlert = (type, message) => {
+    if (window.HostBerry && typeof window.HostBerry.showAlert === 'function') {
+      window.HostBerry.showAlert(type, message);
+    } else {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+      alertDiv.style.cssText = 'top:20px; right:20px; z-index:9999; min-width:300px;';
+      alertDiv.innerHTML = String(message);
+      document.body.appendChild(alertDiv);
+      setTimeout(() => alertDiv.remove(), 5000);
+    }
   };
 
   // Manejador del login

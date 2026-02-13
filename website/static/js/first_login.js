@@ -223,64 +223,10 @@
     });
   }
 
-  // Función para cambiar tema
-  function toggleTheme() {
-    const body = document.body;
-    const themeToggle = document.getElementById('theme-toggle');
-    const themeEmoji = document.getElementById('theme-emoji');
-    
-    if (body.classList.contains('dark-theme')) {
-      body.classList.remove('dark-theme');
-      body.classList.add('light-theme');
-      themeToggle.classList.remove('dark');
-      themeToggle.classList.add('light');
-      themeEmoji.textContent = '🌙';
-      localStorage.setItem('theme', 'light');
-    } else {
-      body.classList.remove('light-theme');
-      body.classList.add('dark-theme');
-      themeToggle.classList.remove('light');
-      themeToggle.classList.add('dark');
-      themeEmoji.textContent = '☀️';
-      localStorage.setItem('theme', 'dark');
-    }
-  }
-
-  // Función para aplicar tema guardado
-  function applySavedTheme() {
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    const body = document.body;
-    const themeToggle = document.getElementById('theme-toggle');
-    const themeEmoji = document.getElementById('theme-emoji');
-    
-    if (savedTheme === 'light') {
-      body.classList.remove('dark-theme');
-      body.classList.add('light-theme');
-      themeToggle.classList.remove('dark');
-      themeToggle.classList.add('light');
-      themeEmoji.textContent = '🌙';
-    } else {
-      body.classList.remove('light-theme');
-      body.classList.add('dark-theme');
-      themeToggle.classList.remove('light');
-      themeToggle.classList.add('dark');
-      themeEmoji.textContent = '☀️';
-    }
-  }
-
   document.addEventListener('DOMContentLoaded', function(){
-    // Aplicar tema guardado
-    applySavedTheme();
-    
     // Configurar botones de mostrar/ocultar contraseña
     attachToggle('toggle-new-password', 'new_password', 'eye-emoji-new');
     attachToggle('toggle-confirm-password', 'confirm_password', 'eye-emoji-confirm');
-    
-    // Configurar cambio de tema
-    const themeToggle = document.getElementById('theme-toggle');
-    if (themeToggle) {
-      themeToggle.addEventListener('click', toggleTheme);
-    }
     
     const form = document.getElementById('firstLoginForm');
     
@@ -297,7 +243,7 @@
       }
       
       try{
-        const currentLang = document.documentElement.lang || document.querySelector('html').getAttribute('lang') || 'es';
+        const currentLang = (document.documentElement && (document.documentElement.lang || document.documentElement.getAttribute('lang'))) || 'es';
         const token = localStorage.getItem('access_token');
         const headers = {
           'Content-Type': 'application/json',

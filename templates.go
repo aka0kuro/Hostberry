@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/template/html/v2"
@@ -267,6 +268,10 @@ func renderTemplate(c *fiber.Ctx, name string, data fiber.Map) error {
 	}
 
 	data["page"] = name
+	// cache-busting de assets (si el handler no lo provee)
+	if _, ok := data["last_update"]; !ok {
+		data["last_update"] = time.Now().Unix()
+	}
 	
 	data["language"] = language
 	data["t"] = i18nFuncs["t"]

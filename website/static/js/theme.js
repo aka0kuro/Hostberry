@@ -24,18 +24,18 @@ function toggleTheme() {
 // Function to update theme icon
 function updateThemeIcon(theme) {
     const themeToggle = document.getElementById('theme-toggle');
-    if (themeToggle) {
-        if (theme === 'dark') {
-            themeToggle.textContent = '☀️';
-            themeToggle.title = 'Switch to light theme';
-            themeToggle.classList.remove('light');
-            themeToggle.classList.add('dark');
-        } else {
-            themeToggle.textContent = '🌙';
-            themeToggle.title = 'Switch to dark theme';
-            themeToggle.classList.remove('dark');
-            themeToggle.classList.add('light');
-        }
+    if (!themeToggle) return;
+    const t = (key, fallback) => (window.HostBerry?.t ? window.HostBerry.t(key, fallback) : fallback);
+    if (theme === 'dark') {
+        themeToggle.textContent = '☀️';
+        themeToggle.title = t('common.switch_to_light_theme', 'Switch to light theme');
+        themeToggle.classList.remove('light');
+        themeToggle.classList.add('dark');
+    } else {
+        themeToggle.textContent = '🌙';
+        themeToggle.title = t('common.switch_to_dark_theme', 'Switch to dark theme');
+        themeToggle.classList.remove('dark');
+        themeToggle.classList.add('light');
     }
 }
 
@@ -91,6 +91,20 @@ function detectSystemTheme() {
 function initTheme() {
     loadTheme();
     detectSystemTheme();
+    bindThemeToggle();
+}
+
+// Bind click handler to theme toggle button (sin onclick inline)
+function bindThemeToggle() {
+    const themeToggle = document.getElementById('theme-toggle');
+    if (!themeToggle) return;
+    if (themeToggle.dataset && themeToggle.dataset.hbThemeBound === '1') return;
+    if (themeToggle.dataset) themeToggle.dataset.hbThemeBound = '1';
+    
+    themeToggle.addEventListener('click', function (e) {
+        e.preventDefault();
+        toggleTheme();
+    });
 }
 
 // Function to get current theme

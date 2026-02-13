@@ -1,3 +1,4 @@
+{{/*
 <style>
   .security-settings-card .card-body,
   .performance-settings-card .card-body {
@@ -120,6 +121,7 @@
     color: rgba(0, 0, 0, 0.6) !important;
   }
 </style>
+*/}}
 
 <div class="dashboard-container">
     <!-- Header Section -->
@@ -498,6 +500,9 @@
     </div>
 </div>
 
+<script defer src="/static/js/settings.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>
+
+{{/*
 <script>
 (function(){
   // Notificaciones estilo dashboard (toast)
@@ -1104,3 +1109,4 @@
 
 })();
 </script>
+*/}}

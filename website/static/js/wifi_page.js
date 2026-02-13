@@ -57,6 +57,12 @@
     return errorMessage;
   };
 
+  const escapeHtmlForDisplay = (text) => {
+    if (text == null) return '';
+    const s = String(text);
+    return (window.HostBerry && window.HostBerry.escapeHtml) ? window.HostBerry.escapeHtml(s) : s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  };
+
   // Función para mostrar alertas
   const showAlert = (type, message) => {
     if (window.HostBerry && window.HostBerry.showAlert) {
@@ -526,7 +532,7 @@
             <div class="text-center py-5">
               <i class="bi bi-exclamation-triangle text-warning" style="font-size: 4rem;"></i>
               <p class="mt-3">${t('errors.scan_failed', 'Scan failed')}</p>
-              <p class="text-muted small">${translateError(errorText) || t('errors.unknown_error', 'Unknown error')}</p>
+              <p class="text-muted small">${escapeHtmlForDisplay(translateError(errorText) || t('errors.unknown_error', 'Unknown error'))}</p>
               <button class="btn btn-primary mt-3" onclick="scanNetworks()">
                 <i class="bi bi-arrow-clockwise me-2"></i>${t('common.retry', 'Retry')}
               </button>
@@ -560,7 +566,7 @@
                 <div class="text-center py-5">
                   <i class="bi bi-exclamation-triangle text-warning" style="font-size: 4rem;"></i>
                   <p class="mt-3">${t('wifi.scan_error', 'Error scanning WiFi networks')}</p>
-                  <p class="text-muted small">${errorData.error || 'Usuario no encontrado'}</p>
+                  <p class="text-muted small">${escapeHtmlForDisplay(errorData.error || 'Usuario no encontrado')}</p>
                   <button class="btn btn-primary mt-3" onclick="location.reload()">
                     <i class="bi bi-arrow-clockwise me-2"></i>Recargar página
                   </button>
@@ -676,7 +682,9 @@
             const security = net.security || net.encryption || 'none';
             const securityIcon = security === 'none' || security === 'Open' ? 'bi-unlock' : 'bi-lock';
             const ssid = net.ssid || t('wifi.unnamed_network', 'Unnamed network') + ' ' + (index + 1);
-            const escapedSsid = ssid.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const displaySsid = escapeHtmlForDisplay(ssid);
+            const displaySecurity = escapeHtmlForDisplay(String(security || '').toUpperCase());
+            const displayChannel = net.channel ? escapeHtmlForDisplay(net.channel) : '';
             
             const card = document.createElement('div');
             card.className = 'network-card';
@@ -691,7 +699,6 @@
             const buttonClass = isConnected ? 'btn-success' : 'btn-primary';
             const buttonIcon = isConnected ? 'bi-x-circle' : 'bi-box-arrow-in-right';
             const buttonText = isConnected ? t('wifi.disconnect', 'Disconnect') : t('wifi.connect', 'Connect');
-            const buttonAction = isConnected ? `disconnectWiFi(this)` : `connectToNetwork('${escapedSsid}', '${security}', this)`;
             
             // Traducción para "Connected" badge
             const connectedBadge = isConnected ? ` <span class="badge bg-success ms-2">${t('wifi.connected', 'Connected')}</span>` : '';
@@ -702,24 +709,34 @@
                   <i class="bi bi-wifi"></i>
                 </div>
                 <div class="network-card-info">
-                  <div class="network-card-ssid">${ssid}${connectedBadge}</div>
+                  <div class="network-card-ssid">${displaySsid}${connectedBadge}</div>
                   <div class="network-card-details">
                     <span class="network-card-detail-item">
                       <i class="bi bi-bar-chart me-1"></i> ${signal !== null && signal !== 0 ? signal + 'dBm (' + signalPercent + '%)' : '--'}
                     </span>
                     <span class="network-card-detail-item">
-                      <i class="bi ${securityIcon} me-1"></i> ${security.toUpperCase()}
+                      <i class="bi ${securityIcon} me-1"></i> ${displaySecurity}
                     </span>
-                    ${net.channel ? `<span class="network-card-detail-item"><i class="bi bi-hash me-1"></i> ${net.channel}</span>` : ''}
+                    ${net.channel ? `<span class="network-card-detail-item"><i class="bi bi-hash me-1"></i> ${displayChannel}</span>` : ''}
                   </div>
                 </div>
               </div>
               <div class="network-card-actions">
-                <button class="btn ${buttonClass} btn-sm" onclick="${buttonAction}">
+                <button class="btn ${buttonClass} btn-sm" type="button">
                   <i class="bi ${buttonIcon} me-2"></i>${buttonText}
                 </button>
               </div>
             `;
+            const actionButton = card.querySelector('.network-card-actions button');
+            if (actionButton) {
+              actionButton.onclick = () => {
+                if (isConnected) {
+                  disconnectWiFi(actionButton);
+                } else {
+                  connectToNetwork(ssid, security, actionButton);
+                }
+              };
+            }
             tbody.appendChild(card);
           });
         }
@@ -738,7 +755,7 @@
           <div class="text-center py-5">
             <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"></i>
             <p class="mt-3">${t('errors.scan_error', 'Scan error')}</p>
-            <p class="text-muted small">${translateError(error.message)}</p>
+            <p class="text-muted small">${escapeHtmlForDisplay(translateError(error.message))}</p>
             <button class="btn btn-primary mt-3" onclick="scanNetworks()">
               <i class="bi bi-arrow-clockwise me-2"></i>${t('common.retry', 'Retry')}
             </button>
@@ -785,6 +802,10 @@
     formWrapper.className = 'network-connect-form-wrapper';
     
     const needsPassword = security && security !== 'none' && security !== 'Open' && security !== 'open';
+    const safeSignal = escapeHtmlForDisplay(signal);
+    const safeEncryption = escapeHtmlForDisplay(String(encryption || '').toUpperCase());
+    const safeChannel = escapeHtmlForDisplay(channel !== '--' ? channel : '--');
+    const passwordInputId = 'network-password-' + String(ssid).replace(/[^a-zA-Z0-9]/g, '-');
     
     formWrapper.innerHTML = `
       <div class="network-connect-form show">
@@ -793,19 +814,19 @@
             <div class="col-4">
               <div class="network-info-item">
                 <label class="network-info-label">${t('wifi.network_signal', 'Signal')}</label>
-                <div class="network-info-value">${signal}</div>
+                <div class="network-info-value">${safeSignal}</div>
               </div>
             </div>
             <div class="col-4">
               <div class="network-info-item">
                 <label class="network-info-label">${t('wifi.network_security', 'Security')}</label>
-                <div class="network-info-value">${encryption.toUpperCase()}</div>
+                <div class="network-info-value">${safeEncryption}</div>
               </div>
             </div>
             <div class="col-4">
               <div class="network-info-item">
                 <label class="network-info-label">${t('wifi.network_channel', 'Channel')}</label>
-                <div class="network-info-value">${channel !== '--' ? channel : '--'}</div>
+                <div class="network-info-value">${safeChannel}</div>
               </div>
             </div>
           </div>
@@ -813,24 +834,36 @@
         <div class="network-connect-form-group">
           <label class="network-connect-form-label">${t('wifi.network_password', 'Password')}</label>
           <div class="password-input-wrapper">
-            <input type="password" class="network-connect-form-input" id="network-password-${ssid.replace(/[^a-zA-Z0-9]/g, '-')}" 
+            <input type="password" class="network-connect-form-input" id="${passwordInputId}" 
                    placeholder="${needsPassword ? t('wifi.network_password', 'Password') : t('wifi.open_network', 'Open network')}" 
                    ${needsPassword ? 'required' : ''}>
-            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility(this)" title="${t('common.show_password', 'Show password')}">
+            <button type="button" class="password-toggle-btn" title="${t('common.show_password', 'Show password')}">
               <i class="bi bi-eye"></i>
             </button>
           </div>
         </div>
         <div class="network-connect-form-actions">
-          <button class="btn btn-secondary btn-sm" onclick="this.closest('.network-connect-form-wrapper').remove()">
+          <button type="button" class="btn btn-secondary btn-sm network-connect-cancel">
             ${t('common.cancel', 'Cancel')}
           </button>
-          <button class="btn btn-primary btn-sm network-connect-submit" onclick="submitConnect('${ssid.replace(/'/g, "\\'")}', '${security.replace(/'/g, "\\'")}', this)">
+          <button type="button" class="btn btn-primary btn-sm network-connect-submit">
             <i class="bi bi-box-arrow-in-right me-2"></i>${t('wifi.connect', 'Connect')}
           </button>
         </div>
       </div>
     `;
+    const togglePasswordBtn = formWrapper.querySelector('.password-toggle-btn');
+    if (togglePasswordBtn) {
+      togglePasswordBtn.addEventListener('click', () => togglePasswordVisibility(togglePasswordBtn));
+    }
+    const cancelBtn = formWrapper.querySelector('.network-connect-cancel');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => formWrapper.remove());
+    }
+    const submitBtn = formWrapper.querySelector('.network-connect-submit');
+    if (submitBtn) {
+      submitBtn.addEventListener('click', () => submitConnect(ssid, security, submitBtn));
+    }
     
     if (card) {
       card.appendChild(formWrapper);
@@ -895,9 +928,6 @@
     }
   }
   
-  // Hacer la función global para que pueda ser llamada desde onclick
-  window.togglePasswordVisibility = togglePasswordVisibility;
-
   // Enviar conexión
   async function submitConnect(ssid, security, buttonElement) {
     const formWrapper = buttonElement.closest('.network-connect-form-wrapper');
@@ -1043,18 +1073,21 @@
         const buttonIcon = isConnected ? 'bi-x-circle' : 'bi-box-arrow-in-right';
         const buttonText = isConnected ? t('wifi.disconnect', 'Disconnect') : t('wifi.connect', 'Connect');
         const security = card.getAttribute('data-security') || 'none';
-        const escapedSsid = ssid.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        const buttonAction = isConnected ? `disconnectWiFi(this)` : `connectToNetwork('${escapedSsid}', '${security}', this)`;
         
         existingBtn.className = `btn ${buttonClass} btn-sm`;
         existingBtn.innerHTML = `<i class="bi ${buttonIcon} me-2"></i>${buttonText}`;
-        existingBtn.setAttribute('onclick', buttonAction);
+        existingBtn.onclick = () => {
+          if (isConnected) {
+            disconnectWiFi(existingBtn);
+          } else {
+            connectToNetwork(ssid, security, existingBtn);
+          }
+        };
       }
       
       // Actualizar badge de conectado
       const ssidDiv = card.querySelector('.network-card-ssid');
       if (ssidDiv) {
-        const currentText = ssidDiv.textContent.replace(/\s*\(.*?\)\s*$/, '').trim();
         if (isConnected) {
           if (!ssidDiv.querySelector('.badge')) {
             const badge = document.createElement('span');
@@ -1079,8 +1112,11 @@
     buttonElement.innerHTML = `<i class="bi bi-arrow-clockwise spinning me-2"></i>${t('wifi.disconnecting', 'Disconnecting...')}`;
     
     try {
-      // Usar endpoint legacy /api/wifi/disconnect
-      const resp = await apiRequest('/api/wifi/disconnect', { method: 'POST' });
+      // Intentar endpoint v1 y fallback legacy para compatibilidad
+      let resp = await apiRequest('/api/v1/wifi/disconnect', { method: 'POST' });
+      if (resp && resp.status === 404) {
+        resp = await apiRequest('/api/wifi/disconnect', { method: 'POST' });
+      }
       const data = await resp.json();
       
       if (resp.ok && data.success) {

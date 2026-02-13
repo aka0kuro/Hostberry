@@ -216,7 +216,10 @@
         </div>
     </div>
 </div>
-<script defer src="/static/js/lib/chart.umd.min.js"></script>
+<script defer src="/static/js/lib/chart.umd.min.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>
+<script defer src="/static/js/monitoring.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>
+
+{{/*
 <script>
 (function(){
   // Esperar a que Chart.js esté cargado
@@ -860,3 +863,4 @@
   }
 })();
 </script>
+*/}}

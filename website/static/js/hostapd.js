@@ -74,9 +74,7 @@
     // Usar 'running' como el estado real del servicio (más confiable que 'enabled')
     const isActuallyActive = running || enabled;
     
-    // Recargar interfaces cuando el estado cambie (para mostrar ap0 si se activa)
-    loadInterfaces();
-    
+    // Nota: loadInterfaces se llama en init y tras crear ap0; evadir aquí para no saturar API
     if (statusValue) {
       statusValue.textContent = isActuallyActive ? t('hostapd.enabled', 'Enabled') : t('hostapd.disabled', 'Disabled');
       statusValue.className = 'stat-value' + (isActuallyActive ? ' text-success' : ' text-danger');
@@ -222,18 +220,33 @@
             statusBadge = 'danger';
             statusText = t('hostapd.inactive', 'Inactive');
           }
+          const apName = String(ap.name || ap.interface || '-');
+          const apSsid = String(ap.ssid || '-');
+          const configTarget = String(ap.name || ap.ssid || '');
+          const configTargetEncoded = encodeURIComponent(configTarget);
+          const clientsCount = Number.isFinite(Number(ap.clients_count)) ? Number(ap.clients_count) : 0;
           
           html += '<tr>';
-          html += `<td>${ap.name || ap.interface || '-'}</td>`;
-          html += `<td>${ap.ssid || '-'}</td>`;
+          html += `<td>${escapeHtml(apName)}</td>`;
+          html += `<td>${escapeHtml(apSsid)}</td>`;
           html += `<td><span class="badge bg-${statusBadge}" title="${serviceRunning && !transmitting ? t('hostapd.check_diagnostics', 'Service is running but WiFi network is not visible. Check diagnostics.') : ''}">${statusText}</span></td>`;
-          html += `<td>${ap.clients_count || 0}</td>`;
-          html += `<td><button class="btn btn-sm btn-outline-primary" onclick="configureAccessPoint('${ap.name || ap.ssid || ''}')"><i class="bi bi-gear"></i></button></td>`;
+          html += `<td>${clientsCount}</td>`;
+          html += `<td><button class="btn btn-sm btn-outline-primary" type="button" data-config-ap="${configTargetEncoded}"><i class="bi bi-gear"></i></button></td>`;
           html += '</tr>';
         });
         
         html += '</tbody></table></div>';
         container.innerHTML = html;
+        container.querySelectorAll('button[data-config-ap]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const rawTarget = btn.getAttribute('data-config-ap') || '';
+            try {
+              configureAccessPoint(decodeURIComponent(rawTarget));
+            } catch (_e) {
+              configureAccessPoint(rawTarget);
+            }
+          });
+        });
         
         // Mostrar diagnósticos si algún AP está corriendo pero no transmite
         const hasNotTransmitting = aps.some(ap => ap.service_running === true && ap.transmitting !== true);
@@ -369,15 +382,12 @@
     };
     
     try {
-      console.log('Toggling HostAPD...');
       const resp = await HostBerry.apiRequest('/api/v1/hostapd/toggle', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         }
       });
-      
-      console.log('HostAPD toggle response:', resp);
       
       if (resp && resp.ok) {
         let result;
@@ -386,13 +396,11 @@
         } catch (jsonErr) {
           console.error('Error parsing JSON response:', jsonErr);
           const text = await resp.text().catch(() => '');
-          console.log('Response text:', text);
+          console.error('HostAPD toggle non-JSON response:', text);
           HostBerry.showAlert('warning', t('errors.unexpected_response', 'Unexpected response from server'));
           restoreButton();
           return;
         }
-        
-        console.log('HostAPD toggle result:', result);
         
         if (result.error) {
           // Si falta la configuración, mostrar mensaje más claro
@@ -484,7 +492,7 @@
         html += '<div class="row g-2">';
         html += '<div class="col-md-6"><strong>' + t('hostapd.service_running', 'Service Running') + ':</strong> <span class="badge bg-' + (diagnostics.service_running ? 'success' : 'danger') + '">' + (diagnostics.service_running ? t('common.yes', 'Yes') : t('common.no', 'No')) + '</span></div>';
         html += '<div class="col-md-6"><strong>' + t('hostapd.transmitting', 'Transmitting') + ':</strong> <span class="badge bg-' + (diagnostics.transmitting ? 'success' : 'warning') + '">' + (diagnostics.transmitting ? t('common.yes', 'Yes') : t('common.no', 'No')) + '</span></div>';
-        html += '<div class="col-md-6"><strong>' + t('hostapd.interface', 'Interface') + ':</strong> <code>' + (diagnostics.interface || 'N/A') + '</code></div>';
+        html += '<div class="col-md-6"><strong>' + t('hostapd.interface', 'Interface') + ':</strong> <code>' + escapeHtml(diagnostics.interface || 'N/A') + '</code></div>';
         html += '<div class="col-md-6"><strong>' + t('hostapd.interface_up', 'Interface Up') + ':</strong> <span class="badge bg-' + (diagnostics.interface_up ? 'success' : 'danger') + '">' + (diagnostics.interface_up ? t('common.yes', 'Yes') : t('common.no', 'No')) + '</span></div>';
         html += '<div class="col-md-6"><strong>' + t('hostapd.interface_in_ap_mode', 'Interface in AP Mode') + ':</strong> <span class="badge bg-' + (diagnostics.interface_in_ap_mode ? 'success' : 'warning') + '">' + (diagnostics.interface_in_ap_mode ? t('common.yes', 'Yes') : t('common.no', 'No')) + '</span></div>';
         html += '<div class="col-md-6"><strong>DNSmasq:</strong> <span class="badge bg-' + (diagnostics.dnsmasq_running ? 'success' : 'warning') + '">' + (diagnostics.dnsmasq_running ? t('common.running', 'Running') : t('common.stopped', 'Stopped')) + '</span></div>';
@@ -497,7 +505,7 @@
           html += '<h6 class="fw-bold mb-3 text-danger"><i class="bi bi-exclamation-triangle me-2"></i>' + t('hostapd.errors_detected', 'Errors Detected') + '</h6>';
           html += '<ul class="list-unstyled">';
           diagnostics.errors.forEach(error => {
-            html += '<li class="mb-2"><span class="badge bg-danger me-2">!</span>' + error + '</li>';
+            html += '<li class="mb-2"><span class="badge bg-danger me-2">!</span>' + escapeHtml(String(error || '')) + '</li>';
           });
           html += '</ul>';
           html += '</div>';
@@ -517,7 +525,7 @@
         html += '<ul class="mb-0">';
         
         if (!diagnostics.interface_up) {
-          html += '<li>' + t('hostapd.tip_interface_down', 'The network interface is down. Try: sudo ip link set {interface} up').replace('{interface}', diagnostics.interface || 'wlan0') + '</li>';
+          html += '<li>' + t('hostapd.tip_interface_down', 'The network interface is down. Try: sudo ip link set {interface} up').replace('{interface}', escapeHtml(diagnostics.interface || 'wlan0')) + '</li>';
         }
         if (!diagnostics.interface_in_ap_mode && diagnostics.service_running) {
           html += '<li>' + t('hostapd.tip_driver_issue', 'The interface is not in AP mode. This may indicate a driver issue. Check if your WiFi adapter supports AP mode.') + '</li>';
@@ -560,8 +568,9 @@
   
   // Función auxiliar para escapar HTML
   function escapeHtml(text) {
+    if (text == null) return '';
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = String(text);
     return div.innerHTML;
   }
 
@@ -738,7 +747,6 @@
           }
           
           // Nota: No cargamos la contraseña por seguridad
-          console.log('HostAPD configuration loaded:', config);
         }
       }
     } catch (e) {
@@ -765,12 +773,7 @@
           method: 'POST'
         });
         if (ap0Resp && ap0Resp.ok) {
-          const ap0Result = await ap0Resp.json();
-          if (ap0Result.success && !ap0Result.exists) {
-            console.log('ap0 interface created successfully');
-          } else if (ap0Result.exists) {
-            console.log('ap0 interface already exists');
-          }
+          await ap0Resp.json();
         }
       } catch (e) {
         console.error('Error creating ap0 interface:', e);
@@ -841,7 +844,6 @@
           }
           
           try {
-            console.log('Saving HostAPD configuration:', data);
             const resp = await HostBerry.apiRequest('/api/v1/hostapd/config', {
               method: 'POST',
               body: data

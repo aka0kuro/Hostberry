@@ -1,131 +1,78 @@
-<!DOCTYPE html>
-<html lang="{{ .language }}" class="dark-theme">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ call .t "auth.first_login" "First Login" }} - {{ call .t "common.app_name" "HostBerry" }}</title>
-    <meta name="description" content="{{ call .t "auth.first_login_description" "Change your default credentials" }}">
-    <link rel="icon" type="image/png" href="/static/hostberry.png?v={{ .last_update }}">
-    <link rel="shortcut icon" type="image/png" href="/static/hostberry.png?v={{ .last_update }}">
-    <link rel="apple-touch-icon" href="/static/hostberry.png?v={{ .last_update }}">
-    
-    <!-- CSS offline HostBerry -->
-    <link href="/static/css/hostberry.css" rel="stylesheet">
-    <link href="/static/css/login.css" rel="stylesheet">
-</head>
-<body class="dark-theme">
-    <!-- Textos i18n para notificaciones -->
-    <div id="i18n-data" style="display:none"
-         data-user-not-found="{{ call .t "auth.user_not_found" "User not found" }}"
-         data-incorrect-password="{{ call .t "auth.incorrect_password" "Incorrect password" }}"
-         data-too-many-attempts="{{ call .t "auth.too_many_attempts" "Too many attempts" }}"
-         data-connection-error="{{ call .t "auth.connection_error" "Connection error" }}"
-         data-login-generic-error="{{ call .t "auth.login_generic_error" "Login error" }}"
-         data-login-success="{{ call .t "auth.login_success" "Login successful" }}"
-         data-passwords-dont-match="{{ call .t "auth.passwords_dont_match" "Passwords do not match" }}"
-         data-credentials-updated="{{ call .t "auth.credentials_updated" "Credentials updated" }}"
-         data-validation-error="{{ call .t "errors.validation_error" "Validation error" }}"
-         data-password-special-char="{{ call .t "errors.password_special_char" "Password must contain a special character" }}"
-         data-password-length="{{ call .t "errors.password_length" "Password too short" }}"
-         data-password-uppercase="{{ call .t "errors.password_uppercase" "Password must contain an uppercase letter" }}"
-         data-password-lowercase="{{ call .t "errors.password_lowercase" "Password must contain a lowercase letter" }}"
-         data-password-number="{{ call .t "errors.password_number" "Password must contain a number" }}"
-         data-username-required="{{ call .t "errors.username_required" "Username required" }}"
-         data-username-too-short="{{ call .t "errors.username_too_short" "Username too short" }}"
-         data-username-too-long="{{ call .t "errors.username_too_long" "Username too long" }}"
-         data-field-required="{{ call .t "errors.field_required" "This field is required" }}"
-         data-invalid-format="{{ call .t "errors.invalid_format" "Invalid format" }}"
-         data-too-short="{{ call .t "errors.too_short" "Too short" }}"
-         data-too-long="{{ call .t "errors.too_long" "Too long" }}"
-         data-invalid-string="{{ call .t "errors.invalid_string" "Invalid text" }}"
-         data-unknown-error="{{ call .t "errors.unknown_error" "Unknown error" }}"
-    ></div>
-    
-    <!-- Selector de idioma -->
-    <div class="dropdown lang-dropdown">
-        <button class="btn lang-toggle dropdown-toggle" type="button" onclick="event.preventDefault(); event.stopPropagation(); this.closest('.dropdown').classList.toggle('show');" aria-expanded="false">
-            {{ if eq .language "es" }}ES{{ else }}EN{{ end }}
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end">
-            <li><a class="dropdown-item" href="/first-login?lang=es" onclick="setLanguageCookie('es')">🇪🇸 Español</a></li>
-            <li><a class="dropdown-item" href="/first-login?lang=en" onclick="setLanguageCookie('en')">🇺🇸 English</a></li>
-        </ul>
-    </div>
-    
-    <script>
-    // Función para guardar el idioma en cookie
-    function setLanguageCookie(lang) {
-        // Guardar en cookie con expiración de 1 año
-        const expires = new Date();
-        expires.setFullYear(expires.getFullYear() + 1);
-        document.cookie = `lang=${lang}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`;
-        // También guardar en localStorage como respaldo
-        localStorage.setItem('language', lang);
-    }
-    </script>
-    </div>
-    
-    <!-- Botón flotante de cambio de tema -->
-    <button id="theme-toggle" class="theme-toggle dark" type="button" title="{{ call .t "common.change_theme" "Change theme" }}" aria-label="{{ call .t "common.change_theme" "Change theme" }}" onclick="toggleTheme()">
-        <span id="theme-emoji" style="font-size:28px; line-height:1" aria-hidden="true">☀️</span>
-    </button>
+<!-- Textos i18n para notificaciones (usado por first_login.js) -->
+<div id="i18n-data" style="display:none"
+     data-user-not-found="{{ call .t "auth.user_not_found" "User not found" }}"
+     data-incorrect-password="{{ call .t "auth.incorrect_password" "Incorrect password" }}"
+     data-too-many-attempts="{{ call .t "auth.too_many_attempts" "Too many attempts" }}"
+     data-connection-error="{{ call .t "auth.connection_error" "Connection error" }}"
+     data-login-generic-error="{{ call .t "auth.login_generic_error" "Login error" }}"
+     data-login-success="{{ call .t "auth.login_success" "Login successful" }}"
+     data-passwords-dont-match="{{ call .t "auth.passwords_dont_match" "Passwords do not match" }}"
+     data-credentials-updated="{{ call .t "auth.credentials_updated" "Credentials updated" }}"
+     data-validation-error="{{ call .t "errors.validation_error" "Validation error" }}"
+     data-password-special-char="{{ call .t "errors.password_special_char" "Password must contain a special character" }}"
+     data-password-length="{{ call .t "errors.password_length" "Password too short" }}"
+     data-password-uppercase="{{ call .t "errors.password_uppercase" "Password must contain an uppercase letter" }}"
+     data-password-lowercase="{{ call .t "errors.password_lowercase" "Password must contain a lowercase letter" }}"
+     data-password-number="{{ call .t "errors.password_number" "Password must contain a number" }}"
+     data-username-required="{{ call .t "errors.username_required" "Username required" }}"
+     data-username-too-short="{{ call .t "errors.username_too_short" "Username too short" }}"
+     data-username-too-long="{{ call .t "errors.username_too_long" "Username too long" }}"
+     data-field-required="{{ call .t "errors.field_required" "This field is required" }}"
+     data-invalid-format="{{ call .t "errors.invalid_format" "Invalid format" }}"
+     data-too-short="{{ call .t "errors.too_short" "Too short" }}"
+     data-too-long="{{ call .t "errors.too_long" "Too long" }}"
+     data-invalid-string="{{ call .t "errors.invalid_string" "Invalid text" }}"
+     data-unknown-error="{{ call .t "errors.unknown_error" "Unknown error" }}"
+></div>
 
-    <div class="login-container">
-        <div class="login-header">
-            <img src="/static/hostberry.png?v={{ .last_update }}" alt="{{ call .t "common.app_name" "HostBerry" }}" class="logo-image" />
-            <h1>{{ call .t "common.app_name" "HostBerry" }}</h1>
-            <p>{{ call .t "auth.first_login_info" "Change your default credentials" }}</p>
+<div class="login-container">
+    <div class="login-header">
+        <img src="/static/hostberry.png{{ if .last_update }}?v={{ .last_update }}{{ end }}" alt="{{ call .t "common.app_name" "HostBerry" }}" class="logo-image" />
+        <h1>{{ call .t "common.app_name" "HostBerry" }}</h1>
+        <p>{{ call .t "auth.first_login_info" "Change your default credentials" }}</p>
+    </div>
+
+    <form id="firstLoginForm">
+        <div class="mb-3">
+            <label class="form-label">
+                <i class="bi bi-person"></i>
+                {{ call .t "auth.new_username" "New Username" }}
+            </label>
+            <input type="text" class="form-control" name="new_username" required minlength="3" maxlength="50" placeholder="{{ call .t "auth.new_username" "New Username" }}">
         </div>
-        
-        <!-- Contenedor de notificaciones (se creará dinámicamente) -->
-        
-        <form id="firstLoginForm">
-            <div class="mb-3">
-                <label class="form-label">
-                    <i class="bi bi-person"></i>
-                    {{ call .t "auth.new_username" "New Username" }}
-                </label>
-                <input type="text" class="form-control" name="new_username" required minlength="3" maxlength="50" placeholder="{{ call .t "auth.new_username" "New Username" }}">
-            </div>
-            
-            <div class="mb-3">
-                <label class="form-label">
-                    <i class="bi bi-lock"></i>
-                    {{ call .t "auth.new_password" "New Password" }}
-                </label>
-                <div class="password-wrapper">
-                    <input type="password" class="form-control" name="new_password" id="new_password" required minlength="8" maxlength="100" placeholder="{{ call .t "auth.new_password" "New Password" }}">
-                    <button class="password-toggle" type="button" id="toggle-new-password" aria-label="{{ call .t "common.show_password" "Show password" }}" title="{{ call .t "common.show_password" "Show password" }}">
-                        <span id="eye-emoji-new" style="font-size:18px; line-height:1" aria-hidden="true">👁️</span>
-                    </button>
-                </div>
-            </div>
-            
-            <div class="mb-3">
-                <label class="form-label">
-                    <i class="bi bi-lock-fill"></i>
-                    {{ call .t "auth.confirm_password" "Confirm Password" }}
-                </label>
-                <div class="password-wrapper">
-                    <input type="password" class="form-control" name="confirm_password" id="confirm_password" required minlength="8" maxlength="100" placeholder="{{ call .t "auth.confirm_password" "Confirm Password" }}">
-                    <button class="password-toggle" type="button" id="toggle-confirm-password" aria-label="{{ call .t "common.show_password" "Show password" }}" title="{{ call .t "common.show_password" "Show password" }}">
-                        <span id="eye-emoji-confirm" style="font-size:18px; line-height:1" aria-hidden="true">👁️</span>
-                    </button>
-                </div>
-            </div>
-            
-            <button type="submit" class="btn btn-login">
-                <i class="bi bi-check-circle"></i>
-                {{ call .t "auth.save_and_continue" "Save and Continue" }}
-            </button>
-        </form>
-    </div>
 
-    {{ if .translations }}
-    <script id="i18n-json" type="application/json">{{ .translations_json }}</script>
-    {{ end }}
+        <div class="mb-3">
+            <label class="form-label">
+                <i class="bi bi-lock"></i>
+                {{ call .t "auth.new_password" "New Password" }}
+            </label>
+            <div class="password-wrapper">
+                <input type="password" class="form-control" name="new_password" id="new_password" required minlength="8" maxlength="100" placeholder="{{ call .t "auth.new_password" "New Password" }}">
+                <button class="password-toggle" type="button" id="toggle-new-password" aria-label="{{ call .t "common.show_password" "Show password" }}" title="{{ call .t "common.show_password" "Show password" }}">
+                    <span id="eye-emoji-new" style="font-size:18px; line-height:1" aria-hidden="true">👁️</span>
+                </button>
+            </div>
+        </div>
 
-    <script src="/static/js/common.js?v={{ .last_update }}"></script>
-    <script src="/static/js/first_login.js?v={{ .last_update }}"></script>
-</body>
-</html>
+        <div class="mb-3">
+            <label class="form-label">
+                <i class="bi bi-lock-fill"></i>
+                {{ call .t "auth.confirm_password" "Confirm Password" }}
+            </label>
+            <div class="password-wrapper">
+                <input type="password" class="form-control" name="confirm_password" id="confirm_password" required minlength="8" maxlength="100" placeholder="{{ call .t "auth.confirm_password" "Confirm Password" }}">
+                <button class="password-toggle" type="button" id="toggle-confirm-password" aria-label="{{ call .t "common.show_password" "Show password" }}" title="{{ call .t "common.show_password" "Show password" }}">
+                    <span id="eye-emoji-confirm" style="font-size:18px; line-height:1" aria-hidden="true">👁️</span>
+                </button>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-login">
+            <i class="bi bi-check-circle"></i>
+            {{ call .t "auth.save_and_continue" "Save and Continue" }}
+        </button>
+    </form>
+</div>
+
+<script defer src="/static/js/first_login.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>
+

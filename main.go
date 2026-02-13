@@ -415,6 +415,26 @@ func setupRoutes(app *fiber.App) {
 			adblock.Get("/status", adblockStatusHandler)
 			adblock.Post("/enable", adblockEnableHandler)
 			adblock.Post("/disable", adblockDisableHandler)
+
+			// DNSCrypt (sub-sección de AdBlock)
+			dnscrypt := adblock.Group("/dnscrypt")
+			{
+				dnscrypt.Get("/status", dnscryptStatusHandler)
+				dnscrypt.Post("/install", dnscryptInstallHandler)
+				dnscrypt.Post("/configure", dnscryptConfigureHandler)
+				dnscrypt.Post("/enable", dnscryptEnableHandler)
+				dnscrypt.Post("/disable", dnscryptDisableHandler)
+			}
+		}
+
+		tor := api.Group("/tor", requireAuth)
+		{
+			tor.Get("/status", torStatusHandler)
+			tor.Post("/install", torInstallHandler)
+			tor.Post("/configure", torConfigureHandler)
+			tor.Post("/enable", torEnableHandler)
+			tor.Post("/disable", torDisableHandler)
+			tor.Get("/circuit", torCircuitHandler)
 		}
 	}
 

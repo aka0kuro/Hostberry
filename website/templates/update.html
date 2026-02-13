@@ -123,7 +123,7 @@
                     </h5>
                 </div>
                 <div class="actions-card-body">
-                    <div class="update-log-container" id="update-log">
+                    <div class="logs-container" id="update-log">
                         <div class="text-center py-4 text-white-50">
                             <i class="bi bi-file-text"></i>
                             <p class="mb-0 mt-2">{{ call .t "update.no_logs" "No update logs yet" }}</p>
@@ -133,7 +133,10 @@
             </div>
         </div>
     </div>
- 
+
+<script defer src="/static/js/update.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>
+
+{{/*
 <script>
 (function(){
   // Esperar a que HostBerry esté disponible
@@ -357,3 +360,4 @@ body.light-theme .action-btn:hover {
     border-color: rgba(0, 0, 0, 0.2);
 }
 </style>
+*/}}
