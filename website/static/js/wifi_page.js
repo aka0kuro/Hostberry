@@ -88,7 +88,7 @@
   async function loadConnectionStatus() {
     try {
       const resp = await apiRequest('/api/v1/wifi/status');
-      if (!resp.ok) {
+      if (!resp || !resp.ok) {
         console.error(t('wifi.status_error', 'Error getting WiFi status') + ':', resp.status);
         return;
       }
@@ -301,7 +301,7 @@
   async function loadInterfaces() {
     try {
       const resp = await apiRequest('/api/v1/wifi/interfaces');
-      if (!resp.ok) {
+      if (!resp || !resp.ok) {
         console.warn('Error obteniendo interfaces WiFi:', resp.status);
         return;
       }
@@ -516,7 +516,7 @@
       
       const resp = await apiRequest(url);
       
-      if (!resp.ok) {
+      if (!resp || !resp.ok) {
         let errorText = '';
         try {
           errorText = await resp.text();
@@ -1183,7 +1183,7 @@
     // Verificar si WiFi está bloqueado y actualizar botones
     try {
       const resp = await apiRequest('/api/v1/wifi/status');
-      if (resp.ok) {
+      if (resp && resp.ok) {
         const data = await resp.json();
         updateButtonTexts(data);
         const unblockBtn = document.getElementById('unblock-wifi-btn');

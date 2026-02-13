@@ -59,8 +59,8 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
-        const result = await resp.json();
-        if(resp.ok){
+        const result = await resp.json().catch(function(){ return {}; });
+        if(resp && resp.ok){
           // Guardar token en localStorage (para navegadores que no guardan cookies)
           localStorage.setItem('access_token', result.access_token);
           showAlert('success', i18n.login_success);
@@ -76,16 +76,17 @@
         } else {
           // Preferir mensaje real del backend si viene en {error: "..."}
           const backendError = (result && result.error) ? String(result.error) : '';
-          if(resp.status === 422){
+          const status = resp ? resp.status : 0;
+          if(status === 422){
             showAlert('danger', backendError || i18n.login_generic_error);
             return;
           }
-          if(resp.status === 404){
+          if(status === 404){
             showAlert('warning', backendError || i18n.user_not_found);
-          } else if(resp.status === 401){
+          } else if(status === 401){
             // Puede ser contraseña incorrecta O ruta protegida por auth (token requerido)
             showAlert('danger', backendError || i18n.incorrect_password);
-          } else if(resp.status === 429){
+          } else if(status === 429){
             showAlert('warning', backendError || i18n.too_many_attempts);
           } else {
             showAlert('danger', backendError || i18n.login_generic_error);

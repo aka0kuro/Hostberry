@@ -217,7 +217,7 @@
     async function loadServices() {
         try {
             const resp = await apiRequestFn('/api/v1/system/services');
-            if (!resp.ok) throw new Error('Services request failed');
+            if (!resp || !resp.ok) throw new Error('Services request failed');
             
             const data = await resp.json();
             const services = data.services || {};
@@ -259,17 +259,17 @@
                 apiRequestFn('/api/v1/system/info')
             ]);
             
-            if (!statsResp.ok) {
+            if (!statsResp || !statsResp.ok) {
                 console.error('Stats request failed:', statsResp.status, statsResp.statusText);
                 throw new Error('Stats request failed: ' + statsResp.status);
             }
             
-            if (!infoResp.ok) {
-                console.error('Info request failed:', infoResp.status, infoResp.statusText);
+            if (!infoResp || !infoResp.ok) {
+                console.error('Info request failed:', infoResp ? infoResp.status : 'no response', infoResp ? infoResp.statusText : '');
             }
             
-            const statsPayload = await statsResp.json();
-            const infoPayload = infoResp.ok ? await infoResp.json() : {};
+            const statsPayload = statsResp && statsResp.ok ? await statsResp.json().catch(function(){ return {}; }) : {};
+            const infoPayload = infoResp && infoResp.ok ? await infoResp.json().catch(function(){ return {}; }) : {};
             
             // Manejar diferentes formatos de respuesta
             let stats = statsPayload;
@@ -336,9 +336,10 @@
         try {
             const resp = await apiRequestFn('/api/v1/system/activity?limit=10');
             
-            if (!resp.ok) {
-                console.error('Activity request failed:', resp.status, resp.statusText);
-                throw new Error('Activity request failed: ' + resp.status);
+            if (!resp || !resp.ok) {
+                const status = resp ? resp.status : 0;
+                console.error('Activity request failed:', status, resp ? resp.statusText : '');
+                throw new Error('Activity request failed: ' + status);
             }
             
             const activities = await resp.json();

@@ -6,13 +6,13 @@
 
   function escapeHtml(s) {
     const str = String(s ?? '');
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    return (window.HostBerry && window.HostBerry.escapeHtml) ? window.HostBerry.escapeHtml(str) : str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   async function loadConfig() {
     try {
       const resp = await api('/api/v1/wireguard/config');
-      if (resp?.ok) {
+      if (resp && resp.ok) {
         const data = await resp.json();
         const ta = document.getElementById('wg_config');
         if (ta && data && typeof data.config === 'string') ta.value = data.config;
@@ -25,7 +25,7 @@
   async function loadInterfaces() {
     try {
       const resp = await api('/api/v1/wireguard/interfaces');
-      if (resp?.ok) {
+      if (resp && resp.ok) {
         const interfaces = await resp.json();
         const tbody = document.getElementById('interfacesTable');
         if (!tbody) return;
@@ -56,7 +56,7 @@
   async function loadPeers() {
     try {
       const resp = await api('/api/v1/wireguard/peers');
-      if (resp?.ok) {
+      if (resp && resp.ok) {
         const peers = await resp.json();
         const tbody = document.getElementById('peersTable');
         if (!tbody) return;
@@ -82,7 +82,7 @@
   async function toggleWireGuard() {
     try {
       const resp = await api('/api/v1/wireguard/toggle', { method: 'POST' });
-      if (resp?.ok) {
+      if (resp && resp.ok) {
         showAlert('success', t('messages.operation_successful', 'Operation successful'));
         setTimeout(() => window.location.reload(), 1000);
       } else {
@@ -96,7 +96,7 @@
   async function restartWireGuard() {
     try {
       const resp = await api('/api/v1/wireguard/restart', { method: 'POST' });
-      if (resp?.ok) {
+      if (resp && resp.ok) {
         showAlert('success', t('messages.operation_successful', 'Operation successful'));
         setTimeout(() => window.location.reload(), 2000);
       } else {
@@ -123,7 +123,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
         });
-        if (resp?.ok) {
+        if (resp && resp.ok) {
           showAlert('success', t('messages.changes_saved', 'Changes saved'));
         } else {
           showAlert('danger', t('errors.configuration_error', 'Configuration error'));

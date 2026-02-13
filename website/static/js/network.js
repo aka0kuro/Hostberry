@@ -58,7 +58,7 @@
         throw new Error('No response from server');
       }
       
-      if (resp.ok) {
+      if (resp && resp.ok) {
         let data;
         try {
           data = await resp.json();
@@ -272,7 +272,7 @@
         throw new Error('No response from server');
       }
       
-      if (resp.ok) {
+      if (resp && resp.ok) {
         let data;
         try {
           const text = await resp.text();

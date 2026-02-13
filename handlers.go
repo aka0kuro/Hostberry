@@ -766,31 +766,18 @@ func vpnConnectHandler(c *fiber.Ctx) error {
 		Config string `json:"config"`
 		Type   string `json:"type"`
 	}
-
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"error": "Datos inválidos",
-		})
+		return c.Status(400).JSON(fiber.Map{"error": "Datos inválidos"})
 	}
-
-	user, ok := GetUser(c)
-	if !ok {
-		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
+	config, vpnType := req.Config, req.Type
+	if vpnType == "" {
+		vpnType = "openvpn"
 	}
-	userID := user.ID
-
-	result := connectVPN(req.Config, req.Type, user.Username)
-	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("VPN conectado: %s (usuario: %s)", req.Type, user.Username), "vpn", &userID)
-		return c.JSON(result)
-	}
-
-	if errorMsg, ok := result["error"].(string); ok {
-		InsertLog("ERROR", fmt.Sprintf("Error conectando VPN %s: %s (usuario: %s)", req.Type, errorMsg, user.Username), "vpn", &userID)
-		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
-	}
-
-	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+	return RunActionWithUser(c, "vpn", "VPN conectado: %s (usuario: %s)", "Error conectando VPN: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		result := connectVPN(config, vpnType, user.Username)
+		// Log incluye tipo; el mensaje de error del helper usa (errorMsg, username), el successLog solo username
+		return result
+	})
 }
 
 func wireguardStatusHandler(c *fiber.Ctx) error {
@@ -937,34 +924,16 @@ func wireguardConfigHandler(c *fiber.Ctx) error {
 	var req struct {
 		Config string `json:"config"`
 	}
-
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"error": "Datos inválidos",
-		})
+		return c.Status(400).JSON(fiber.Map{"error": "Datos inválidos"})
 	}
 	if err := ValidateWireGuardConfig(req.Config); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
-
-	user, ok := GetUser(c)
-	if !ok {
-		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
-	}
-	userID := user.ID
-
-	result := configureWireGuard(req.Config, user.Username)
-	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("WireGuard configurado por usuario %s", user.Username), "wireguard", &userID)
-		return c.JSON(result)
-	}
-
-	if errorMsg, ok := result["error"].(string); ok {
-		InsertLog("ERROR", fmt.Sprintf("Error configurando WireGuard: %s (usuario: %s)", errorMsg, user.Username), "wireguard", &userID)
-		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
-	}
-
-	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+	config := req.Config
+	return RunActionWithUser(c, "wireguard", "WireGuard configurado por usuario %s", "Error configurando WireGuard: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return configureWireGuard(config, user.Username)
+	})
 }
 
 func adblockStatusHandler(c *fiber.Ctx) error {
@@ -973,45 +942,15 @@ func adblockStatusHandler(c *fiber.Ctx) error {
 }
 
 func adblockEnableHandler(c *fiber.Ctx) error {
-	user, ok := GetUser(c)
-	if !ok {
-		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
-	}
-	userID := user.ID
-
-	result := enableAdBlock(user.Username)
-	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("AdBlock habilitado por usuario %s", user.Username), "adblock", &userID)
-		return c.JSON(result)
-	}
-
-	if errorMsg, ok := result["error"].(string); ok {
-		InsertLog("ERROR", fmt.Sprintf("Error habilitando AdBlock: %s (usuario: %s)", errorMsg, user.Username), "adblock", &userID)
-		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
-	}
-
-	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+	return RunActionWithUser(c, "adblock", "AdBlock habilitado por usuario %s", "Error habilitando AdBlock: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return enableAdBlock(user.Username)
+	})
 }
 
 func adblockDisableHandler(c *fiber.Ctx) error {
-	user, ok := GetUser(c)
-	if !ok {
-		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
-	}
-	userID := user.ID
-
-	result := disableAdBlock(user.Username)
-	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("AdBlock deshabilitado por usuario %s", user.Username), "adblock", &userID)
-		return c.JSON(result)
-	}
-
-	if errorMsg, ok := result["error"].(string); ok {
-		InsertLog("ERROR", fmt.Sprintf("Error deshabilitando AdBlock: %s (usuario: %s)", errorMsg, user.Username), "adblock", &userID)
-		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
-	}
-
-	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+	return RunActionWithUser(c, "adblock", "AdBlock deshabilitado por usuario %s", "Error deshabilitando AdBlock: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return disableAdBlock(user.Username)
+	})
 }
 
 // Handlers para DNSCrypt
@@ -1021,24 +960,9 @@ func dnscryptStatusHandler(c *fiber.Ctx) error {
 }
 
 func dnscryptInstallHandler(c *fiber.Ctx) error {
-	user, ok := GetUser(c)
-	if !ok {
-		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
-	}
-	userID := user.ID
-
-	result := installDNSCrypt(user.Username)
-	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("DNSCrypt instalado por usuario %s", user.Username), "adblock", &userID)
-		return c.JSON(result)
-	}
-
-	if errorMsg, ok := result["error"].(string); ok {
-		InsertLog("ERROR", fmt.Sprintf("Error instalando DNSCrypt: %s (usuario: %s)", errorMsg, user.Username), "adblock", &userID)
-		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
-	}
-
-	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+	return RunActionWithUser(c, "adblock", "DNSCrypt instalado por usuario %s", "Error instalando DNSCrypt: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return installDNSCrypt(user.Username)
+	})
 }
 
 func dnscryptConfigureHandler(c *fiber.Ctx) error {
@@ -1050,71 +974,24 @@ func dnscryptConfigureHandler(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Datos inválidos"})
 	}
-
-	user, ok := GetUser(c)
-	if !ok {
-		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
-	}
-	userID := user.ID
-
 	if req.ServerName == "" {
 		req.ServerName = "adguard-dns"
 	}
-
-	result := configureDNSCrypt(req.ServerName, req.BlockAds, user.Username)
-	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("DNSCrypt configurado por usuario %s", user.Username), "adblock", &userID)
-		return c.JSON(result)
-	}
-
-	if errorMsg, ok := result["error"].(string); ok {
-		InsertLog("ERROR", fmt.Sprintf("Error configurando DNSCrypt: %s (usuario: %s)", errorMsg, user.Username), "adblock", &userID)
-		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
-	}
-
-	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+	return RunActionWithUser(c, "adblock", "DNSCrypt configurado por usuario %s", "Error configurando DNSCrypt: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return configureDNSCrypt(req.ServerName, req.BlockAds, user.Username)
+	})
 }
 
 func dnscryptEnableHandler(c *fiber.Ctx) error {
-	user, ok := GetUser(c)
-	if !ok {
-		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
-	}
-	userID := user.ID
-
-	result := enableDNSCrypt(user.Username)
-	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("DNSCrypt habilitado por usuario %s", user.Username), "adblock", &userID)
-		return c.JSON(result)
-	}
-
-	if errorMsg, ok := result["error"].(string); ok {
-		InsertLog("ERROR", fmt.Sprintf("Error habilitando DNSCrypt: %s (usuario: %s)", errorMsg, user.Username), "adblock", &userID)
-		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
-	}
-
-	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+	return RunActionWithUser(c, "adblock", "DNSCrypt habilitado por usuario %s", "Error habilitando DNSCrypt: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return enableDNSCrypt(user.Username)
+	})
 }
 
 func dnscryptDisableHandler(c *fiber.Ctx) error {
-	user, ok := GetUser(c)
-	if !ok {
-		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
-	}
-	userID := user.ID
-
-	result := disableDNSCrypt(user.Username)
-	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("DNSCrypt deshabilitado por usuario %s", user.Username), "adblock", &userID)
-		return c.JSON(result)
-	}
-
-	if errorMsg, ok := result["error"].(string); ok {
-		InsertLog("ERROR", fmt.Sprintf("Error deshabilitando DNSCrypt: %s (usuario: %s)", errorMsg, user.Username), "adblock", &userID)
-		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
-	}
-
-	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+	return RunActionWithUser(c, "adblock", "DNSCrypt deshabilitado por usuario %s", "Error deshabilitando DNSCrypt: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return disableDNSCrypt(user.Username)
+	})
 }
 
 // Handlers para Tor
@@ -1124,24 +1001,9 @@ func torStatusHandler(c *fiber.Ctx) error {
 }
 
 func torInstallHandler(c *fiber.Ctx) error {
-	user, ok := GetUser(c)
-	if !ok {
-		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
-	}
-	userID := user.ID
-
-	result := installTor(user.Username)
-	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("Tor instalado por usuario %s", user.Username), "tor", &userID)
-		return c.JSON(result)
-	}
-
-	if errorMsg, ok := result["error"].(string); ok {
-		InsertLog("ERROR", fmt.Sprintf("Error instalando Tor: %s (usuario: %s)", errorMsg, user.Username), "tor", &userID)
-		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
-	}
-
-	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+	return RunActionWithUser(c, "tor", "Tor instalado por usuario %s", "Error instalando Tor: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return installTor(user.Username)
+	})
 }
 
 func torConfigureHandler(c *fiber.Ctx) error {
@@ -1185,45 +1047,15 @@ func torConfigureHandler(c *fiber.Ctx) error {
 }
 
 func torEnableHandler(c *fiber.Ctx) error {
-	user, ok := GetUser(c)
-	if !ok {
-		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
-	}
-	userID := user.ID
-
-	result := enableTor(user.Username)
-	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("Tor habilitado por usuario %s", user.Username), "tor", &userID)
-		return c.JSON(result)
-	}
-
-	if errorMsg, ok := result["error"].(string); ok {
-		InsertLog("ERROR", fmt.Sprintf("Error habilitando Tor: %s (usuario: %s)", errorMsg, user.Username), "tor", &userID)
-		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
-	}
-
-	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+	return RunActionWithUser(c, "tor", "Tor habilitado por usuario %s", "Error habilitando Tor: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return enableTor(user.Username)
+	})
 }
 
 func torDisableHandler(c *fiber.Ctx) error {
-	user, ok := GetUser(c)
-	if !ok {
-		return c.Status(401).JSON(fiber.Map{"error": "No autorizado"})
-	}
-	userID := user.ID
-
-	result := disableTor(user.Username)
-	if success, ok := result["success"].(bool); ok && success {
-		InsertLog("INFO", fmt.Sprintf("Tor deshabilitado por usuario %s", user.Username), "tor", &userID)
-		return c.JSON(result)
-	}
-
-	if errorMsg, ok := result["error"].(string); ok {
-		InsertLog("ERROR", fmt.Sprintf("Error deshabilitando Tor: %s (usuario: %s)", errorMsg, user.Username), "tor", &userID)
-		return c.Status(500).JSON(fiber.Map{"error": errorMsg})
-	}
-
-	return c.Status(500).JSON(fiber.Map{"error": "Error desconocido"})
+	return RunActionWithUser(c, "tor", "Tor deshabilitado por usuario %s", "Error deshabilitando Tor: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return disableTor(user.Username)
+	})
 }
 
 func torCircuitHandler(c *fiber.Ctx) error {

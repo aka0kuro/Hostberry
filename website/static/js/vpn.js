@@ -6,13 +6,13 @@
 
   function escapeHtml(s) {
     const str = String(s ?? '');
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    return (window.HostBerry && window.HostBerry.escapeHtml) ? window.HostBerry.escapeHtml(str) : str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   async function loadConnections() {
     try {
       const resp = await api('/api/v1/vpn/connections');
-      if (resp?.ok) {
+      if (resp && resp.ok) {
         const connections = await resp.json();
         const tbody = document.getElementById('connectionsTable');
         if (!tbody) return;
@@ -43,7 +43,7 @@
   async function loadServers() {
     try {
       const resp = await api('/api/v1/vpn/servers');
-      if (resp?.ok) {
+      if (resp && resp.ok) {
         const servers = await resp.json();
         const tbody = document.getElementById('serversTable');
         if (!tbody) return;
@@ -66,7 +66,7 @@
   async function loadClients() {
     try {
       const resp = await api('/api/v1/vpn/clients');
-      if (resp?.ok) {
+      if (resp && resp.ok) {
         const clients = await resp.json();
         const tbody = document.getElementById('clientsTable');
         if (!tbody) return;
@@ -90,7 +90,7 @@
   async function toggleVPN() {
     try {
       const resp = await api('/api/v1/vpn/toggle', { method: 'POST' });
-      if (resp?.ok) {
+      if (resp && resp.ok) {
         showAlert('success', t('messages.operation_successful', 'Operation successful'));
         setTimeout(() => window.location.reload(), 1000);
       } else {
@@ -104,7 +104,7 @@
   async function connectVPN() {
     try {
       const resp = await api('/api/v1/vpn/connect', { method: 'POST' });
-      if (resp?.ok) {
+      if (resp && resp.ok) {
         showAlert('success', t('messages.operation_successful', 'Operation successful'));
         setTimeout(() => window.location.reload(), 1000);
       } else {
@@ -119,7 +119,7 @@
     try {
       const safeName = encodeURIComponent(String(name ?? ''));
       const resp = await api('/api/v1/vpn/connections/' + safeName + '/toggle', { method: 'POST' });
-      if (resp?.ok) {
+      if (resp && resp.ok) {
         showAlert('success', t('messages.operation_successful', 'Operation successful'));
         setTimeout(loadConnections, 1000);
       } else {
@@ -133,7 +133,7 @@
   async function generateCertificates() {
     try {
       const resp = await api('/api/v1/vpn/certificates/generate', { method: 'POST' });
-      if (resp?.ok) {
+      if (resp && resp.ok) {
         showAlert('success', t('messages.operation_successful', 'Operation successful'));
       } else {
         showAlert('danger', t('errors.operation_failed', 'Operation failed'));
@@ -165,7 +165,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
         });
-        if (resp?.ok) {
+        if (resp && resp.ok) {
           showAlert('success', t('messages.changes_saved', 'Changes saved'));
         } else {
           showAlert('danger', t('errors.configuration_error', 'Configuration error'));

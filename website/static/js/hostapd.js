@@ -570,11 +570,13 @@
     }
   };
   
-  // Función auxiliar para escapar HTML
+  // Función auxiliar para escapar HTML (usa HostBerry.escapeHtml si está disponible)
   function escapeHtml(text) {
     if (text == null) return '';
+    const s = String(text);
+    if (window.HostBerry && window.HostBerry.escapeHtml) return window.HostBerry.escapeHtml(s);
     const div = document.createElement('div');
-    div.textContent = String(text);
+    div.textContent = s;
     return div.innerHTML;
   }
 
