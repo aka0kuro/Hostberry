@@ -213,7 +213,13 @@
       document.getElementById('wizard-ap-password-box').classList.toggle('d-none', this.checked);
     });
 
-    setStep(1);
+    var params = new URLSearchParams(window.location.search || '');
+    var stepParam = params.get('step');
+    if (stepParam === '3') {
+      setStep(3);
+    } else {
+      setStep(1);
+    }
     scanNetworks();
   }
 

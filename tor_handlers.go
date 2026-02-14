@@ -25,13 +25,30 @@ type TorConfigOptions struct {
 	AutomapHostsOnResolve bool   // Resolver .onion y .exit a través de Tor
 }
 
+// Rutas típicas del binario tor (por si PATH no incluye /usr/bin en el proceso)
+var torBinaryPaths = []string{"/usr/bin/tor", "/usr/sbin/tor"}
+
+func isTorInstalled() bool {
+	// Primero: command -v tor (PATH del shell)
+	checkCmd := exec.Command("sh", "-c", "command -v tor 2>/dev/null")
+	if checkCmd.Run() == nil {
+		return true
+	}
+	// Segundo: comprobar rutas conocidas (útil cuando el proceso no tiene /usr/bin en PATH, p. ej. systemd)
+	for _, p := range torBinaryPaths {
+		if st, err := os.Stat(p); err == nil && st.Mode().IsRegular() {
+			return true
+		}
+	}
+	return false
+}
+
 // Funciones para Tor
 func getTorStatus() map[string]interface{} {
 	result := make(map[string]interface{})
 
-	// Verificar si está instalado
-	checkCmd := exec.Command("sh", "-c", "command -v tor 2>/dev/null")
-	installed := checkCmd.Run() == nil
+	// Verificar si está instalado (PATH + rutas conocidas)
+	installed := isTorInstalled()
 	result["installed"] = installed
 
 	if !installed {
@@ -112,8 +129,7 @@ func installTor(user string) map[string]interface{} {
 	LogTf("logs.tor_installing", user)
 
 	// Verificar si ya está instalado
-	checkCmd := exec.Command("sh", "-c", "command -v tor 2>/dev/null")
-	if checkCmd.Run() == nil {
+	if isTorInstalled() {
 		result["success"] = true
 		result["message"] = "Tor ya está instalado"
 		result["already_installed"] = true
@@ -150,8 +166,7 @@ func configureTor(opts TorConfigOptions) map[string]interface{} {
 	LogTf("logs.tor_configuring", opts.User)
 
 	// Verificar si está instalado
-	checkCmd := exec.Command("sh", "-c", "command -v tor 2>/dev/null")
-	if checkCmd.Run() != nil {
+	if !isTorInstalled() {
 		result["success"] = false
 		result["error"] = "Tor no está instalado. Instálalo primero."
 		return result
@@ -280,8 +295,7 @@ func enableTor(user string) map[string]interface{} {
 	LogTf("logs.tor_enabling", user)
 
 	// Verificar si está instalado
-	checkCmd := exec.Command("sh", "-c", "command -v tor 2>/dev/null")
-	if checkCmd.Run() != nil {
+	if !isTorInstalled() {
 		result["success"] = false
 		result["error"] = "Tor no está instalado. Instálalo primero."
 		return result
