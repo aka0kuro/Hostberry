@@ -109,15 +109,25 @@
     if (!selectedSSID) return;
     const password = (document.getElementById('wizard-wifi-password') || {}).value || '';
     const connectBtn = document.getElementById('wizard-connect-btn');
+    const btnText = connectBtn && connectBtn.querySelector('.btn-text');
     if (connectBtn) {
       connectBtn.disabled = true;
-      connectBtn.querySelector('.btn-text').textContent = t('setup_wizard.connecting', 'Conectando...');
+      if (btnText) btnText.textContent = t('setup_wizard.connecting', 'Conectando...');
     }
+    var timeoutId;
+    var timeoutMs = 28000;
+    var connectPromise = apiRequest('/api/v1/wifi/connect', {
+      method: 'POST',
+      body: { ssid: selectedSSID, password: password, country: 'ES' }
+    });
+    var timeoutPromise = new Promise(function(_, reject) {
+      timeoutId = setTimeout(function() {
+        reject(new Error(t('setup_wizard.error_connect_timeout', 'Tiempo de espera agotado. Comprueba la contraseña e inténtalo de nuevo.')));
+      }, timeoutMs);
+    });
     try {
-      const resp = await apiRequest('/api/v1/wifi/connect', {
-        method: 'POST',
-        body: { ssid: selectedSSID, password: password, country: 'ES' }
-      });
+      const resp = await Promise.race([connectPromise, timeoutPromise]);
+      clearTimeout(timeoutId);
       const data = await resp.json().catch(function() { return {}; });
       if (resp.ok && data.success !== false) {
         showAlert('success', t('setup_wizard.connected', 'Conectado'));
@@ -126,11 +136,12 @@
         showAlert('danger', (data.error || t('setup_wizard.error_connect', 'Error al conectar')));
       }
     } catch (e) {
-      showAlert('danger', t('setup_wizard.error_connect', 'Error al conectar'));
+      clearTimeout(timeoutId);
+      showAlert('danger', e && e.message ? e.message : t('setup_wizard.error_connect', 'Error al conectar'));
     } finally {
       if (connectBtn) {
         connectBtn.disabled = false;
-        connectBtn.querySelector('.btn-text').textContent = t('setup_wizard.connect', 'Conectar');
+        if (btnText) btnText.textContent = t('setup_wizard.connect', 'Conectar');
       }
     }
   }

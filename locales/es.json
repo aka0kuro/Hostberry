@@ -2282,6 +2282,7 @@
     "next": "Siguiente",
     "error_scan": "Error al buscar redes",
     "error_connect": "Error al conectar",
+    "error_connect_timeout": "Tiempo de espera agotado. Comprueba la contraseña e inténtalo de nuevo.",
     "error_save_ap": "Error al guardar la configuración del punto de acceso",
     "success_ap": "Punto de acceso configurado correctamente",
     "show_password": "Ver contraseña",
