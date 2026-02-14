@@ -2116,6 +2116,7 @@
     "blocky.refresh_failed": "Blocky did not respond. Is the service running?",
     "blocky.lists_managed_here": "Blocky lists are managed in the Blocky section (upstreams and block lists).",
     "blocky.refresh_via_button": "Use «Update lists» or the «Refresh lists» button in Blocky to reload.",
+    "blocky.help": "After saving configuration, enable Blocky. Use «Refresh lists» to reload block lists without restarting. DNS listens on port 53; the API on localhost:4000.",
     "logs.blocky_installing": "Installing Blocky by user %s",
     "logs.blocky_installed": "Blocky installed successfully",
     "logs.blocky_install_error": "Error installing Blocky: %v",

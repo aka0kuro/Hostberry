@@ -1214,20 +1214,8 @@ func torPageHandler(c *fiber.Ctx) error {
 }
 
 func adblockPageHandler(c *fiber.Ctx) error {
-	status := getAdBlockStatus()
-	blockyStatus := getBlockyStatus()
-	// Si Blocky está activo, obtener estado de bloqueo desde su API para la web
-	var blockyBlockingStatus map[string]interface{}
-	if blockyStatus["active"] == true {
-		blockyBlockingStatus = blockyAPIBlockingStatus()
-	}
 	return renderTemplate(c, "adblock", fiber.Map{
-		"Title":                 T(c, "adblock.overview", "AdBlock Overview"),
-		"adblock_stats":         fiber.Map{},
-		"adblock_status":        status,
-		"adblock_config":        fiber.Map{},
-		"blocky_status":         blockyStatus,
-		"blocky_blocking_status": blockyBlockingStatus,
+		"Title": T(c, "adblock.overview", "AdBlock (Blocky)"),
 	})
 }
 

@@ -1,384 +1,96 @@
-
-<div class="row">
-    <!-- Vista General: motor activo e información desde nuestra web (sin Prometheus) -->
-    <div class="col-12 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-shield-x"></i>
-                    {{ call .t "adblock.overview" "Overview" }}
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row align-items-center mb-3">
-                    <div class="col-auto">
-                        <span class="badge bg-{{ if .adblock_status.active }}success{{ else }}secondary{{ end }} fs-6">
-                            {{ if eq .adblock_status.type "blocky" }}{{ call .t "blocky.engine" "Blocky" }}{{ else if eq .adblock_status.type "dnscrypt" }}{{ call .t "dnscrypt.title" "DNSCrypt" }}{{ else if eq .adblock_status.type "dnsmasq" }}dnsmasq{{ else if eq .adblock_status.type "pihole" }}Pi-hole{{ else }}{{ call .t "adblock.adblock_disabled" "Disabled" }}{{ end }}
-                        </span>
-                    </div>
-                    {{ if .adblock_status.active }}
-                    <div class="col">
-                        {{ if eq .adblock_status.type "blocky" }}
-                        {{ if .blocky_blocking_status }}
-                        <span class="text-muted">{{ call .t "blocky.blocking_status" "Blocking" }}:</span>
-                        <span class="ms-2">{{ if .blocky_blocking_status.enabled }}{{ call .t "adblock.adblock_enabled" "Enabled" }}{{ else }}{{ call .t "adblock.adblock_disabled" "Disabled" }}{{ end }}</span>
-                        {{ end }}
-                        {{ end }}
-                    </div>
-                    {{ end }}
+{{/* Página Adblock: solo Blocky y su configuración */}}
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-10 col-xl-8">
+        <!-- Cabecera Blocky -->
+        <div class="card mb-4">
+            <div class="card-body text-center py-4">
+                <div class="mb-2">
+                    <i class="bi bi-database-fill-gear text-primary" style="font-size: 2.5rem;"></i>
                 </div>
-                <div class="row">
-                    <div class="col-md-3 mb-3">
-                        <div class="text-center">
-                            <i class="bi bi-cpu text-primary" style="font-size: 2rem;"></i>
-                            <h6 class="mt-2">{{ call .t "adblock.status" "Status" }}</h6>
-                            <h4 class="text-primary">{{ if .adblock_status.active }}{{ call .t "adblock.adblock_running" "Running" }}{{ else }}{{ call .t "adblock.adblock_stopped" "Stopped" }}{{ end }}</h4>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="text-center">
-                            <i class="bi bi-shield-check text-warning" style="font-size: 2rem;"></i>
-                            <h6 class="mt-2">{{ call .t "adblock.blocked_domains" "Blocked" }}</h6>
-                            <h4 class="text-warning">{{ if .adblock_status.blocked_domains }}{{ .adblock_status.blocked_domains }}{{ else }}—{{ end }}</h4>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="text-center">
-                            <i class="bi bi-list text-info" style="font-size: 2rem;"></i>
-                            <h6 class="mt-2">{{ call .t "adblock.lists" "Lists" }}</h6>
-                            <h4 class="text-info" id="overview-lists-count">—</h4>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="text-center">
-                            <i class="bi bi-arrow-clockwise text-success" style="font-size: 2rem;"></i>
-                            <h6 class="mt-2">{{ call .t "adblock.last_update" "Last Update" }}</h6>
-                            <h4 class="text-success">{{ if .adblock_stats.last_update }}{{ .adblock_stats.last_update }}{{ else }}—{{ end }}</h4>
-                        </div>
-                    </div>
-                </div>
+                <h4 class="card-title mb-2">{{ call .t "blocky.title" "Blocky" }}</h4>
+                <p class="text-muted mb-0 small">{{ call .t "blocky.description" "DNS proxy and ad-blocker. Configure upstreams and block lists below." }}</p>
             </div>
         </div>
-    </div>
 
-    <!-- Estado de AdBlock -->
-    <div class="col-md-4 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-heart-pulse"></i>
-                    {{ call .t "adblock.status" "Status" }}
-                </h5>
+        <!-- Estado y acciones -->
+        <div class="card mb-4">
+            <div class="card-header d-flex align-items-center">
+                <i class="bi bi-heart-pulse me-2"></i>
+                <span>{{ call .t "adblock.status" "Status" }}</span>
             </div>
             <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <span class="status-indicator status-{{ if .adblock_status.active }}online{{ else }}offline{{ end }}"></span>
-                    <span>{{ if .adblock_status.active }}{{ call .t "adblock.adblock_enabled" "Enabled" }}{{ else }}{{ call .t "adblock.adblock_disabled" "Disabled" }}{{ end }}</span>
-                </div>
-                <div class="d-flex align-items-center mb-3">
-                    <span class="status-indicator status-{{ if .adblock_status.active }}online{{ else }}offline{{ end }}"></span>
-                    <span>{{ if .adblock_status.active }}{{ call .t "adblock.adblock_running" "Running" }}{{ else }}{{ call .t "adblock.adblock_stopped" "Stopped" }}{{ end }}</span>
-                </div>
-                {{ if eq .adblock_status.type "blocky" }}
-                <div class="mb-3" id="blocky-blocking-status-inline">
-                    {{ if .blocky_blocking_status }}
-                    <label class="form-label">{{ call .t "blocky.blocking_status" "Blocking" }}</label>
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-{{ if .blocky_blocking_status.enabled }}shield-check text-success{{ else }}shield-x text-secondary{{ end }} me-2"></i>
-                        <span class="h6 mb-0">{{ if .blocky_blocking_status.enabled }}{{ call .t "adblock.adblock_enabled" "Enabled" }}{{ else }}{{ call .t "adblock.adblock_disabled" "Disabled" }}{{ end }}</span>
-                    </div>
-                    {{ end }}
-                </div>
-                {{ end }}
-                <div class="d-grid gap-2">
-                    <button class="btn btn-outline-success" onclick="toggleAdBlock()">
-                        <i class="bi bi-shield-x"></i>
-                        <span id="btn-toggle-label">{{ if .adblock_status.active }}{{ call .t "adblock.disable_adblock" "Disable" }}{{ else }}{{ call .t "adblock.enable_adblock" "Enable" }}{{ end }}</span>
-                    </button>
-                    <button class="btn btn-outline-primary" onclick="updateLists()" id="btn-update-lists">
-                        <i class="bi bi-arrow-clockwise"></i>
-                        {{ call .t "adblock.update_lists" "Update Lists" }}
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Listas de AdBlock (dnsmasq/pihole) o mensaje Blocky -->
-    <div class="col-md-8 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-list"></i>
-                    {{ call .t "adblock.lists" "Lists" }}
-                </h5>
-            </div>
-            <div class="card-body">
-                {{ if eq .adblock_status.type "blocky" }}
-                <p class="text-muted mb-2">{{ call .t "blocky.lists_managed_here" "Blocky listas se gestionan en la sección Blocky (upstreams y listas de bloqueo)." }}</p>
-                <p class="small text-muted mb-0">{{ call .t "blocky.refresh_via_button" "Usa «Actualizar listas» o el botón «Refrescar listas» en Blocky para recargar." }}</p>
-                {{ else }}
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>{{ call .t "adblock.list_name" "Name" }}</th>
-                                <th>{{ call .t "adblock.list_status" "Status" }}</th>
-                                <th>{{ call .t "adblock.list_domains" "Domains" }}</th>
-                                <th>{{ call .t "adblock.list_last_update" "Last Update" }}</th>
-                                <th>{{ call .t "common.actions" "Actions" }}</th>
-                            </tr>
-                        </thead>
-                        <tbody id="listsTable">
-                        </tbody>
-                    </table>
-                </div>
-                {{ end }}
-            </div>
-        </div>
-    </div>
-
-    <!-- Configuración de AdBlock -->
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-gear"></i>
-                    {{ call .t "adblock.configuration" "Configuration" }}
-                </h5>
-            </div>
-            <div class="card-body">
-                <form id="adblockConfigForm">
-                    <div class="mb-3">
-                        <label for="update_interval" class="form-label">{{ call .t "adblock.update_interval" "Update Interval" }}</label>
-                        <select class="form-select" id="update_interval" name="update_interval">
-                            <option value="daily" {{ if eq .adblock_config.update_interval "daily" }}selected{{ end }}>{{ call .t "adblock.daily" "Daily" }}</option>
-                            <option value="weekly" {{ if eq .adblock_config.update_interval "weekly" }}selected{{ end }}>{{ call .t "adblock.weekly" "Weekly" }}</option>
-                            <option value="monthly" {{ if eq .adblock_config.update_interval "monthly" }}selected{{ end }}>{{ call .t "adblock.monthly" "Monthly" }}</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="max_lists" class="form-label">{{ call .t "adblock.max_lists" "Max Lists" }}</label>
-                        <input type="number" class="form-control" id="max_lists" name="max_lists" value="{{ if .adblock_config.max_lists }}{{ .adblock_config.max_lists }}{{ else }}5{{ end }}">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="cache_size" class="form-label">{{ call .t "adblock.cache_size" "Cache Size" }}</label>
-                        <input type="number" class="form-control" id="cache_size" name="cache_size" value="{{ if .adblock_config.cache_size }}{{ .adblock_config.cache_size }}{{ else }}50{{ end }}">
-                    </div>
-                    
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-circle"></i>
-                            {{ call .t "common.save" "Save" }}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Dominios Bloqueados -->
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-shield-x"></i>
-                    {{ call .t "adblock.blocked_domains" "Blocked Domains" }}
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>{{ call .t "adblock.domain_name" "Domain" }}</th>
-                                <th>{{ call .t "adblock.domain_status" "Status" }}</th>
-                                <th>{{ call .t "common.actions" "Actions" }}</th>
-                            </tr>
-                        </thead>
-                        <tbody id="domainsTable">
-                            <!-- Los dominios se cargarán dinámicamente -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Estadísticas (desde nuestra web / API Blocky, sin Prometheus) -->
-    <div class="col-12 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-graph-up"></i>
-                    {{ call .t "adblock.statistics" "Statistics" }}
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3 mb-3">
-                        <div class="text-center">
-                            <h6>{{ call .t "adblock.blocked_domains" "Blocked" }}</h6>
-                            <h4 class="text-danger">{{ if .adblock_status.blocked_domains }}{{ .adblock_status.blocked_domains }}{{ else }}—{{ end }}</h4>
+                <div class="row align-items-center mb-4">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="status-indicator status-offline me-2" id="blocky-status-indicator"></span>
+                            <span id="blocky-status-text">{{ call .t "blocky.not_installed" "Not installed" }}</span>
+                        </div>
+                        <div id="blocky-blocking-row" class="text-muted small" style="display: none;">
+                            <span>{{ call .t "blocky.blocking_status" "Blocking" }}:</span>
+                            <span id="blocky-blocking-value">—</span>
                         </div>
                     </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="text-center">
-                            <h6>{{ call .t "blocky.blocking_status" "Blocking" }}</h6>
-                            <h4 class="text-warning">{{ if and (eq .adblock_status.type "blocky") .blocky_blocking_status }}{{ if .blocky_blocking_status.enabled }}{{ call .t "adblock.adblock_enabled" "Enabled" }}{{ else }}{{ call .t "adblock.adblock_disabled" "Disabled" }}{{ end }}{{ else }}—{{ end }}</h4>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="text-center">
-                            <h6>{{ call .t "adblock.status" "Status" }}</h6>
-                            <h4 class="text-success">{{ if .adblock_status.active }}{{ call .t "adblock.adblock_running" "Running" }}{{ else }}{{ call .t "adblock.adblock_stopped" "Stopped" }}{{ end }}</h4>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="text-center">
-                            <h6>{{ call .t "adblock.last_update" "Last Update" }}</h6>
-                            <h4 class="text-info">{{ if .adblock_stats.last_update }}{{ .adblock_stats.last_update }}{{ else }}—{{ end }}</h4>
+                    <div class="col-md-6">
+                        <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+                            <button class="btn btn-primary" id="blocky-install-btn" onclick="installBlocky()">
+                                <i class="bi bi-download"></i>
+                                {{ call .t "blocky.install" "Install Blocky" }}
+                            </button>
+                            <button class="btn btn-outline-secondary" id="blocky-configure-btn" onclick="showBlockyConfig()" style="display: none;">
+                                <i class="bi bi-gear"></i>
+                                {{ call .t "blocky.configure" "Configure" }}
+                            </button>
+                            <button class="btn btn-success" id="blocky-enable-btn" onclick="enableBlocky()" style="display: none;">
+                                <i class="bi bi-play-circle"></i>
+                                {{ call .t "blocky.enable" "Enable" }}
+                            </button>
+                            <button class="btn btn-outline-danger" id="blocky-disable-btn" onclick="disableBlocky()" style="display: none;">
+                                <i class="bi bi-stop-circle"></i>
+                                {{ call .t "blocky.disable" "Disable" }}
+                            </button>
+                            <button class="btn btn-outline-info" id="blocky-refresh-lists-btn" onclick="blockyRefreshLists()" style="display: none;">
+                                <i class="bi bi-arrow-clockwise"></i>
+                                {{ call .t "blocky.refresh_lists" "Refresh lists" }}
+                            </button>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Blocky: instalación, configuración y control desde la web -->
-    <div class="col-12 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-database-fill-gear"></i>
-                    {{ call .t "blocky.title" "Blocky" }}
-                </h5>
-            </div>
-            <div class="card-body">
-                <p class="text-muted">{{ call .t "blocky.description" "Proxy DNS y bloqueador de anuncios. Configura upstreams y listas de bloqueo desde aquí; la información se muestra en esta página (sin Prometheus)." }}</p>
-
-                <div id="blocky-status" class="mb-3">
-                    <div class="d-flex align-items-center mb-2">
-                        <span class="status-indicator status-offline" id="blocky-status-indicator"></span>
-                        <span id="blocky-status-text">{{ call .t "blocky.not_installed" "Not installed" }}</span>
-                    </div>
-                </div>
-
-                <div class="d-grid gap-2 mb-3">
-                    <button class="btn btn-outline-primary" id="blocky-install-btn" onclick="installBlocky()">
-                        <i class="bi bi-download"></i>
-                        {{ call .t "blocky.install" "Install Blocky" }}
-                    </button>
-                    <button class="btn btn-outline-success" id="blocky-configure-btn" onclick="showBlockyConfig()" style="display: none;">
-                        <i class="bi bi-gear"></i>
-                        {{ call .t "blocky.configure" "Configure" }}
-                    </button>
-                    <button class="btn btn-outline-success" id="blocky-enable-btn" onclick="enableBlocky()" style="display: none;">
-                        <i class="bi bi-play-circle"></i>
-                        {{ call .t "blocky.enable" "Enable" }}
-                    </button>
-                    <button class="btn btn-outline-danger" id="blocky-disable-btn" onclick="disableBlocky()" style="display: none;">
-                        <i class="bi bi-stop-circle"></i>
-                        {{ call .t "blocky.disable" "Disable" }}
-                    </button>
-                    <button class="btn btn-outline-info" id="blocky-refresh-lists-btn" onclick="blockyRefreshLists()" style="display: none;">
-                        <i class="bi bi-arrow-clockwise"></i>
-                        {{ call .t "blocky.refresh_lists" "Refresh lists" }}
-                    </button>
-                </div>
-
-                <div id="blocky-config-form" style="display: none;">
+                <!-- Formulario de configuración (Blocky) -->
+                <div id="blocky-config-form" class="border-top pt-3" style="display: none;">
                     <form id="blockyConfigForm">
                         <div class="mb-3">
                             <label for="blocky-upstreams" class="form-label">{{ call .t "blocky.upstreams" "Upstream DNS (one per line)" }}</label>
-                            <textarea class="form-control font-monospace" id="blocky-upstreams" name="upstreams" rows="3" placeholder="1.1.1.1&#10;8.8.8.8&#10;https://dns.cloudflare.com/dns-query">1.1.1.1
+                            <textarea class="form-control font-monospace" id="blocky-upstreams" name="upstreams" rows="3" placeholder="1.1.1.1&#10;8.8.8.8">1.1.1.1
 8.8.8.8
 https://dns.cloudflare.com/dns-query</textarea>
                         </div>
                         <div class="mb-3">
                             <label for="blocky-block-lists" class="form-label">{{ call .t "blocky.block_lists" "Block lists (URLs, one per line)" }}</label>
-                            <textarea class="form-control font-monospace" id="blocky-block-lists" name="block_lists" rows="4" placeholder="https://raw.githubusercontent.com/...">https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+                            <textarea class="form-control font-monospace" id="blocky-block-lists" name="block_lists" rows="5" placeholder="https://...">https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
 https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt</textarea>
                         </div>
-                        <div class="d-grid">
+                        <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-check-circle"></i>
                                 {{ call .t "common.save" "Save" }}
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="showBlockyConfig()">
+                                {{ call .t "common.cancel" "Cancel" }}
                             </button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- DNSCrypt Configuration -->
-    <div class="col-12 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="bi bi-shield-lock"></i>
-                    {{ call .t "dnscrypt.title" "DNSCrypt" }}
-                </h5>
-            </div>
-            <div class="card-body">
-                <p class="text-muted">{{ call .t "dnscrypt.description" "DNSCrypt encrypts DNS queries and blocks ads and trackers" }}</p>
-                
-                <div id="dnscrypt-status" class="mb-3">
-                    <div class="d-flex align-items-center mb-2">
-                        <span class="status-indicator status-offline" id="dnscrypt-status-indicator"></span>
-                        <span id="dnscrypt-status-text">{{ call .t "dnscrypt.not_installed" "Not installed" }}</span>
-                    </div>
-                </div>
-
-                <div class="d-grid gap-2 mb-3">
-                    <button class="btn btn-outline-primary" id="dnscrypt-install-btn" onclick="installDNSCrypt()">
-                        <i class="bi bi-download"></i>
-                        {{ call .t "dnscrypt.install" "Install DNSCrypt" }}
-                    </button>
-                    <button class="btn btn-outline-success" id="dnscrypt-configure-btn" onclick="showDNSCryptConfig()" style="display: none;">
-                        <i class="bi bi-gear"></i>
-                        {{ call .t "dnscrypt.configure" "Configure" }}
-                    </button>
-                    <button class="btn btn-outline-success" id="dnscrypt-enable-btn" onclick="enableDNSCrypt()" style="display: none;">
-                        <i class="bi bi-play-circle"></i>
-                        {{ call .t "dnscrypt.enable" "Enable" }}
-                    </button>
-                    <button class="btn btn-outline-danger" id="dnscrypt-disable-btn" onclick="disableDNSCrypt()" style="display: none;">
-                        <i class="bi bi-stop-circle"></i>
-                        {{ call .t "dnscrypt.disable" "Disable" }}
-                    </button>
-                </div>
-
-                <!-- Configuración de DNSCrypt (oculta por defecto) -->
-                <div id="dnscrypt-config-form" style="display: none;">
-                    <form id="dnscryptConfigForm">
-                        <div class="mb-3">
-                            <label for="dnscrypt-server" class="form-label">{{ call .t "dnscrypt.server_name" "Server" }}</label>
-                            <select class="form-select" id="dnscrypt-server" name="server_name">
-                                <option value="adguard-dns">{{ call .t "dnscrypt.server_adguard" "AdGuard DNS (recommended - filters ads)" }}</option>
-                                <option value="quad9-dnscrypt">{{ call .t "dnscrypt.server_quad9" "Quad9 (filters malware)" }}</option>
-                                <option value="cloudflare">{{ call .t "dnscrypt.server_cloudflare" "Cloudflare (fast)" }}</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="dnscrypt-block-ads" name="block_ads" checked>
-                                <label class="form-check-label" for="dnscrypt-block-ads">
-                                    {{ call .t "dnscrypt.block_ads" "Block ads" }}
-                                </label>
-                            </div>
-                        </div>
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-circle"></i>
-                                {{ call .t "common.save" "Save" }}
-                            </button>
-                        </div>
-                    </form>
-                </div>
+        <!-- Ayuda breve -->
+        <div class="card mb-4">
+            <div class="card-body py-3">
+                <p class="small text-muted mb-0">
+                    <i class="bi bi-info-circle me-1"></i>
+                    {{ call .t "blocky.help" "After saving configuration, enable Blocky. Use «Refresh lists» to reload block lists without restarting. DNS listens on port 53; the API on localhost:4000." }}
+                </p>
             </div>
         </div>
     </div>
