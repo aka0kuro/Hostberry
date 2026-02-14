@@ -607,6 +607,13 @@ body.light-theme .health-text { color: #212529; }
 .wizard-card {
   width: 100%;
 }
+.wizard-security-option {
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.wizard-security-option:hover {
+  border-color: var(--hb-primary);
+}
 
 /* Compatibilidad: indicador de pasos dentro de .setup-wizard-steps (por si se usa en otro sitio) */
 .setup-wizard-steps .step-indicator { align-items: center; }

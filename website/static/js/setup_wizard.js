@@ -5,6 +5,7 @@
 
   let selectedSSID = null;
   let wizardStep = 1;
+  let selectedSecurityOption = null; // 'vpn' | 'wireguard' | 'tor'
 
   function setStep(step) {
     wizardStep = step;
@@ -14,6 +15,33 @@
     document.querySelectorAll('.step-dot').forEach(function(el) {
       el.classList.toggle('active', parseInt(el.getAttribute('data-step'), 10) === step);
     });
+    if (step === 4 && selectedSecurityOption) {
+      showStep4Config(selectedSecurityOption);
+    }
+  }
+
+  function showStep4Config(option) {
+    document.querySelectorAll('.wizard-config-panel').forEach(function(p) { p.classList.add('d-none'); });
+    var titleText = t('setup_wizard.step_config_title', 'Configuración');
+    var desc = '';
+    if (option === 'vpn') {
+      document.getElementById('wizard-config-vpn').classList.remove('d-none');
+      titleText = t('setup_wizard.security_vpn', 'VPN');
+      desc = t('setup_wizard.step_security_desc', 'Configura la VPN.');
+    } else if (option === 'wireguard') {
+      document.getElementById('wizard-config-wireguard').classList.remove('d-none');
+      titleText = t('setup_wizard.security_wireguard', 'WireGuard');
+      desc = t('setup_wizard.step_security_desc', 'Configura WireGuard.');
+    } else if (option === 'tor') {
+      document.getElementById('wizard-config-tor').classList.remove('d-none');
+      titleText = t('setup_wizard.security_tor', 'Tor');
+      desc = t('setup_wizard.step_security_desc', 'Instala y habilita Tor.');
+      loadTorStatusWizard();
+    }
+    var titleEl = document.getElementById('step4-title-text');
+    var descEl = document.getElementById('step4-desc');
+    if (titleEl) titleEl.textContent = titleText;
+    if (descEl) descEl.textContent = desc;
   }
 
   function signalBars(signal) {
@@ -120,7 +148,7 @@
       const data = await resp.json().catch(function() { return {}; });
       if (resp.ok && data.success !== false) {
         showAlert('success', t('setup_wizard.connected', 'Conectado'));
-        document.getElementById('wizard-next-1').disabled = false;
+        setStep(2);
       } else {
         showAlert('danger', (data.error || t('setup_wizard.error_connect', 'Error al conectar')));
       }
@@ -138,7 +166,7 @@
     const ssid = (document.getElementById('wizard-ap-ssid') || {}).value || 'hostberry';
     const open = (document.getElementById('wizard-ap-open') || {}).checked;
     const password = (document.getElementById('wizard-ap-password') || {}).value.trim();
-    const saveBtn = document.getElementById('wizard-save-ap');
+    const saveBtn = document.getElementById('wizard-next-2');
     if (!open && (password.length < 8 || password.length > 63)) {
       showAlert('warning', t('setup_wizard.ap_password_invalid', 'La contraseña debe tener entre 8 y 63 caracteres (estándar WiFi WPA2/WPA3).'));
       return;
@@ -164,23 +192,98 @@
       const data = await resp.json().catch(function() { return {}; });
       if (resp.ok && !data.error) {
         showAlert('success', t('setup_wizard.success_ap', 'Punto de acceso configurado correctamente'));
-        setTimeout(function() { window.location.href = '/dashboard'; }, 1500);
+        setStep(3);
       } else {
         showAlert('danger', data.error || t('setup_wizard.error_save_ap', 'Error al guardar la configuración del punto de acceso'));
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.querySelector('.btn-text').textContent = t('setup_wizard.save_and_finish', 'Guardar y finalizar'); }
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.querySelector('.btn-text').textContent = t('setup_wizard.next', 'Siguiente'); }
       }
     } catch (e) {
       showAlert('danger', t('setup_wizard.error_save_ap', 'Error al guardar la configuración del punto de acceso'));
-      if (saveBtn) { saveBtn.disabled = false; saveBtn.querySelector('.btn-text').textContent = t('setup_wizard.save_and_finish', 'Guardar y finalizar'); }
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.querySelector('.btn-text').textContent = t('setup_wizard.next', 'Siguiente'); }
     }
+  }
+
+  function loadTorStatusWizard() {
+    var api = window.HostBerry && window.HostBerry.apiRequest ? window.HostBerry.apiRequest.bind(window.HostBerry) : fetch;
+    api('/api/v1/tor/status', { method: 'GET' }).then(function(r) { return r.ok ? r.json() : {}; }).then(function(s) {
+      var dot = document.getElementById('wizard-tor-status-dot');
+      var text = document.getElementById('wizard-tor-status-text');
+      var installBtn = document.getElementById('wizard-tor-install');
+      var enableBtn = document.getElementById('wizard-tor-enable');
+      if (!text) return;
+      if (s.installed) {
+        if (dot) { dot.className = 'status-indicator ' + (s.active ? 'status-online' : 'status-offline'); }
+        text.textContent = s.active ? t('tor.active', 'Activo') : t('tor.inactive', 'Inactivo');
+        if (installBtn) installBtn.classList.add('d-none');
+        if (enableBtn) { enableBtn.classList.remove('d-none'); enableBtn.textContent = s.active ? t('tor.disable', 'Deshabilitar') : t('tor.enable', 'Habilitar'); }
+      } else {
+        if (dot) dot.className = 'status-indicator status-offline';
+        text.textContent = t('tor.not_installed', 'No instalado');
+        if (installBtn) installBtn.classList.remove('d-none');
+        if (enableBtn) enableBtn.classList.add('d-none');
+      }
+    }).catch(function() {});
+  }
+
+  async function wizardTorInstall() {
+    var btn = document.getElementById('wizard-tor-install');
+    if (btn) { btn.disabled = true; btn.textContent = t('common.loading', 'Cargando...'); }
+    try {
+      var r = await (window.HostBerry && window.HostBerry.apiRequest ? window.HostBerry.apiRequest('/api/v1/tor/install', { method: 'POST' }) : fetch('/api/v1/tor/install', { method: 'POST', credentials: 'include' }));
+      var d = await r.json().catch(function() { return {}; });
+      if (r.ok && !d.error) { showAlert('success', d.message || t('tor.installed', 'Instalado')); loadTorStatusWizard(); }
+      else { showAlert('danger', d.error || t('errors.operation_failed', 'Error')); }
+    } catch (e) { showAlert('danger', e.message || 'Error'); }
+    if (btn) { btn.disabled = false; btn.textContent = t('tor.install', 'Instalar Tor'); }
+  }
+
+  async function wizardTorEnable() {
+    var enableBtn = document.getElementById('wizard-tor-enable');
+    if (enableBtn) { enableBtn.disabled = true; }
+    try {
+      var r = await (window.HostBerry && window.HostBerry.apiRequest ? window.HostBerry.apiRequest('/api/v1/tor/enable', { method: 'POST' }) : fetch('/api/v1/tor/enable', { method: 'POST', credentials: 'include' }));
+      var d = await r.json().catch(function() { return {}; });
+      if (r.ok && !d.error) { showAlert('success', d.message || t('tor.enabled', 'Habilitado')); loadTorStatusWizard(); }
+      else { showAlert('danger', d.error || 'Error'); }
+    } catch (e) { showAlert('danger', e.message || 'Error'); }
+    if (enableBtn) { enableBtn.disabled = false; loadTorStatusWizard(); }
+  }
+
+  async function wizardWgSave() {
+    var ta = document.getElementById('wizard-wg-config');
+    var config = (ta && ta.value) ? ta.value.trim() : '';
+    if (!config) { showAlert('warning', t('setup_wizard.wg_config_empty', 'Escribe o pega la configuración.')); return; }
+    try {
+      var r = await apiRequest('/api/v1/wireguard/config', { method: 'POST', body: { config: config } });
+      var d = await r.json().catch(function() { return {}; });
+      if (r.ok && !d.error) { showAlert('success', t('common.saved', 'Guardado')); }
+      else { showAlert('danger', d.error || 'Error'); }
+    } catch (e) { showAlert('danger', e.message || 'Error'); }
   }
 
   function init() {
     document.getElementById('wizard-scan-btn').addEventListener('click', scanNetworks);
     document.getElementById('wizard-connect-btn').addEventListener('click', connectWiFi);
-    document.getElementById('wizard-next-1').addEventListener('click', function() { setStep(2); });
     document.getElementById('wizard-back-2').addEventListener('click', function() { setStep(1); });
-    document.getElementById('wizard-save-ap').addEventListener('click', saveHostapd);
+    document.getElementById('wizard-next-2').addEventListener('click', function() { saveHostapd(); });
+    document.getElementById('wizard-back-3').addEventListener('click', function() { setStep(2); });
+    document.getElementById('wizard-back-4').addEventListener('click', function() { setStep(3); });
+
+    document.querySelectorAll('.wizard-security-option').forEach(function(card) {
+      card.addEventListener('click', function() {
+        selectedSecurityOption = card.getAttribute('data-option');
+        document.querySelectorAll('.wizard-security-option').forEach(function(c) { c.classList.remove('border-primary', 'border-3'); });
+        card.classList.add('border-primary', 'border-3');
+        document.getElementById('wizard-go-config').disabled = false;
+      });
+    });
+    document.getElementById('wizard-go-config').addEventListener('click', function() {
+      if (selectedSecurityOption) setStep(4);
+    });
+
+    document.getElementById('wizard-wg-save').addEventListener('click', wizardWgSave);
+    document.getElementById('wizard-tor-install').addEventListener('click', wizardTorInstall);
+    document.getElementById('wizard-tor-enable').addEventListener('click', wizardTorEnable);
 
     setupPasswordToggle('wizard-wifi-password', 'wizard-wifi-toggle-pwd');
     setupPasswordToggle('wizard-ap-password', 'wizard-ap-toggle-pwd');
