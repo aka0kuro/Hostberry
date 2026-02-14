@@ -651,11 +651,8 @@ func installBlocky(user string) map[string]interface{} {
 		}
 		return result
 	}
-	tarPath := "/usr/bin/tar"
-	if _, err := os.Stat(tarPath); err != nil {
-		tarPath = "/bin/tar"
-	}
-	extractCmd := fmt.Sprintf("sudo %s -xzf %s/blocky.tar.gz -C %s && sudo cp %s/blocky /usr/local/bin/blocky && sudo chmod +x /usr/local/bin/blocky", tarPath, tmpDir, tmpDir, tmpDir)
+	// PATH explícito: entornos (systemd, cron) pueden no tener tar/cp/chmod en PATH
+	extractCmd := fmt.Sprintf("sudo sh -c 'export PATH=/usr/bin:/bin; tar -xzf %s/blocky.tar.gz -C %s && cp %s/blocky /usr/local/bin/blocky && chmod +x /usr/local/bin/blocky'", tmpDir, tmpDir, tmpDir)
 	if out, err := executeCommand(extractCmd); err != nil {
 		result["success"] = false
 		result["error"] = fmt.Sprintf("Error extrayendo Blocky: %v", err)

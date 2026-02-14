@@ -1716,6 +1716,101 @@ EOF
     print_success "Configuración por defecto de HostAPD creada"
 }
 
+# Instalar Blocky (proxy DNS y ad-blocker para la página Adblock)
+install_blocky() {
+    local BLOCKY_VERSION="v0.28.2"
+    local BLOCKY_CONFIG_DIR="/etc/blocky"
+    local BLOCKY_CONFIG_FILE="${BLOCKY_CONFIG_DIR}/config.yml"
+    local BLOCKY_SERVICE="/etc/systemd/system/blocky.service"
+
+    if [ -x "/usr/local/bin/blocky" ] || systemctl cat blocky &>/dev/null; then
+        print_success "Blocky ya está instalado"
+        return 0
+    fi
+
+    print_info "Instalando Blocky (DNS proxy y ad-blocker)..."
+
+    local ARCH
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64|amd64) BLOCKY_ARCH="x86_64" ;;
+        aarch64)      BLOCKY_ARCH="arm64" ;;
+        armv7l|armhf) BLOCKY_ARCH="armv7" ;;
+        armv6l)       BLOCKY_ARCH="armv6" ;;
+        *)            BLOCKY_ARCH="x86_64" ;;
+    esac
+
+    local BLOCKY_URL="https://github.com/0xERR0R/blocky/releases/download/${BLOCKY_VERSION}/blocky_${BLOCKY_VERSION}_Linux_${BLOCKY_ARCH}.tar.gz"
+    local TMP_BLOCKY="/tmp/blocky_install"
+    rm -rf "$TMP_BLOCKY"
+    mkdir -p "$TMP_BLOCKY"
+
+    if command -v wget &>/dev/null; then
+        wget -q -O "${TMP_BLOCKY}/blocky.tar.gz" "$BLOCKY_URL" || true
+    else
+        curl -sL -o "${TMP_BLOCKY}/blocky.tar.gz" "$BLOCKY_URL" || true
+    fi
+
+    if [ ! -s "${TMP_BLOCKY}/blocky.tar.gz" ]; then
+        print_warning "No se pudo descargar Blocky (${BLOCKY_ARCH}). Puedes instalarlo desde la web Adblock más tarde."
+        rm -rf "$TMP_BLOCKY"
+        return 0
+    fi
+
+    export PATH="/usr/bin:/bin:$PATH"
+    tar -xzf "${TMP_BLOCKY}/blocky.tar.gz" -C "$TMP_BLOCKY"
+    cp "${TMP_BLOCKY}/blocky" /usr/local/bin/blocky
+    chmod +x /usr/local/bin/blocky
+    rm -rf "$TMP_BLOCKY"
+
+    mkdir -p "$BLOCKY_CONFIG_DIR"
+    if [ ! -f "$BLOCKY_CONFIG_FILE" ]; then
+        cat > "$BLOCKY_CONFIG_FILE" <<'BLOCKYCONF'
+# Blocky - Configuración por defecto HostBerry
+upstreams:
+  groups:
+    default:
+    - 1.1.1.1
+    - 8.8.8.8
+    - https://dns.cloudflare.com/dns-query
+
+blocking:
+  denylists:
+    default:
+    - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+    - https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt
+  blockType: zeroIp
+  refreshPeriod: 4h
+
+ports:
+  dns: 53
+  http: 127.0.0.1:4000
+
+log:
+  level: warn
+  format: text
+BLOCKYCONF
+        print_success "Configuración por defecto de Blocky creada: $BLOCKY_CONFIG_FILE"
+    fi
+
+    cat > "$BLOCKY_SERVICE" <<EOF
+[Unit]
+Description=Blocky DNS proxy and ad-blocker
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/blocky --config $BLOCKY_CONFIG_FILE
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    print_success "Blocky instalado (servicio no iniciado; configúralo desde la web Adblock)"
+}
+
 # Crear servicio systemd
 create_systemd_service() {
     print_info "Creando servicio systemd..."
@@ -1869,6 +1964,7 @@ main() {
     create_hostapd_default_config
     configure_firewall
     create_systemd_service
+    install_blocky
     start_service
     cleanup_temp
     show_final_info

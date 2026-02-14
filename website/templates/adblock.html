@@ -84,6 +84,42 @@ https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt</textarea>
             </div>
         </div>
 
+        <!-- Estadísticas de Blocky -->
+        <div class="card mb-4" id="blocky-stats-card">
+            <div class="card-header d-flex align-items-center">
+                <i class="bi bi-graph-up me-2"></i>
+                <span>{{ call .t "blocky.statistics" "Statistics" }}</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3" id="blocky-stats-body">
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 rounded border text-center">
+                            <div class="small text-muted mb-1">{{ call .t "blocky.stat_service" "Service" }}</div>
+                            <div class="fw-semibold" id="blocky-stat-service">—</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 rounded border text-center">
+                            <div class="small text-muted mb-1">{{ call .t "blocky.blocking_status" "Blocking" }}</div>
+                            <div class="fw-semibold" id="blocky-stat-blocking">—</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 rounded border text-center">
+                            <div class="small text-muted mb-1">{{ call .t "blocky.stat_api" "API" }}</div>
+                            <div class="fw-semibold" id="blocky-stat-api">—</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 rounded border text-center">
+                            <div class="small text-muted mb-1">{{ call .t "blocky.stat_disabled_groups" "Disabled groups" }}</div>
+                            <div class="fw-semibold small" id="blocky-stat-groups">—</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Ayuda breve -->
         <div class="card mb-4">
             <div class="card-body py-3">

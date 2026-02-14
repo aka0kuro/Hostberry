@@ -39,8 +39,34 @@
       const refreshBtn = document.getElementById('blocky-refresh-lists-btn');
       const blockingRow = document.getElementById('blocky-blocking-row');
       const blockingValue = document.getElementById('blocky-blocking-value');
+      const statService = document.getElementById('blocky-stat-service');
+      const statBlocking = document.getElementById('blocky-stat-blocking');
+      const statApi = document.getElementById('blocky-stat-api');
+      const statGroups = document.getElementById('blocky-stat-groups');
 
       if (!indicator || !statusText) return;
+
+      if (statService) {
+        statService.textContent = status?.installed
+          ? (status?.active ? t('blocky.active', 'Active') : t('blocky.inactive', 'Inactive'))
+          : t('blocky.not_installed', 'Not installed');
+      }
+      if (statBlocking) {
+        statBlocking.textContent = status?.active && status?.blocking_enabled !== undefined
+          ? (status.blocking_enabled ? t('adblock.adblock_enabled', 'Enabled') : t('adblock.adblock_disabled', 'Disabled'))
+          : '—';
+      }
+      if (statApi) {
+        statApi.textContent = status?.active && status?.blocking_enabled !== undefined ? 'OK' : '—';
+      }
+      if (statGroups) {
+        const groups = status?.disabled_groups;
+        if (Array.isArray(groups) && groups.length > 0) {
+          statGroups.textContent = groups.join(', ');
+        } else {
+          statGroups.textContent = status?.active ? (t('blocky.stat_none', 'None') || 'None') : '—';
+        }
+      }
 
       if (status?.installed) {
         if (installBtn) installBtn.style.display = 'none';
