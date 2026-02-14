@@ -87,7 +87,7 @@
     const btn = document.getElementById('wizard-scan-btn');
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<i class="bi bi-arrow-clockwise spinning me-2"></i>' + t('common.loading', 'Cargando...');
+      btn.innerHTML = '<i class="bi bi-arrow-clockwise spinning me-2"></i>' + t('setup_wizard.scanning', 'Escaneando...');
     }
     try {
       const resp = await apiRequest('/api/v1/wifi/scan', { method: 'POST' });

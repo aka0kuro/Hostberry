@@ -1,11 +1,17 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"time"
 )
 
 func getAdBlockStatus() map[string]interface{} {
@@ -33,16 +39,29 @@ func getAdBlockStatus() map[string]interface{} {
 		dnscryptStatus = "inactive"
 	}
 
+	// Verificar Blocky
+	blockyCmd := exec.Command("sh", "-c", "systemctl is-active blocky 2>/dev/null || echo inactive")
+	blockyOut, _ := blockyCmd.Output()
+	blockyStatus := strings.TrimSpace(string(blockyOut))
+	if blockyStatus == "" {
+		blockyStatus = "inactive"
+	}
+
 	// Verificar si dnscrypt-proxy está instalado
 	dnscryptInstalled := false
 	if checkCmd := exec.Command("sh", "-c", "command -v dnscrypt-proxy 2>/dev/null"); checkCmd.Run() == nil {
 		dnscryptInstalled = true
 	}
 
-	result["active"] = dnsmasqStatus == "active" || piholeStatus == "active" || dnscryptStatus == "active"
+	blockyInstalled := blockyBinaryExists()
+
+	result["active"] = dnsmasqStatus == "active" || piholeStatus == "active" || dnscryptStatus == "active" || blockyStatus == "active"
 	result["type"] = "none"
 
-	if dnscryptStatus == "active" {
+	// Prioridad: Blocky > DNSCrypt > dnsmasq > Pi-hole
+	if blockyStatus == "active" {
+		result["type"] = "blocky"
+	} else if dnscryptStatus == "active" {
 		result["type"] = "dnscrypt"
 	} else if dnsmasqStatus == "active" {
 		result["type"] = "dnsmasq"
@@ -52,9 +71,13 @@ func getAdBlockStatus() map[string]interface{} {
 
 	result["dnscrypt_installed"] = dnscryptInstalled
 	result["dnscrypt_active"] = dnscryptStatus == "active"
+	result["blocky_installed"] = blockyInstalled
+	result["blocky_active"] = blockyStatus == "active"
 
 	if result["active"] == true {
-		if hostsContent, err := os.ReadFile("/etc/hosts"); err == nil {
+		if result["type"] == "blocky" {
+			result["blocked_domains"] = 0 // Blocky no expone conteo por API; la web mostrará estado de bloqueo
+		} else if hostsContent, err := os.ReadFile("/etc/hosts"); err == nil {
 			blockedCount := strings.Count(string(hostsContent), "0.0.0.0")
 			result["blocked_domains"] = blockedCount
 		} else {
@@ -110,6 +133,7 @@ func disableAdBlock(user string) map[string]interface{} {
 	executeCommand("sudo systemctl stop dnsmasq")
 	executeCommand("sudo systemctl stop pihole-FTL")
 	executeCommand("sudo systemctl stop dnscrypt-proxy")
+	executeCommand("sudo systemctl stop blocky")
 
 	result["success"] = true
 	result["message"] = "AdBlock deshabilitado"
@@ -448,4 +472,398 @@ func disableDNSCrypt(user string) map[string]interface{} {
 	result["message"] = "DNSCrypt deshabilitado correctamente"
 	LogT("logs.dnscrypt_disabled")
 	return result
+}
+
+// --- Blocky ---
+
+const blockyConfigDir = "/etc/blocky"
+const blockyConfigPath = "/etc/blocky/config.yml"
+const blockyHTTPPort = "4000"
+const blockyVersion = "v0.28"
+
+func blockyBinaryExists() bool {
+	// Servicio blocky o binario en path
+	if out, err := exec.Command("sh", "-c", "systemctl cat blocky 2>/dev/null | head -1").Output(); err == nil && strings.Contains(string(out), "blocky") {
+		return true
+	}
+	if checkCmd := exec.Command("sh", "-c", "command -v blocky 2>/dev/null"); checkCmd.Run() == nil {
+		return true
+	}
+	if _, err := os.Stat("/usr/local/bin/blocky"); err == nil {
+		return true
+	}
+	return false
+}
+
+// blockyAPIBlockingStatus llama a la API de Blocky (GET /api/blocking/status) y devuelve el JSON como map.
+func blockyAPIBlockingStatus() map[string]interface{} {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get("http://127.0.0.1:" + blockyHTTPPort + "/api/blocking/status")
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil
+	}
+	var out map[string]interface{}
+	if json.NewDecoder(resp.Body).Decode(&out) != nil {
+		return nil
+	}
+	return out
+}
+
+func getBlockyStatus() map[string]interface{} {
+	result := make(map[string]interface{})
+	installed := blockyBinaryExists()
+	result["installed"] = installed
+	result["active"] = false
+	result["success"] = true
+
+	if !installed {
+		return result
+	}
+
+	statusCmd := exec.Command("sh", "-c", "systemctl is-active blocky 2>/dev/null || echo inactive")
+	statusOut, _ := statusCmd.Output()
+	status := strings.TrimSpace(string(statusOut))
+	result["active"] = status == "active"
+	result["status"] = status
+
+	enabledCmd := exec.Command("sh", "-c", "systemctl is-enabled blocky 2>/dev/null || echo disabled")
+	enabledOut, _ := enabledCmd.Output()
+	result["enabled"] = strings.TrimSpace(string(enabledOut)) == "enabled"
+
+	if _, err := os.Stat(blockyConfigPath); err == nil {
+		result["config_exists"] = true
+		result["config_path"] = blockyConfigPath
+	} else {
+		result["config_exists"] = false
+	}
+
+	// Datos desde la API de Blocky (bloqueo habilitado/deshabilitado, grupos)
+	if result["active"] == true {
+		if apiStatus := blockyAPIBlockingStatus(); apiStatus != nil {
+			result["blocking_enabled"] = apiStatus["enabled"]
+			result["disabled_groups"] = apiStatus["disabledGroups"]
+		}
+	}
+
+	return result
+}
+
+func installBlocky(user string) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	if user == "" {
+		user = "unknown"
+	}
+
+	LogTf("logs.blocky_installing", user)
+
+	if blockyBinaryExists() {
+		result["success"] = true
+		result["message"] = "Blocky ya está instalado"
+		result["already_installed"] = true
+		return result
+	}
+
+	// Detectar arquitectura en tiempo de ejecución (uname -m)
+	var arch string
+	if out, err := exec.Command("uname", "-m").Output(); err == nil {
+		switch strings.TrimSpace(string(out)) {
+		case "x86_64", "amd64":
+			arch = "x86_64"
+		case "aarch64":
+			arch = "arm64"
+		case "armv7l", "armhf":
+			arch = "armv7"
+		case "armv6l":
+			arch = "armv6"
+		default:
+			arch = "x86_64"
+		}
+	} else {
+		switch runtime.GOARCH {
+		case "amd64", "386":
+			arch = "x86_64"
+		case "arm64":
+			arch = "arm64"
+		case "arm":
+			arch = "armv7"
+		default:
+			arch = "x86_64"
+		}
+	}
+
+	url := fmt.Sprintf("https://github.com/0xERR0R/blocky/releases/download/%s/blocky_%s_Linux_%s.tar.gz", blockyVersion, blockyVersion, arch)
+	tmpDir := "/tmp/blocky_install"
+	executeCommand("sudo rm -rf " + tmpDir)
+	executeCommand("sudo mkdir -p " + tmpDir)
+
+	// Descargar con curl
+	downloadCmd := fmt.Sprintf("sudo curl -sL -o %s/blocky.tar.gz %s", tmpDir, url)
+	if out, err := executeCommand(downloadCmd); err != nil {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("Error descargando Blocky: %v", err)
+		if out != "" {
+			result["error"] = strings.TrimSpace(out)
+		}
+		LogTf("logs.blocky_install_error", err)
+		return result
+	}
+
+	// Extraer y copiar a /usr/local/bin
+	extractCmd := fmt.Sprintf("sudo tar -xzf %s/blocky.tar.gz -C %s && sudo cp %s/blocky /usr/local/bin/blocky && sudo chmod +x /usr/local/bin/blocky", tmpDir, tmpDir, tmpDir)
+	if out, err := executeCommand(extractCmd); err != nil {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("Error extrayendo Blocky: %v", err)
+		if out != "" {
+			result["error"] = strings.TrimSpace(out)
+		}
+		return result
+	}
+
+	// Crear directorio de configuración
+	executeCommand("sudo mkdir -p " + blockyConfigDir)
+
+	// Crear unidad systemd
+	serviceContent := `[Unit]
+Description=Blocky DNS proxy and ad-blocker
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/blocky --config ` + blockyConfigPath + `
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+`
+	servicePath := "/etc/systemd/system/blocky.service"
+	writeCmd := exec.Command("sudo", "tee", servicePath)
+	writeCmd.Stdin = strings.NewReader(serviceContent)
+	if err := writeCmd.Run(); err != nil {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("Error creando servicio systemd: %v", err)
+		return result
+	}
+	executeCommand("sudo systemctl daemon-reload")
+
+	executeCommand("sudo rm -rf " + tmpDir)
+
+	result["success"] = true
+	result["message"] = "Blocky instalado correctamente"
+	LogT("logs.blocky_installed")
+	return result
+}
+
+func configureBlocky(upstreams []string, blockLists []string, user string) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	if user == "" {
+		user = "unknown"
+	}
+
+	LogTf("logs.blocky_configuring", user)
+
+	if !blockyBinaryExists() {
+		result["success"] = false
+		result["error"] = "Blocky no está instalado. Instálalo primero."
+		return result
+	}
+
+	if len(upstreams) == 0 {
+		upstreams = []string{"1.1.1.1", "8.8.8.8", "https://dns.cloudflare.com/dns-query"}
+	}
+	if len(blockLists) == 0 {
+		blockLists = []string{
+			"https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+			"https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt",
+		}
+	}
+
+	// Generar config.yml
+	var upLines []string
+	for _, u := range upstreams {
+		u = strings.TrimSpace(u)
+		if u != "" {
+			upLines = append(upLines, "    - "+u)
+		}
+	}
+	var listLines []string
+	for _, l := range blockLists {
+		l = strings.TrimSpace(l)
+		if l != "" {
+			listLines = append(listLines, "  - "+l)
+		}
+	}
+
+	configContent := `# Blocky - Configuración generada por HostBerry
+# No editar manualmente si se gestiona desde la web.
+
+upstreams:
+  groups:
+    default:
+` + strings.Join(upLines, "\n") + `
+
+blocking:
+  denylists:
+    default:
+` + strings.Join(listLines, "\n") + `
+  blockType: zeroIp
+  refreshPeriod: 4h
+
+ports:
+  dns: 53
+  http: 127.0.0.1:4000
+
+log:
+  level: warn
+  format: text
+`
+
+	writeCmd := fmt.Sprintf("sudo tee %s > /dev/null", blockyConfigPath)
+	cmd := exec.Command("sh", "-c", writeCmd)
+	cmd.Stdin = strings.NewReader(configContent)
+	if err := cmd.Run(); err != nil {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("Error escribiendo configuración: %v", err)
+		LogTf("logs.blocky_config_error", err)
+		return result
+	}
+
+	result["success"] = true
+	result["message"] = "Blocky configurado correctamente"
+	LogT("logs.blocky_configured")
+	return result
+}
+
+func enableBlocky(user string) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	if user == "" {
+		user = "unknown"
+	}
+
+	LogTf("logs.blocky_enabling", user)
+
+	if !blockyBinaryExists() {
+		result["success"] = false
+		result["error"] = "Blocky no está instalado. Instálalo primero."
+		return result
+	}
+
+	if _, err := os.Stat(blockyConfigPath); os.IsNotExist(err) {
+		configResult := configureBlocky(nil, nil, user)
+		if success, ok := configResult["success"].(bool); !ok || !success {
+			result["success"] = false
+			result["error"] = "Error generando configuración por defecto"
+			if errMsg, ok := configResult["error"].(string); ok {
+				result["error"] = errMsg
+			}
+			return result
+		}
+	}
+
+	// Detener otros DNS para evitar conflicto en puerto 53
+	executeCommand("sudo systemctl stop dnsmasq 2>/dev/null || true")
+	executeCommand("sudo systemctl stop pihole-FTL 2>/dev/null || true")
+	executeCommand("sudo systemctl stop dnscrypt-proxy 2>/dev/null || true")
+
+	startCmd := "sudo systemctl start blocky"
+	if out, err := executeCommand(startCmd); err != nil {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("Error iniciando Blocky: %v", err)
+		if out != "" {
+			result["error"] = strings.TrimSpace(out)
+		}
+		LogTf("logs.blocky_start_error", err)
+		return result
+	}
+
+	executeCommand("sudo systemctl enable blocky")
+
+	// Configurar resolv.conf para usar Blocky local
+	resolvConf := "/etc/resolv.conf"
+	backupCmd := fmt.Sprintf("sudo cp %s %s.backup 2>/dev/null || true", resolvConf, resolvConf)
+	executeCommand(backupCmd)
+
+	content, _ := os.ReadFile(resolvConf)
+	newLines := []string{}
+	for _, line := range strings.Split(string(content), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && !strings.HasPrefix(trimmed, "nameserver") {
+			newLines = append(newLines, line)
+		}
+	}
+	newLines = append(newLines, "nameserver 127.0.0.1", "nameserver ::1")
+	writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", resolvConf))
+	writeCmd.Stdin = strings.NewReader(strings.Join(newLines, "\n"))
+	writeCmd.Run()
+	executeCommand("sudo systemctl restart systemd-resolved 2>/dev/null || true")
+
+	result["success"] = true
+	result["message"] = "Blocky habilitado correctamente"
+	LogT("logs.blocky_enabled")
+	return result
+}
+
+func disableBlocky(user string) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	if user == "" {
+		user = "unknown"
+	}
+
+	LogTf("logs.blocky_disabling", user)
+
+	executeCommand("sudo systemctl stop blocky")
+	executeCommand("sudo systemctl disable blocky")
+
+	resolvConf := "/etc/resolv.conf"
+	backupPath := resolvConf + ".backup"
+	if _, err := os.Stat(backupPath); err == nil {
+		executeCommand(fmt.Sprintf("sudo cp %s %s", backupPath, resolvConf))
+	} else {
+		writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", resolvConf))
+		writeCmd.Stdin = strings.NewReader("nameserver 8.8.8.8\nnameserver 8.8.4.4\n")
+		writeCmd.Run()
+	}
+	executeCommand("sudo systemctl restart systemd-resolved 2>/dev/null || true")
+
+	result["success"] = true
+	result["message"] = "Blocky deshabilitado correctamente"
+	LogT("logs.blocky_disabled")
+	return result
+}
+
+// blockyAPIProxy realiza una petición a la API de Blocky y devuelve el cuerpo y código.
+// Usado por el handler que hace de proxy para el frontend.
+func blockyAPIProxy(method, path string, body []byte) (int, []byte) {
+	baseURL := "http://127.0.0.1:" + blockyHTTPPort + "/api"
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	url := baseURL + path
+	var req *http.Request
+	var err error
+	if len(body) > 0 {
+		req, err = http.NewRequest(method, url, bytes.NewReader(body))
+	} else {
+		req, err = http.NewRequest(method, url, nil)
+	}
+	if err != nil {
+		return 0, nil
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, nil
+	}
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, data
 }

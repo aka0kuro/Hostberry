@@ -1,6 +1,6 @@
- 
+
 <div class="row">
-    <!-- Vista General de AdBlock -->
+    <!-- Vista General: motor activo e información desde nuestra web (sin Prometheus) -->
     <div class="col-12 mb-4">
         <div class="card">
             <div class="card-header">
@@ -10,33 +10,50 @@
                 </h5>
             </div>
             <div class="card-body">
+                <div class="row align-items-center mb-3">
+                    <div class="col-auto">
+                        <span class="badge bg-{{ if .adblock_status.active }}success{{ else }}secondary{{ end }} fs-6">
+                            {{ if eq .adblock_status.type "blocky" }}{{ call .t "blocky.engine" "Blocky" }}{{ else if eq .adblock_status.type "dnscrypt" }}{{ call .t "dnscrypt.title" "DNSCrypt" }}{{ else if eq .adblock_status.type "dnsmasq" }}dnsmasq{{ else if eq .adblock_status.type "pihole" }}Pi-hole{{ else }}{{ call .t "adblock.adblock_disabled" "Disabled" }}{{ end }}
+                        </span>
+                    </div>
+                    {{ if .adblock_status.active }}
+                    <div class="col">
+                        {{ if eq .adblock_status.type "blocky" }}
+                        {{ if .blocky_blocking_status }}
+                        <span class="text-muted">{{ call .t "blocky.blocking_status" "Blocking" }}:</span>
+                        <span class="ms-2">{{ if .blocky_blocking_status.enabled }}{{ call .t "adblock.adblock_enabled" "Enabled" }}{{ else }}{{ call .t "adblock.adblock_disabled" "Disabled" }}{{ end }}</span>
+                        {{ end }}
+                        {{ end }}
+                    </div>
+                    {{ end }}
+                </div>
                 <div class="row">
                     <div class="col-md-3 mb-3">
                         <div class="text-center">
-                            <i class="bi bi-list text-primary" style="font-size: 2rem;"></i>
-                            <h6 class="mt-2">{{ call .t "adblock.lists" "Lists" }}</h6>
-                            <h4 class="text-primary">{{ if .adblock_stats.lists_count }}{{ .adblock_stats.lists_count }}{{ else }}3{{ end }}</h4>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="text-center">
-                            <i class="bi bi-globe text-success" style="font-size: 2rem;"></i>
-                            <h6 class="mt-2">{{ call .t "adblock.domains" "Domains" }}</h6>
-                            <h4 class="text-success">{{ if .adblock_stats.domains_count }}{{ .adblock_stats.domains_count }}{{ else }}50000{{ end }}</h4>
+                            <i class="bi bi-cpu text-primary" style="font-size: 2rem;"></i>
+                            <h6 class="mt-2">{{ call .t "adblock.status" "Status" }}</h6>
+                            <h4 class="text-primary">{{ if .adblock_status.active }}{{ call .t "adblock.adblock_running" "Running" }}{{ else }}{{ call .t "adblock.adblock_stopped" "Stopped" }}{{ end }}</h4>
                         </div>
                     </div>
                     <div class="col-md-3 mb-3">
                         <div class="text-center">
                             <i class="bi bi-shield-check text-warning" style="font-size: 2rem;"></i>
                             <h6 class="mt-2">{{ call .t "adblock.blocked_domains" "Blocked" }}</h6>
-                            <h4 class="text-warning">{{ if .adblock_stats.blocked_count }}{{ .adblock_stats.blocked_count }}{{ else }}1500{{ end }}</h4>
+                            <h4 class="text-warning">{{ if .adblock_status.blocked_domains }}{{ .adblock_status.blocked_domains }}{{ else }}—{{ end }}</h4>
                         </div>
                     </div>
                     <div class="col-md-3 mb-3">
                         <div class="text-center">
-                            <i class="bi bi-clock text-info" style="font-size: 2rem;"></i>
+                            <i class="bi bi-list text-info" style="font-size: 2rem;"></i>
+                            <h6 class="mt-2">{{ call .t "adblock.lists" "Lists" }}</h6>
+                            <h4 class="text-info" id="overview-lists-count">—</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center">
+                            <i class="bi bi-arrow-clockwise text-success" style="font-size: 2rem;"></i>
                             <h6 class="mt-2">{{ call .t "adblock.last_update" "Last Update" }}</h6>
-                            <h4 class="text-info">{{ if .adblock_stats.last_update }}{{ .adblock_stats.last_update }}{{ else }}{{ call .t "adblock.default_last_update" "2 hours" }}{{ end }}</h4>
+                            <h4 class="text-success">{{ if .adblock_stats.last_update }}{{ .adblock_stats.last_update }}{{ else }}—{{ end }}</h4>
                         </div>
                     </div>
                 </div>
@@ -55,37 +72,30 @@
             </div>
             <div class="card-body">
                 <div class="d-flex align-items-center mb-3">
-                    <span class="status-indicator status-{{ if .adblock_status.enabled }}online{{ else }}offline{{ end }}"></span>
-                    <span>{{ if .adblock_status.enabled }}{{ call .t "adblock.adblock_enabled" "Enabled" }}{{ else }}{{ call .t "adblock.adblock_disabled" "Disabled" }}{{ end }}</span>
+                    <span class="status-indicator status-{{ if .adblock_status.active }}online{{ else }}offline{{ end }}"></span>
+                    <span>{{ if .adblock_status.active }}{{ call .t "adblock.adblock_enabled" "Enabled" }}{{ else }}{{ call .t "adblock.adblock_disabled" "Disabled" }}{{ end }}</span>
                 </div>
-                
                 <div class="d-flex align-items-center mb-3">
-                    <span class="status-indicator status-{{ if .adblock_status.running }}online{{ else }}offline{{ end }}"></span>
-                    <span>{{ if .adblock_status.running }}{{ call .t "adblock.adblock_running" "Running" }}{{ else }}{{ call .t "adblock.adblock_stopped" "Stopped" }}{{ end }}</span>
+                    <span class="status-indicator status-{{ if .adblock_status.active }}online{{ else }}offline{{ end }}"></span>
+                    <span>{{ if .adblock_status.active }}{{ call .t "adblock.adblock_running" "Running" }}{{ else }}{{ call .t "adblock.adblock_stopped" "Stopped" }}{{ end }}</span>
                 </div>
-                
-                <div class="mb-3">
-                    <label class="form-label">{{ call .t "adblock.blocked_today" "Blocked Today" }}</label>
+                {{ if eq .adblock_status.type "blocky" }}
+                <div class="mb-3" id="blocky-blocking-status-inline">
+                    {{ if .blocky_blocking_status }}
+                    <label class="form-label">{{ call .t "blocky.blocking_status" "Blocking" }}</label>
                     <div class="d-flex align-items-center">
-                        <i class="bi bi-shield-x text-danger me-2"></i>
-                        <span class="h6 mb-0">{{ if .adblock_status.blocked_today }}{{ .adblock_status.blocked_today }}{{ else }}45{{ end }}</span>
+                        <i class="bi bi-{{ if .blocky_blocking_status.enabled }}shield-check text-success{{ else }}shield-x text-secondary{{ end }} me-2"></i>
+                        <span class="h6 mb-0">{{ if .blocky_blocking_status.enabled }}{{ call .t "adblock.adblock_enabled" "Enabled" }}{{ else }}{{ call .t "adblock.adblock_disabled" "Disabled" }}{{ end }}</span>
                     </div>
+                    {{ end }}
                 </div>
-                
-                <div class="mb-3">
-                    <label class="form-label">{{ call .t "adblock.whitelisted_domains" "Whitelisted" }}</label>
-                    <div class="d-flex align-items-center">
-                        <i class="bi bi-shield-check text-success me-2"></i>
-                        <span class="h6 mb-0">{{ if .adblock_status.whitelisted_count }}{{ .adblock_status.whitelisted_count }}{{ else }}25{{ end }}</span>
-                    </div>
-                </div>
-                
+                {{ end }}
                 <div class="d-grid gap-2">
                     <button class="btn btn-outline-success" onclick="toggleAdBlock()">
                         <i class="bi bi-shield-x"></i>
-                        {{ if .adblock_status.enabled }}{{ call .t "adblock.disable_adblock" "Disable" }}{{ else }}{{ call .t "adblock.enable_adblock" "Enable" }}{{ end }}
+                        <span id="btn-toggle-label">{{ if .adblock_status.active }}{{ call .t "adblock.disable_adblock" "Disable" }}{{ else }}{{ call .t "adblock.enable_adblock" "Enable" }}{{ end }}</span>
                     </button>
-                    <button class="btn btn-outline-primary" onclick="updateLists()">
+                    <button class="btn btn-outline-primary" onclick="updateLists()" id="btn-update-lists">
                         <i class="bi bi-arrow-clockwise"></i>
                         {{ call .t "adblock.update_lists" "Update Lists" }}
                     </button>
@@ -94,7 +104,7 @@
         </div>
     </div>
 
-    <!-- Listas de AdBlock -->
+    <!-- Listas de AdBlock (dnsmasq/pihole) o mensaje Blocky -->
     <div class="col-md-8 mb-4">
         <div class="card">
             <div class="card-header">
@@ -104,6 +114,10 @@
                 </h5>
             </div>
             <div class="card-body">
+                {{ if eq .adblock_status.type "blocky" }}
+                <p class="text-muted mb-2">{{ call .t "blocky.lists_managed_here" "Blocky listas se gestionan en la sección Blocky (upstreams y listas de bloqueo)." }}</p>
+                <p class="small text-muted mb-0">{{ call .t "blocky.refresh_via_button" "Usa «Actualizar listas» o el botón «Refrescar listas» en Blocky para recargar." }}</p>
+                {{ else }}
                 <div class="table-responsive">
                     <table class="table table-hover">
                         <thead>
@@ -116,10 +130,10 @@
                             </tr>
                         </thead>
                         <tbody id="listsTable">
-                            <!-- Las listas se cargarán dinámicamente -->
                         </tbody>
                     </table>
                 </div>
+                {{ end }}
             </div>
         </div>
     </div>
@@ -193,7 +207,7 @@
         </div>
     </div>
 
-    <!-- Estadísticas de AdBlock -->
+    <!-- Estadísticas (desde nuestra web / API Blocky, sin Prometheus) -->
     <div class="col-12 mb-4">
         <div class="card">
             <div class="card-header">
@@ -206,28 +220,95 @@
                 <div class="row">
                     <div class="col-md-3 mb-3">
                         <div class="text-center">
-                            <h6>{{ call .t "adblock.total_blocked" "Total Blocked" }}</h6>
-                            <h4 class="text-danger">{{ if .adblock_stats.total_blocked }}{{ .adblock_stats.total_blocked }}{{ else }}1500{{ end }}</h4>
+                            <h6>{{ call .t "adblock.blocked_domains" "Blocked" }}</h6>
+                            <h4 class="text-danger">{{ if .adblock_status.blocked_domains }}{{ .adblock_status.blocked_domains }}{{ else }}—{{ end }}</h4>
                         </div>
                     </div>
                     <div class="col-md-3 mb-3">
                         <div class="text-center">
-                            <h6>{{ call .t "adblock.blocked_today" "Blocked Today" }}</h6>
-                            <h4 class="text-warning">{{ if .adblock_stats.blocked_today }}{{ .adblock_stats.blocked_today }}{{ else }}45{{ end }}</h4>
+                            <h6>{{ call .t "blocky.blocking_status" "Blocking" }}</h6>
+                            <h4 class="text-warning">{{ if and (eq .adblock_status.type "blocky") .blocky_blocking_status }}{{ if .blocky_blocking_status.enabled }}{{ call .t "adblock.adblock_enabled" "Enabled" }}{{ else }}{{ call .t "adblock.adblock_disabled" "Disabled" }}{{ end }}{{ else }}—{{ end }}</h4>
                         </div>
                     </div>
                     <div class="col-md-3 mb-3">
                         <div class="text-center">
-                            <h6>{{ call .t "adblock.whitelisted" "Whitelisted" }}</h6>
-                            <h4 class="text-success">{{ if .adblock_stats.whitelisted }}{{ .adblock_stats.whitelisted }}{{ else }}25{{ end }}</h4>
+                            <h6>{{ call .t "adblock.status" "Status" }}</h6>
+                            <h4 class="text-success">{{ if .adblock_status.active }}{{ call .t "adblock.adblock_running" "Running" }}{{ else }}{{ call .t "adblock.adblock_stopped" "Stopped" }}{{ end }}</h4>
                         </div>
                     </div>
                     <div class="col-md-3 mb-3">
                         <div class="text-center">
-                            <h6>{{ call .t "adblock.uptime" "Uptime" }}</h6>
-                            <h4 class="text-info">{{ if .adblock_stats.uptime }}{{ .adblock_stats.uptime }}{{ else }}10 días{{ end }}</h4>
+                            <h6>{{ call .t "adblock.last_update" "Last Update" }}</h6>
+                            <h4 class="text-info">{{ if .adblock_stats.last_update }}{{ .adblock_stats.last_update }}{{ else }}—{{ end }}</h4>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Blocky: instalación, configuración y control desde la web -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-database-fill-gear"></i>
+                    {{ call .t "blocky.title" "Blocky" }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">{{ call .t "blocky.description" "Proxy DNS y bloqueador de anuncios. Configura upstreams y listas de bloqueo desde aquí; la información se muestra en esta página (sin Prometheus)." }}</p>
+
+                <div id="blocky-status" class="mb-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="status-indicator status-offline" id="blocky-status-indicator"></span>
+                        <span id="blocky-status-text">{{ call .t "blocky.not_installed" "Not installed" }}</span>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 mb-3">
+                    <button class="btn btn-outline-primary" id="blocky-install-btn" onclick="installBlocky()">
+                        <i class="bi bi-download"></i>
+                        {{ call .t "blocky.install" "Install Blocky" }}
+                    </button>
+                    <button class="btn btn-outline-success" id="blocky-configure-btn" onclick="showBlockyConfig()" style="display: none;">
+                        <i class="bi bi-gear"></i>
+                        {{ call .t "blocky.configure" "Configure" }}
+                    </button>
+                    <button class="btn btn-outline-success" id="blocky-enable-btn" onclick="enableBlocky()" style="display: none;">
+                        <i class="bi bi-play-circle"></i>
+                        {{ call .t "blocky.enable" "Enable" }}
+                    </button>
+                    <button class="btn btn-outline-danger" id="blocky-disable-btn" onclick="disableBlocky()" style="display: none;">
+                        <i class="bi bi-stop-circle"></i>
+                        {{ call .t "blocky.disable" "Disable" }}
+                    </button>
+                    <button class="btn btn-outline-info" id="blocky-refresh-lists-btn" onclick="blockyRefreshLists()" style="display: none;">
+                        <i class="bi bi-arrow-clockwise"></i>
+                        {{ call .t "blocky.refresh_lists" "Refresh lists" }}
+                    </button>
+                </div>
+
+                <div id="blocky-config-form" style="display: none;">
+                    <form id="blockyConfigForm">
+                        <div class="mb-3">
+                            <label for="blocky-upstreams" class="form-label">{{ call .t "blocky.upstreams" "Upstream DNS (one per line)" }}</label>
+                            <textarea class="form-control font-monospace" id="blocky-upstreams" name="upstreams" rows="3" placeholder="1.1.1.1&#10;8.8.8.8&#10;https://dns.cloudflare.com/dns-query">1.1.1.1
+8.8.8.8
+https://dns.cloudflare.com/dns-query</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="blocky-block-lists" class="form-label">{{ call .t "blocky.block_lists" "Block lists (URLs, one per line)" }}</label>
+                            <textarea class="form-control font-monospace" id="blocky-block-lists" name="block_lists" rows="4" placeholder="https://raw.githubusercontent.com/...">https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt</textarea>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i>
+                                {{ call .t "common.save" "Save" }}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

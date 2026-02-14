@@ -1037,6 +1037,62 @@ func dnscryptDisableHandler(c *fiber.Ctx) error {
 	})
 }
 
+// Handlers para Blocky
+func blockyStatusHandler(c *fiber.Ctx) error {
+	result := getBlockyStatus()
+	return c.JSON(result)
+}
+
+func blockyInstallHandler(c *fiber.Ctx) error {
+	return RunActionWithUser(c, "adblock", "Blocky instalado por usuario %s", "Error instalando Blocky: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return installBlocky(user.Username)
+	})
+}
+
+func blockyConfigureHandler(c *fiber.Ctx) error {
+	var req struct {
+		Upstreams  []string `json:"upstreams"`
+		BlockLists []string `json:"block_lists"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Datos inválidos"})
+	}
+	return RunActionWithUser(c, "adblock", "Blocky configurado por usuario %s", "Error configurando Blocky: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return configureBlocky(req.Upstreams, req.BlockLists, user.Username)
+	})
+}
+
+func blockyEnableHandler(c *fiber.Ctx) error {
+	return RunActionWithUser(c, "adblock", "Blocky habilitado por usuario %s", "Error habilitando Blocky: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return enableBlocky(user.Username)
+	})
+}
+
+func blockyDisableHandler(c *fiber.Ctx) error {
+	return RunActionWithUser(c, "adblock", "Blocky deshabilitado por usuario %s", "Error deshabilitando Blocky: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return disableBlocky(user.Username)
+	})
+}
+
+func blockyAPIProxyHandler(c *fiber.Ctx) error {
+	path := c.Params("*")
+	if path == "" {
+		path = c.Path()
+	}
+	// path puede ser "blocking/status", "lists/refresh", etc.
+	method := c.Method()
+	var body []byte
+	if method == "POST" && c.Body() != nil {
+		body = c.Body()
+	}
+	code, data := blockyAPIProxy(method, path, body)
+	if code == 0 {
+		return c.Status(502).JSON(fiber.Map{"error": "Blocky no responde. ¿Está el servicio activo?"})
+	}
+	c.Set("Content-Type", "application/json")
+	return c.Status(code).Send(data)
+}
+
 // Handlers para Tor
 func torStatusHandler(c *fiber.Ctx) error {
 	result := getTorStatus()
@@ -1158,11 +1214,20 @@ func torPageHandler(c *fiber.Ctx) error {
 }
 
 func adblockPageHandler(c *fiber.Ctx) error {
+	status := getAdBlockStatus()
+	blockyStatus := getBlockyStatus()
+	// Si Blocky está activo, obtener estado de bloqueo desde su API para la web
+	var blockyBlockingStatus map[string]interface{}
+	if blockyStatus["active"] == true {
+		blockyBlockingStatus = blockyAPIBlockingStatus()
+	}
 	return renderTemplate(c, "adblock", fiber.Map{
-		"Title":          T(c, "adblock.overview", "AdBlock Overview"),
-		"adblock_stats":  fiber.Map{},
-		"adblock_status": fiber.Map{},
-		"adblock_config": fiber.Map{},
+		"Title":                 T(c, "adblock.overview", "AdBlock Overview"),
+		"adblock_stats":         fiber.Map{},
+		"adblock_status":        status,
+		"adblock_config":        fiber.Map{},
+		"blocky_status":         blockyStatus,
+		"blocky_blocking_status": blockyBlockingStatus,
 	})
 }
 

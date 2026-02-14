@@ -184,6 +184,18 @@
 
   async function updateLists() {
     try {
+      const statusResp = await api('/api/v1/adblock/status', { method: 'GET' });
+      const status = await readJson(statusResp);
+      if (status?.type === 'blocky') {
+        const refreshResp = await api('/api/v1/adblock/blocky/api/lists/refresh', { method: 'POST' });
+        if (refreshResp && refreshResp.ok) {
+          notify('success', t('blocky.lists_refreshed', 'Blocky lists refreshed'));
+          loadBlockyStatus();
+        } else {
+          notify('danger', t('blocky.refresh_failed', 'Blocky did not respond. Is the service running?'));
+        }
+        return;
+      }
       const resp = await api('/api/v1/adblock/update', { method: 'POST' });
       const payload = await readJson(resp);
       if (resp && resp.ok && payload?.success !== false) {
@@ -330,6 +342,125 @@
     }
   }
 
+  // --- Blocky ---
+  async function loadBlockyStatus() {
+    try {
+      const resp = await api('/api/v1/adblock/blocky/status', { method: 'GET' });
+      if (!resp || !resp.ok) return;
+      const status = await readJson(resp);
+
+      const indicator = document.getElementById('blocky-status-indicator');
+      const statusText = document.getElementById('blocky-status-text');
+      const installBtn = document.getElementById('blocky-install-btn');
+      const configureBtn = document.getElementById('blocky-configure-btn');
+      const enableBtn = document.getElementById('blocky-enable-btn');
+      const disableBtn = document.getElementById('blocky-disable-btn');
+      const refreshBtn = document.getElementById('blocky-refresh-lists-btn');
+
+      if (!indicator || !statusText) return;
+
+      if (status?.installed) {
+        if (installBtn) installBtn.style.display = 'none';
+        if (configureBtn) configureBtn.style.display = 'inline-block';
+
+        if (status?.active) {
+          indicator.className = 'status-indicator status-online';
+          statusText.textContent = t('blocky.active', 'Active');
+          if (enableBtn) enableBtn.style.display = 'none';
+          if (disableBtn) disableBtn.style.display = 'inline-block';
+          if (refreshBtn) refreshBtn.style.display = 'inline-block';
+        } else {
+          indicator.className = 'status-indicator status-offline';
+          statusText.textContent = t('blocky.inactive', 'Inactive');
+          if (enableBtn) enableBtn.style.display = 'inline-block';
+          if (disableBtn) disableBtn.style.display = 'none';
+          if (refreshBtn) refreshBtn.style.display = 'none';
+        }
+      } else {
+        indicator.className = 'status-indicator status-offline';
+        statusText.textContent = t('blocky.not_installed', 'Not installed');
+        if (installBtn) installBtn.style.display = 'inline-block';
+        if (configureBtn) configureBtn.style.display = 'none';
+        if (enableBtn) enableBtn.style.display = 'none';
+        if (disableBtn) disableBtn.style.display = 'none';
+        if (refreshBtn) refreshBtn.style.display = 'none';
+      }
+    } catch (error) {
+      console.error('Error loading Blocky status:', error);
+    }
+  }
+
+  async function installBlocky() {
+    if (!confirm(t('blocky.install_confirm', 'Install Blocky? This will download the binary and create the systemd service.'))) return;
+    try {
+      const resp = await api('/api/v1/adblock/blocky/install', { method: 'POST' });
+      const result = await readJson(resp);
+      if (resp && resp.ok && result?.success !== false) {
+        notify('success', result?.message || t('blocky.installed', 'Blocky installed'));
+        loadBlockyStatus();
+      } else {
+        notify('danger', result?.error || t('errors.operation_failed', 'Operation failed'));
+      }
+    } catch (error) {
+      console.error('Error installing Blocky:', error);
+      notify('danger', t('errors.network_error', 'Network error. Please try again.'));
+    }
+  }
+
+  function showBlockyConfig() {
+    const form = document.getElementById('blocky-config-form');
+    if (!form) return;
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  }
+
+  async function enableBlocky() {
+    try {
+      const resp = await api('/api/v1/adblock/blocky/enable', { method: 'POST' });
+      const result = await readJson(resp);
+      if (resp && resp.ok && result?.success !== false) {
+        notify('success', result?.message || t('blocky.enabled', 'Enabled'));
+        loadBlockyStatus();
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        notify('danger', result?.error || t('errors.operation_failed', 'Operation failed'));
+      }
+    } catch (error) {
+      console.error('Error enabling Blocky:', error);
+      notify('danger', t('errors.network_error', 'Network error. Please try again.'));
+    }
+  }
+
+  async function disableBlocky() {
+    if (!confirm(t('blocky.disable_confirm', 'Disable Blocky? DNS will fall back to system default.'))) return;
+    try {
+      const resp = await api('/api/v1/adblock/blocky/disable', { method: 'POST' });
+      const result = await readJson(resp);
+      if (resp && resp.ok && result?.success !== false) {
+        notify('success', result?.message || t('blocky.disabled', 'Disabled'));
+        loadBlockyStatus();
+        setTimeout(() => window.location.reload(), 800);
+      } else {
+        notify('danger', result?.error || t('errors.operation_failed', 'Operation failed'));
+      }
+    } catch (error) {
+      console.error('Error disabling Blocky:', error);
+      notify('danger', t('errors.network_error', 'Network error. Please try again.'));
+    }
+  }
+
+  async function blockyRefreshLists() {
+    try {
+      const resp = await api('/api/v1/adblock/blocky/api/lists/refresh', { method: 'POST' });
+      if (resp && resp.ok) {
+        notify('success', t('blocky.lists_refreshed', 'Blocky lists refreshed'));
+      } else {
+        notify('danger', t('blocky.refresh_failed', 'Blocky did not respond. Is the service running?'));
+      }
+    } catch (error) {
+      notify('danger', t('errors.network_error', 'Network error. Please try again.'));
+    }
+  }
+
   // --- Forms ---
   function bindForms() {
     document.getElementById('adblockConfigForm')?.addEventListener('submit', async function (e) {
@@ -385,6 +516,32 @@
         notify('danger', t('errors.network_error', 'Network error. Please try again.'));
       }
     });
+
+    document.getElementById('blockyConfigForm')?.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const upstreamsText = document.getElementById('blocky-upstreams')?.value || '';
+      const blockListsText = document.getElementById('blocky-block-lists')?.value || '';
+      const upstreams = upstreamsText.split(/\n/).map(s => s.trim()).filter(Boolean);
+      const block_lists = blockListsText.split(/\n/).map(s => s.trim()).filter(Boolean);
+
+      try {
+        const resp = await api('/api/v1/adblock/blocky/configure', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ upstreams, block_lists }),
+        });
+        const result = await readJson(resp);
+        if (resp && resp.ok && result?.success !== false) {
+          notify('success', result?.message || t('blocky.configured', 'Blocky configured'));
+          document.getElementById('blocky-config-form').style.display = 'none';
+        } else {
+          notify('danger', result?.error || t('errors.operation_failed', 'Operation failed'));
+        }
+      } catch (error) {
+        console.error('Error configuring Blocky:', error);
+        notify('danger', t('errors.network_error', 'Network error. Please try again.'));
+      }
+    });
   }
 
   // Exponer funciones usadas por onclick en templates
@@ -401,17 +558,25 @@
   window.enableDNSCrypt = enableDNSCrypt;
   window.disableDNSCrypt = disableDNSCrypt;
 
+  window.loadBlockyStatus = loadBlockyStatus;
+  window.installBlocky = installBlocky;
+  window.showBlockyConfig = showBlockyConfig;
+  window.enableBlocky = enableBlocky;
+  window.disableBlocky = disableBlocky;
+  window.blockyRefreshLists = blockyRefreshLists;
+
   document.addEventListener('DOMContentLoaded', () => {
     loadLists();
     loadDomains();
     loadDNSCryptStatus();
+    loadBlockyStatus();
     bindForms();
 
-    // Auto-refresh (suave)
     setInterval(() => {
       loadLists();
       loadDomains();
       loadDNSCryptStatus();
+      loadBlockyStatus();
     }, 30000);
   });
 })();

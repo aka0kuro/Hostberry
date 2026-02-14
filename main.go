@@ -435,6 +435,15 @@ func setupRoutes(app *fiber.App) {
 				dnscrypt.Post("/enable", dnscryptEnableHandler)
 				dnscrypt.Post("/disable", dnscryptDisableHandler)
 			}
+
+			// Blocky (proxy DNS y ad-blocker, configuración desde la web)
+			adblock.Get("/blocky/status", blockyStatusHandler)
+			adblock.Post("/blocky/install", blockyInstallHandler)
+			adblock.Post("/blocky/configure", blockyConfigureHandler)
+			adblock.Post("/blocky/enable", blockyEnableHandler)
+			adblock.Post("/blocky/disable", blockyDisableHandler)
+			adblock.Get("/blocky/api/*", blockyAPIProxyHandler)
+			adblock.Post("/blocky/api/*", blockyAPIProxyHandler)
 		}
 
 		tor := api.Group("/tor", requireAuth)
