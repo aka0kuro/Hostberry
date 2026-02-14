@@ -50,7 +50,7 @@
     <script defer src="/static/js/theme.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>
 </head>
 <body class="dark-theme hb-page hb-page-{{ .page }}{{ if or (eq .page "login") (eq .page "first_login") }} hb-page-auth{{ end }}" data-page="{{ .page }}">
-    {{ if and (ne .page "login") (ne .page "first_login") (ne .page "setup_wizard") }}
+    {{ if and (ne .page "login") (ne .page "first_login") (ne .page "setup_wizard") (ne .page "setup_wizard_vpn") (ne .page "setup_wizard_wireguard") (ne .page "setup_wizard_tor") }}
     <!-- Sidebar vertical izquierdo -->
     <aside class="sidebar-nav">
         <div class="sidebar-header">
@@ -182,7 +182,7 @@
 
     {{ if or (eq .page "login") (eq .page "first_login") }}
         {{embed}}
-    {{ else if eq .page "setup_wizard" }}
+    {{ else if or (eq .page "setup_wizard") (eq .page "setup_wizard_vpn") (eq .page "setup_wizard_wireguard") (eq .page "setup_wizard_tor") }}
         <div class="main-content setup-wizard-main">
             {{embed}}
         </div>

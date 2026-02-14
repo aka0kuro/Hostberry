@@ -263,20 +263,23 @@ install_dependencies() {
         fi
     fi
     
-    # Instalar WireGuard, Tor y OpenVPN (VPN/Seguridad)
-    print_info "Instalando WireGuard, Tor y OpenVPN..."
-    local vpn_packages=("wireguard-tools" "tor" "openvpn")
-    for pkg in "${vpn_packages[@]}"; do
+    # Instalar Tor, OpenVPN y WireGuard (VPN/Seguridad)
+    print_info "Instalando Tor, OpenVPN y WireGuard..."
+    apt-get update -qq 2>/dev/null || true
+    for pkg in tor openvpn wireguard-tools; do
         if dpkg -l 2>/dev/null | grep -q "^ii.*${pkg} "; then
             print_success "${pkg}: ya instalado"
         elif apt-get install -y "${pkg}" > /dev/null 2>&1; then
             print_success "${pkg}: instalado"
         else
-            # wireguard-tools puede llamarse solo wireguard en algunas distros
-            if [ "$pkg" = "wireguard-tools" ] && apt-get install -y wireguard > /dev/null 2>&1; then
-                print_success "wireguard: instalado (incluye herramientas)"
+            if [ "$pkg" = "wireguard-tools" ]; then
+                if apt-get install -y wireguard > /dev/null 2>&1; then
+                    print_success "wireguard: instalado (incluye herramientas)"
+                else
+                    print_warning "No se pudo instalar WireGuard. Manual: sudo apt-get install wireguard-tools"
+                fi
             else
-                print_warning "No se pudo instalar ${pkg}. Instálalo manualmente si necesitas VPN/Tor: sudo apt-get install ${pkg}"
+                print_warning "No se pudo instalar ${pkg}. Manual: sudo apt-get install ${pkg}"
             fi
         fi
     done
