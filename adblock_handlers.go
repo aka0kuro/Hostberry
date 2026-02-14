@@ -853,36 +853,55 @@ log:
   format: text
 `
 
-	// Escribir en archivo temporal y copiar con sudo cp (evita problemas con tee/sudo/entorno)
-	executeCommand("sudo mkdir -p " + blockyConfigDir)
-	tmpFile, err := os.CreateTemp("", "blocky_config_*.yml")
-	if err != nil {
-		result["success"] = false
-		result["error"] = fmt.Sprintf("Error creando archivo temporal: %v", err)
-		return result
-	}
-	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
-	if _, err := tmpFile.WriteString(configContent); err != nil {
-		tmpFile.Close()
-		result["success"] = false
-		result["error"] = fmt.Sprintf("Error escribiendo configuración: %v", err)
-		return result
-	}
-	if err := tmpFile.Close(); err != nil {
-		result["success"] = false
-		result["error"] = fmt.Sprintf("Error cerrando archivo: %v", err)
-		return result
-	}
-	cpCmd := fmt.Sprintf("sudo cp %q %q", tmpPath, blockyConfigPath)
-	if out, err := executeCommand(cpCmd); err != nil {
-		result["success"] = false
-		result["error"] = fmt.Sprintf("Error escribiendo configuración: %v", err)
-		if out != "" {
-			result["error"] = fmt.Sprintf("Error escribiendo configuración: %s", strings.TrimSpace(out))
+	// Escribir configuración: si somos root, escribir directamente; si no, temporal + sudo cp
+	if os.Geteuid() == 0 {
+		if err := os.MkdirAll(blockyConfigDir, 0755); err != nil {
+			result["success"] = false
+			result["error"] = fmt.Sprintf("Error creando directorio: %v", err)
+			return result
 		}
-		LogTf("logs.blocky_config_error", err)
-		return result
+		if err := os.WriteFile(blockyConfigPath, []byte(configContent), 0644); err != nil {
+			result["success"] = false
+			result["error"] = fmt.Sprintf("Error escribiendo configuración: %v", err)
+			LogTf("logs.blocky_config_error", err)
+			return result
+		}
+	} else {
+		if _, err := executeCommand("sudo mkdir -p " + blockyConfigDir); err != nil {
+			result["success"] = false
+			result["error"] = fmt.Sprintf("Error creando directorio: %v", err)
+			return result
+		}
+		tmpFile, err := os.CreateTemp("", "blocky_config_*.yml")
+		if err != nil {
+			result["success"] = false
+			result["error"] = fmt.Sprintf("Error creando archivo temporal: %v", err)
+			return result
+		}
+		tmpPath := tmpFile.Name()
+		defer os.Remove(tmpPath)
+		if _, err := tmpFile.WriteString(configContent); err != nil {
+			tmpFile.Close()
+			result["success"] = false
+			result["error"] = fmt.Sprintf("Error escribiendo configuración: %v", err)
+			return result
+		}
+		if err := tmpFile.Close(); err != nil {
+			result["success"] = false
+			result["error"] = fmt.Sprintf("Error cerrando archivo: %v", err)
+			return result
+		}
+		cpCmd := "sudo cp " + tmpPath + " " + blockyConfigPath
+		out, cpErr := executeCommand(cpCmd)
+		if cpErr != nil {
+			result["success"] = false
+			result["error"] = "Error escribiendo configuración: " + strings.TrimSpace(out)
+			if out == "" {
+				result["error"] = fmt.Sprintf("Error escribiendo configuración: %v", cpErr)
+			}
+			LogTf("logs.blocky_config_error", cpErr)
+			return result
+		}
 	}
 
 	result["success"] = true
