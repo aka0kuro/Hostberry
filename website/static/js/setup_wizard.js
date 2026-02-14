@@ -28,6 +28,7 @@
       document.getElementById('wizard-config-vpn').classList.remove('d-none');
       titleText = t('setup_wizard.security_vpn', 'VPN');
       desc = t('setup_wizard.step_security_desc', 'Configura la VPN.');
+      loadWizardOpenVPNConfig();
     } else if (option === 'wireguard') {
       document.getElementById('wizard-config-wireguard').classList.remove('d-none');
       titleText = t('setup_wizard.security_wireguard', 'WireGuard');
@@ -42,6 +43,37 @@
     var descEl = document.getElementById('step4-desc');
     if (titleEl) titleEl.textContent = titleText;
     if (descEl) descEl.textContent = desc;
+  }
+
+  function loadWizardOpenVPNConfig() {
+    apiRequest('/api/v1/vpn/config', { method: 'GET' }).then(function(r) { return r.ok ? r.json() : {}; }).then(function(data) {
+      var ta = document.getElementById('wizard-openvpn-config');
+      if (ta && data && typeof data.config === 'string') ta.value = data.config;
+    }).catch(function() {});
+  }
+
+  async function saveWizardOpenVPN() {
+    var ta = document.getElementById('wizard-openvpn-config');
+    var config = (ta && ta.value) ? ta.value.trim() : '';
+    if (!config) { showAlert('warning', t('vpn.config_required', 'Pega o sube una configuración primero')); return; }
+    try {
+      var r = await apiRequest('/api/v1/vpn/config', { method: 'POST', body: { config: config } });
+      var d = await r.json().catch(function() { return {}; });
+      if (r.ok && !d.error) showAlert('success', d.message || t('common.saved', 'Guardado'));
+      else showAlert('danger', d.error || 'Error');
+    } catch (e) { showAlert('danger', e.message || 'Error'); }
+  }
+
+  async function connectWizardOpenVPN() {
+    var ta = document.getElementById('wizard-openvpn-config');
+    var config = (ta && ta.value) ? ta.value.trim() : '';
+    if (!config) { showAlert('warning', t('vpn.config_required', 'Pega o sube una configuración primero')); return; }
+    try {
+      var r = await apiRequest('/api/v1/vpn/connect', { method: 'POST', body: { config: config, type: 'openvpn' } });
+      var d = await r.json().catch(function() { return {}; });
+      if (r.ok && !d.error) { showAlert('success', d.message || t('vpn.connect_vpn', 'Conectar')); }
+      else showAlert('danger', d.error || 'Error');
+    } catch (e) { showAlert('danger', e.message || 'Error'); }
   }
 
   function signalBars(signal) {
@@ -210,19 +242,53 @@
       var text = document.getElementById('wizard-tor-status-text');
       var installBtn = document.getElementById('wizard-tor-install');
       var enableBtn = document.getElementById('wizard-tor-enable');
+      var iptDot = document.getElementById('wizard-tor-iptables-dot');
+      var iptLabel = document.getElementById('wizard-tor-iptables-label');
+      var iptEnable = document.getElementById('wizard-tor-iptables-enable');
+      var iptDisable = document.getElementById('wizard-tor-iptables-disable');
       if (!text) return;
       if (s.installed) {
         if (dot) { dot.className = 'status-indicator ' + (s.active ? 'status-online' : 'status-offline'); }
         text.textContent = s.active ? t('tor.active', 'Activo') : t('tor.inactive', 'Inactivo');
         if (installBtn) installBtn.classList.add('d-none');
         if (enableBtn) { enableBtn.classList.remove('d-none'); enableBtn.textContent = s.active ? t('tor.disable', 'Deshabilitar') : t('tor.enable', 'Habilitar'); }
+        if (s.active && iptDot && iptLabel && iptEnable && iptDisable) {
+          var iptActive = !!s.iptables_active;
+          iptDot.className = 'status-indicator ' + (iptActive ? 'status-online' : 'status-offline');
+          iptLabel.textContent = iptActive ? t('tor.torify_active', 'Activo') : t('tor.torify_inactive', 'Inactivo');
+          iptEnable.classList.remove('d-none');
+          iptDisable.classList.remove('d-none');
+          if (iptActive) { iptEnable.style.display = 'none'; iptDisable.style.display = 'inline-block'; }
+          else { iptEnable.style.display = 'inline-block'; iptDisable.style.display = 'none'; }
+        }
       } else {
         if (dot) dot.className = 'status-indicator status-offline';
         text.textContent = t('tor.not_installed', 'No instalado');
         if (installBtn) installBtn.classList.remove('d-none');
         if (enableBtn) enableBtn.classList.add('d-none');
+        if (iptLabel) iptLabel.textContent = t('tor.torify_inactive', 'Inactivo');
+        if (iptDot) iptDot.className = 'status-indicator status-offline';
+        if (iptEnable) iptEnable.classList.add('d-none');
+        if (iptDisable) iptDisable.classList.add('d-none');
       }
     }).catch(function() {});
+  }
+
+  async function wizardTorIptablesEnable() {
+    try {
+      var r = await apiRequest('/api/v1/tor/iptables-enable', { method: 'POST' });
+      var d = await r.json().catch(function() { return {}; });
+      if (r.ok && !d.error) { showAlert('success', d.message || t('tor.torify_enabled', 'Red torificada')); loadTorStatusWizard(); }
+      else showAlert('danger', d.error || 'Error');
+    } catch (e) { showAlert('danger', e.message || 'Error'); }
+  }
+
+  async function wizardTorIptablesDisable() {
+    try {
+      var r = await apiRequest('/api/v1/tor/iptables-disable', { method: 'POST' });
+      var d = await r.json().catch(function() { return {}; });
+      if (r.ok && !d.error) { showAlert('success', d.message || t('tor.torify_disabled', 'Redirección desactivada')); loadTorStatusWizard(); }
+    } catch (e) { showAlert('danger', e.message || 'Error'); }
   }
 
   async function wizardTorInstall() {
@@ -284,6 +350,36 @@
     document.getElementById('wizard-wg-save').addEventListener('click', wizardWgSave);
     document.getElementById('wizard-tor-install').addEventListener('click', wizardTorInstall);
     document.getElementById('wizard-tor-enable').addEventListener('click', wizardTorEnable);
+    var wizTorIptEn = document.getElementById('wizard-tor-iptables-enable');
+    var wizTorIptDis = document.getElementById('wizard-tor-iptables-disable');
+    if (wizTorIptEn) wizTorIptEn.addEventListener('click', wizardTorIptablesEnable);
+    if (wizTorIptDis) wizTorIptDis.addEventListener('click', wizardTorIptablesDisable);
+
+    var wizOpenvpnFile = document.getElementById('wizard-openvpn-file');
+    if (wizOpenvpnFile) {
+      wizOpenvpnFile.addEventListener('change', function() {
+        var file = this.files && this.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function() { var ta = document.getElementById('wizard-openvpn-config'); if (ta) ta.value = reader.result || ''; };
+        reader.readAsText(file);
+      });
+    }
+    var wizOpenvpnSave = document.getElementById('wizard-openvpn-save');
+    var wizOpenvpnConnect = document.getElementById('wizard-openvpn-connect');
+    if (wizOpenvpnSave) wizOpenvpnSave.addEventListener('click', saveWizardOpenVPN);
+    if (wizOpenvpnConnect) wizOpenvpnConnect.addEventListener('click', connectWizardOpenVPN);
+
+    var wizWgFile = document.getElementById('wizard-wg-file');
+    if (wizWgFile) {
+      wizWgFile.addEventListener('change', function() {
+        var file = this.files && this.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function() { var ta = document.getElementById('wizard-wg-config'); if (ta) ta.value = reader.result || ''; };
+        reader.readAsText(file);
+      });
+    }
 
     setupPasswordToggle('wizard-wifi-password', 'wizard-wifi-toggle-pwd');
     setupPasswordToggle('wizard-ap-password', 'wizard-ap-toggle-pwd');
