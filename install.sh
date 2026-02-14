@@ -1816,7 +1816,8 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
-    print_success "Blocky instalado (servicio no iniciado; configúralo desde la web Adblock)"
+    systemctl enable blocky
+    print_success "Blocky instalado (arrancará con el sistema; configúralo desde la web Adblock)"
 }
 
 # Crear servicio systemd

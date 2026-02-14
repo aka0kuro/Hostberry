@@ -779,6 +779,8 @@ WantedBy=multi-user.target
 		return result
 	}
 	executeCommand("sudo systemctl daemon-reload")
+	// Que Blocky arranque con el sistema
+	executeCommand("sudo systemctl enable blocky")
 
 	executeCommand("sudo rm -rf " + tmpDir)
 
