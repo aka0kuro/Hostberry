@@ -479,7 +479,7 @@ func disableDNSCrypt(user string) map[string]interface{} {
 const blockyConfigDir = "/etc/blocky"
 const blockyConfigPath = "/etc/blocky/config.yml"
 const blockyHTTPPort = "4000"
-const blockyVersion = "v0.28"
+const blockyVersion = "v0.28.2"
 
 func blockyBinaryExists() bool {
 	// Servicio blocky o binario en path
