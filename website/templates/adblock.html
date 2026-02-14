@@ -1,17 +1,85 @@
 {{/* Página Adblock: solo Blocky y su configuración */}}
-<div class="row justify-content-center">
-    <div class="col-12 col-lg-10 col-xl-8">
-        <!-- Cabecera Blocky -->
-        <div class="card mb-4">
-            <div class="card-body text-center py-4">
-                <div class="mb-2">
-                    <i class="bi bi-database-fill-gear text-primary" style="font-size: 2.5rem;"></i>
+<div class="adblock-page dashboard-page">
+    <!-- Cabecera -->
+    <div class="dashboard-header">
+        <div class="header-content">
+            <h1 class="dashboard-title">
+                <i class="bi bi-database-fill-gear me-2"></i>
+                {{ call .t "blocky.title" "Blocky" }}
+            </h1>
+            <p class="dashboard-subtitle">{{ call .t "blocky.description" "DNS proxy and ad-blocker. Configure upstreams and block lists below." }}</p>
+        </div>
+    </div>
+
+    <!-- Estadísticas de Blocky (tarjetas individuales arriba) -->
+    <div class="row quick-stats-row mb-4 g-3 g-md-4" id="blocky-stats-row">
+        <div class="col-12 col-sm-6 col-lg-3 mb-3 mb-md-4">
+            <div class="stat-card blocky-stat-service">
+                <div class="stat-icon"><i class="bi bi-heart-pulse"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">{{ call .t "blocky.stat_service" "Service" }}</div>
+                    <div class="stat-value" id="blocky-stat-service">—</div>
                 </div>
-                <h4 class="card-title mb-2">{{ call .t "blocky.title" "Blocky" }}</h4>
-                <p class="text-muted mb-0 small">{{ call .t "blocky.description" "DNS proxy and ad-blocker. Configure upstreams and block lists below." }}</p>
             </div>
         </div>
+        <div class="col-12 col-sm-6 col-lg-3 mb-3 mb-md-4">
+            <div class="stat-card blocky-stat-blocking">
+                <div class="stat-icon"><i class="bi bi-shield-lock"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">{{ call .t "blocky.blocking_status" "Blocking" }}</div>
+                    <div class="stat-value" id="blocky-stat-blocking">—</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-3 mb-3 mb-md-4">
+            <div class="stat-card blocky-stat-blocked">
+                <div class="stat-icon"><i class="bi bi-x-octagon"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">{{ call .t "blocky.stat_blocked_queries" "Blocked queries" }}</div>
+                    <div class="stat-value" id="blocky-stat-blocked">—</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-3 mb-3 mb-md-4">
+            <div class="stat-card blocky-stat-total">
+                <div class="stat-icon"><i class="bi bi-graph-up"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">{{ call .t "blocky.stat_total_queries" "Total queries" }}</div>
+                    <div class="stat-value" id="blocky-stat-total">—</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-3 mb-3 mb-md-4">
+            <div class="stat-card blocky-stat-cached">
+                <div class="stat-icon"><i class="bi bi-lightning"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">{{ call .t "blocky.stat_cached" "Cached" }}</div>
+                    <div class="stat-value" id="blocky-stat-cached">—</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-3 mb-3 mb-md-4">
+            <div class="stat-card blocky-stat-api">
+                <div class="stat-icon"><i class="bi bi-plug"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">{{ call .t "blocky.stat_api" "API" }}</div>
+                    <div class="stat-value small" id="blocky-stat-api">—</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-3 mb-3 mb-md-4">
+            <div class="stat-card blocky-stat-groups">
+                <div class="stat-icon"><i class="bi bi-collection"></i></div>
+                <div class="stat-content">
+                    <div class="stat-label">{{ call .t "blocky.stat_disabled_groups" "Disabled groups" }}</div>
+                    <div class="stat-value small text-truncate" id="blocky-stat-groups" title="">—</div>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10 col-xl-8">
         <!-- Estado y acciones -->
         <div class="card mb-4">
             <div class="card-header d-flex align-items-center">
@@ -89,60 +157,6 @@ https://dns.cloudflare.com/dns-query</textarea>
             </div>
         </div>
 
-        <!-- Estadísticas de Blocky -->
-        <div class="card mb-4" id="blocky-stats-card">
-            <div class="card-header d-flex align-items-center">
-                <i class="bi bi-graph-up me-2"></i>
-                <span>{{ call .t "blocky.statistics" "Statistics" }}</span>
-            </div>
-            <div class="card-body">
-                <div class="row g-3" id="blocky-stats-body">
-                    <div class="col-6 col-md-3">
-                        <div class="p-3 rounded border text-center">
-                            <div class="small text-muted mb-1">{{ call .t "blocky.stat_service" "Service" }}</div>
-                            <div class="fw-semibold" id="blocky-stat-service">—</div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="p-3 rounded border text-center">
-                            <div class="small text-muted mb-1">{{ call .t "blocky.blocking_status" "Blocking" }}</div>
-                            <div class="fw-semibold" id="blocky-stat-blocking">—</div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="p-3 rounded border text-center">
-                            <div class="small text-muted mb-1">{{ call .t "blocky.stat_blocked_queries" "Blocked queries" }}</div>
-                            <div class="fw-semibold" id="blocky-stat-blocked">—</div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="p-3 rounded border text-center">
-                            <div class="small text-muted mb-1">{{ call .t "blocky.stat_total_queries" "Total queries" }}</div>
-                            <div class="fw-semibold" id="blocky-stat-total">—</div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="p-3 rounded border text-center">
-                            <div class="small text-muted mb-1">{{ call .t "blocky.stat_cached" "Cached" }}</div>
-                            <div class="fw-semibold" id="blocky-stat-cached">—</div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="p-3 rounded border text-center">
-                            <div class="small text-muted mb-1">{{ call .t "blocky.stat_api" "API" }}</div>
-                            <div class="fw-semibold" id="blocky-stat-api">—</div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="p-3 rounded border text-center">
-                            <div class="small text-muted mb-1">{{ call .t "blocky.stat_disabled_groups" "Disabled groups" }}</div>
-                            <div class="fw-semibold small" id="blocky-stat-groups">—</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Ayuda breve -->
         <div class="card mb-4">
             <div class="card-body py-3">
@@ -151,6 +165,7 @@ https://dns.cloudflare.com/dns-query</textarea>
                     {{ call .t "blocky.help" "After saving configuration, enable Blocky. Use «Refresh lists» to reload block lists without restarting. DNS listens on port 53; the API on localhost:4000." }}
                 </p>
             </div>
+        </div>
         </div>
     </div>
 </div>

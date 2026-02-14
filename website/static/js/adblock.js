@@ -82,8 +82,10 @@
         const groups = status?.disabled_groups;
         if (Array.isArray(groups) && groups.length > 0) {
           statGroups.textContent = groups.join(', ');
+          statGroups.setAttribute('title', groups.join(', '));
         } else {
           statGroups.textContent = status?.active ? (t('blocky.stat_none', 'None') || 'None') : '—';
+          statGroups.removeAttribute('title');
         }
       }
 
