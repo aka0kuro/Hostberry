@@ -910,6 +910,45 @@
     }
   }
 
+  // LibreSpeed speed test
+  async function runSpeedtest() {
+    const runBtn = document.getElementById('speedtest-run-btn');
+    const resultDiv = document.getElementById('speedtest-result');
+    const progressDiv = document.getElementById('speedtest-progress');
+    const errorDiv = document.getElementById('speedtest-error');
+    if (!runBtn || !resultDiv || !progressDiv || !errorDiv) return;
+    runBtn.disabled = true;
+    resultDiv.classList.add('d-none');
+    errorDiv.classList.add('d-none');
+    errorDiv.textContent = '';
+    progressDiv.classList.remove('d-none');
+    try {
+      const resp = await HostBerry.apiRequest('/api/v1/network/speedtest', { method: 'POST' });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success === true) {
+        const fmt = (n) => (n == null || n === '' ? '—' : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }));
+        document.getElementById('speedtest-ping').textContent = data.ping_ms != null ? fmt(data.ping_ms) + ' ms' : '—';
+        document.getElementById('speedtest-jitter').textContent = data.jitter_ms != null ? fmt(data.jitter_ms) + ' ms' : '—';
+        document.getElementById('speedtest-download').textContent = data.download_mbps != null ? fmt(data.download_mbps) + ' Mbps' : '—';
+        document.getElementById('speedtest-upload').textContent = data.upload_mbps != null ? fmt(data.upload_mbps) + ' Mbps' : '—';
+        const serverEl = document.getElementById('speedtest-server');
+        const clientEl = document.getElementById('speedtest-client');
+        if (serverEl) serverEl.textContent = data.server_name ? (t('network.speedtest_server', 'Server') + ': ' + data.server_name) : '';
+        if (clientEl) clientEl.textContent = data.client_ip || data.client_org ? (data.client_ip || '') + (data.client_org ? ' — ' + data.client_org : '') : '';
+        resultDiv.classList.remove('d-none');
+      } else {
+        errorDiv.textContent = data.error || t('network.speedtest_error', 'Speed test failed');
+        errorDiv.classList.remove('d-none');
+      }
+    } catch (e) {
+      errorDiv.textContent = t('network.speedtest_error', 'Speed test failed') + ': ' + (e.message || String(e));
+      errorDiv.classList.remove('d-none');
+    } finally {
+      progressDiv.classList.add('d-none');
+      runBtn.disabled = false;
+    }
+  }
+
   // Initialize Network Page
   function initNetworkPage() {
     loadInterfaces();
@@ -1006,6 +1045,7 @@
   // Export functions
   window.loadInterfaces = loadInterfaces;
   window.loadRoutingTable = loadRoutingTable;
+  window.runSpeedtest = runSpeedtest;
 
   // Initialize
   if (document.readyState === 'loading') {

@@ -621,7 +621,17 @@
     "select_interface": "Select Interface",
     "dhcp_interface_help": "Network interface for DHCP server",
     "save_dhcp_config": "Save DHCP Configuration",
-    "traffic": "Network Traffic Statistics"
+    "traffic": "Network Traffic Statistics",
+    "speedtest_title": "LibreSpeed - Speed Test",
+    "speedtest_run": "Run test",
+    "speedtest_desc": "Test your Internet speed with LibreSpeed. Requires librespeed-cli installed (see GitHub).",
+    "speedtest_ping": "Ping",
+    "speedtest_jitter": "Jitter",
+    "speedtest_download": "Download",
+    "speedtest_upload": "Upload",
+    "speedtest_running": "Running speed test (up to 2 min)...",
+    "speedtest_error": "Speed test failed",
+    "speedtest_server": "Server"
   },
   "wifi": {
     "title": "WiFi",

@@ -1820,6 +1820,24 @@ EOF
     print_success "Blocky instalado (arrancará con el sistema; configúralo desde la web Adblock)"
 }
 
+# Instalar LibreSpeed CLI (test de velocidad en la página Red) vía apt
+install_librespeed_cli() {
+    if command -v librespeed-cli &>/dev/null; then
+        print_success "LibreSpeed CLI ya está instalado"
+        return 0
+    fi
+    if ! command -v apt-get &>/dev/null; then
+        print_warning "apt-get no disponible; instala librespeed-cli manualmente para el test de velocidad en Red"
+        return 0
+    fi
+    print_info "Instalando LibreSpeed CLI (test de velocidad)..."
+    if apt-get update -qq 2>/dev/null && apt-get install -y librespeed-cli >/dev/null 2>&1; then
+        print_success "LibreSpeed CLI instalado (test de velocidad en la página Red)"
+    else
+        print_warning "No se pudo instalar librespeed-cli por apt. Instálalo con: sudo apt install librespeed-cli"
+    fi
+}
+
 # Crear servicio systemd
 create_systemd_service() {
     print_info "Creando servicio systemd..."
@@ -1974,6 +1992,7 @@ main() {
     configure_firewall
     create_systemd_service
     install_blocky
+    install_librespeed_cli
     start_service
     cleanup_temp
     show_final_info

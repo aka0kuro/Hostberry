@@ -351,6 +351,7 @@ func setupRoutes(app *fiber.App) {
 			network.Get("/interfaces", networkInterfacesHandler)
 			network.Get("/routing", networkRoutingHandler)
 			network.Post("/firewall/toggle", networkFirewallToggleHandler)
+			network.Post("/speedtest", networkSpeedtestHandler)
 			network.Get("/config", networkConfigHandler)
 			network.Post("/config", networkConfigHandler)
 		}

@@ -627,7 +627,17 @@
     "select_interface": "Seleccionar Interfaz",
     "dhcp_interface_help": "Interfaz de red para el servidor DHCP",
     "save_dhcp_config": "Guardar Configuración DHCP",
-    "traffic": "Estadísticas de Tráfico de Red"
+    "traffic": "Estadísticas de Tráfico de Red",
+    "speedtest_title": "LibreSpeed - Test de velocidad",
+    "speedtest_run": "Ejecutar test",
+    "speedtest_desc": "Prueba la velocidad de tu Internet con LibreSpeed. Requiere librespeed-cli instalado (ver GitHub).",
+    "speedtest_ping": "Ping",
+    "speedtest_jitter": "Jitter",
+    "speedtest_download": "Descarga",
+    "speedtest_upload": "Subida",
+    "speedtest_running": "Ejecutando test de velocidad (hasta 2 min)...",
+    "speedtest_error": "Error en el test de velocidad",
+    "speedtest_server": "Servidor"
   },
   "wifi": {
     "title": "WiFi",

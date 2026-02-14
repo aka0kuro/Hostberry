@@ -151,6 +151,64 @@
         </div>
     </div>
 
+    <!-- LibreSpeed - Speed Test -->
+    <div class="row dashboard-grid mb-4 g-3">
+        <div class="col-12">
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <h5 class="dashboard-card-title">
+                        <i class="bi bi-speedometer2 me-2"></i>
+                        {{ call .t "network.speedtest_title" "LibreSpeed - Speed Test" }}
+                    </h5>
+                    <button type="button" class="btn btn-sm btn-primary" id="speedtest-run-btn" onclick="runSpeedtest()">
+                        <i class="bi bi-play-fill me-1"></i>
+                        {{ call .t "network.speedtest_run" "Run test" }}
+                    </button>
+                </div>
+                <div class="dashboard-card-body">
+                    <p class="text-muted small mb-3">{{ call .t "network.speedtest_desc" "Test your Internet speed with LibreSpeed. Requires librespeed-cli installed (see GitHub)." }}</p>
+                    <div id="speedtest-result" class="d-none">
+                        <div class="row g-3 mb-3">
+                            <div class="col-6 col-md-3">
+                                <div class="p-3 rounded border text-center">
+                                    <div class="small text-muted">{{ call .t "network.speedtest_ping" "Ping" }}</div>
+                                    <div class="fw-bold" id="speedtest-ping">—</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="p-3 rounded border text-center">
+                                    <div class="small text-muted">{{ call .t "network.speedtest_jitter" "Jitter" }}</div>
+                                    <div class="fw-bold" id="speedtest-jitter">—</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="p-3 rounded border text-center">
+                                    <div class="small text-muted">{{ call .t "network.speedtest_download" "Download" }}</div>
+                                    <div class="fw-bold text-success" id="speedtest-download">—</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="p-3 rounded border text-center">
+                                    <div class="small text-muted">{{ call .t "network.speedtest_upload" "Upload" }}</div>
+                                    <div class="fw-bold text-primary" id="speedtest-upload">—</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="small text-muted">
+                            <span id="speedtest-server"></span>
+                            <span class="ms-2" id="speedtest-client"></span>
+                        </div>
+                    </div>
+                    <div id="speedtest-progress" class="text-center py-4 d-none">
+                        <div class="spinning mb-2"><i class="bi bi-speedometer2" style="font-size: 2rem;"></i></div>
+                        <p class="mb-0 text-muted">{{ call .t "network.speedtest_running" "Running speed test (up to 2 min)..." }}</p>
+                    </div>
+                    <div id="speedtest-error" class="alert alert-warning d-none" role="alert"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Network Configuration -->
     <div class="row dashboard-grid mb-4 g-3">
         <!-- Hostname and DNS Configuration -->
