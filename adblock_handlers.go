@@ -130,9 +130,7 @@ func disableAdBlock(user string) map[string]interface{} {
 
 	LogTf("logs.adblock_disabling", user)
 
-	executeCommand("sudo systemctl stop dnsmasq")
-	executeCommand("sudo systemctl stop pihole-FTL")
-	executeCommand("sudo systemctl stop dnscrypt-proxy")
+	executeCommand("sudo systemctl stop dnsmasq 2>/dev/null || true")
 	executeCommand("sudo systemctl stop blocky")
 
 	result["success"] = true
@@ -805,10 +803,8 @@ func enableBlocky(user string) map[string]interface{} {
 		}
 	}
 
-	// Detener otros DNS para evitar conflicto en puerto 53
+	// Liberar puerto 53: detener dnsmasq si está (Blocky es el único DNS que usamos)
 	executeCommand("sudo systemctl stop dnsmasq 2>/dev/null || true")
-	executeCommand("sudo systemctl stop pihole-FTL 2>/dev/null || true")
-	executeCommand("sudo systemctl stop dnscrypt-proxy 2>/dev/null || true")
 
 	startCmd := "sudo systemctl start blocky"
 	if out, err := executeCommand(startCmd); err != nil {
@@ -823,7 +819,7 @@ func enableBlocky(user string) map[string]interface{} {
 
 	executeCommand("sudo systemctl enable blocky")
 
-	// Configurar resolv.conf para usar Blocky local
+	// Configurar resolv.conf para usar Blocky local (temp file + sudo cp para no requerir sudo sh)
 	resolvConf := "/etc/resolv.conf"
 	backupCmd := fmt.Sprintf("sudo cp %s %s.backup 2>/dev/null || true", resolvConf, resolvConf)
 	executeCommand(backupCmd)
@@ -837,9 +833,12 @@ func enableBlocky(user string) map[string]interface{} {
 		}
 	}
 	newLines = append(newLines, "nameserver 127.0.0.1", "nameserver ::1")
-	writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", resolvConf))
-	writeCmd.Stdin = strings.NewReader(strings.Join(newLines, "\n"))
-	writeCmd.Run()
+	newContent := strings.Join(newLines, "\n")
+	tmpResolv := filepath.Join(os.TempDir(), "hostberry_resolv.conf")
+	if err := os.WriteFile(tmpResolv, []byte(newContent), 0644); err == nil {
+		executeCommand(fmt.Sprintf("sudo cp %s %s", tmpResolv, resolvConf))
+		os.Remove(tmpResolv)
+	}
 	executeCommand("sudo systemctl restart systemd-resolved 2>/dev/null || true")
 
 	result["success"] = true
@@ -865,9 +864,11 @@ func disableBlocky(user string) map[string]interface{} {
 	if _, err := os.Stat(backupPath); err == nil {
 		executeCommand(fmt.Sprintf("sudo cp %s %s", backupPath, resolvConf))
 	} else {
-		writeCmd := exec.Command("sudo", "sh", "-c", fmt.Sprintf("cat > %s", resolvConf))
-		writeCmd.Stdin = strings.NewReader("nameserver 8.8.8.8\nnameserver 8.8.4.4\n")
-		writeCmd.Run()
+		tmpResolv := filepath.Join(os.TempDir(), "hostberry_resolv.conf")
+		if err := os.WriteFile(tmpResolv, []byte("nameserver 8.8.8.8\nnameserver 8.8.4.4\n"), 0644); err == nil {
+			executeCommand(fmt.Sprintf("sudo cp %s %s", tmpResolv, resolvConf))
+			os.Remove(tmpResolv)
+		}
 	}
 	executeCommand("sudo systemctl restart systemd-resolved 2>/dev/null || true")
 

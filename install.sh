@@ -1084,6 +1084,14 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH disable dnsmasq" >> "/etc/sudoers.d/hostberry"
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH unmask dnsmasq" >> "/etc/sudoers.d/hostberry"
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH daemon-reload" >> "/etc/sudoers.d/hostberry"
+        # Blocky (Adblock DNS proxy)
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH start blocky" >> "/etc/sudoers.d/hostberry"
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH stop blocky" >> "/etc/sudoers.d/hostberry"
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH enable blocky" >> "/etc/sudoers.d/hostberry"
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH disable blocky" >> "/etc/sudoers.d/hostberry"
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH restart blocky" >> "/etc/sudoers.d/hostberry"
+        # systemd-resolved (para resolv.conf al activar/desactivar Blocky)
+        echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH restart systemd-resolved" >> "/etc/sudoers.d/hostberry"
     fi
     
     # Agregar permisos para hostnamectl y hostname (cambio de hostname)
