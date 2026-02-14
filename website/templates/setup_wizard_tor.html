@@ -1,0 +1,52 @@
+<div class="setup-wizard-page">
+    <div class="setup-wizard-header">
+        <div class="step-indicator d-flex justify-content-center align-items-center gap-2 flex-wrap">
+            <div class="step-dot" data-step="1">1</div>
+            <div class="step-line"></div>
+            <div class="step-dot" data-step="2">2</div>
+            <div class="step-line"></div>
+            <div class="step-dot" data-step="3">3</div>
+            <div class="step-line"></div>
+            <div class="step-dot active" data-step="4">4</div>
+        </div>
+    </div>
+    <div class="setup-wizard-pages">
+        <div class="setup-wizard-page-content">
+            <div class="wizard-page-inner">
+                <h2 class="wizard-page-title">
+                    <i class="bi bi-onion me-2"></i>
+                    {{ call .t "setup_wizard.security_tor" "Tor" }}
+                </h2>
+                <p class="wizard-page-desc text-muted">{{ call .t "setup_wizard.step_security_desc" "Instala y habilita Tor." }}</p>
+                <div class="card glass-card wizard-card">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <span class="status-indicator status-offline me-2" id="wizard-tor-status-dot"></span>
+                            <span id="wizard-tor-status-text">{{ call .t "tor.not_installed" "No instalado" }}</span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <button type="button" class="btn btn-outline-primary" id="wizard-tor-install">{{ call .t "tor.install" "Instalar Tor" }}</button>
+                            <button type="button" class="btn btn-outline-success d-none" id="wizard-tor-enable">{{ call .t "tor.enable" "Habilitar" }}</button>
+                        </div>
+                        <hr class="my-3">
+                        <p class="small text-muted mb-2">{{ call .t "tor.torify_ap_title" "Redirigir tráfico del AP por Tor" }}</p>
+                        <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+                            <span class="status-indicator status-offline" id="wizard-tor-iptables-dot"></span>
+                            <span id="wizard-tor-iptables-label" class="small">{{ call .t "tor.torify_inactive" "Inactivo" }}</span>
+                            <button type="button" class="btn btn-sm btn-outline-primary d-none" id="wizard-tor-iptables-enable">{{ call .t "tor.torify_enable" "Torificar red" }}</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger d-none" id="wizard-tor-iptables-disable">{{ call .t "tor.torify_disable" "Dejar de torificar" }}</button>
+                        </div>
+                        <p class="small text-muted">{{ call .t "setup_wizard.tor_config_help" "Tras instalar y habilitar puedes torificar la red Hostberry. Más opciones en el panel Tor." }}</p>
+                        <a href="/tor" class="btn btn-outline-secondary btn-sm">{{ call .t "setup_wizard.open_full_config" "Abrir Tor completo" }}</a>
+                        <div class="d-flex justify-content-between mt-4 flex-wrap gap-2">
+                            <a href="/setup-wizard" class="btn btn-outline-secondary">{{ call .t "setup_wizard.back" "Atrás" }}</a>
+                            <a href="/dashboard" class="btn btn-primary">{{ call .t "setup_wizard.finish" "Ir al panel" }}</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script defer src="/static/js/setup_wizard_step4.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>
+<script>window.WIZARD_STEP4 = 'tor';</script>

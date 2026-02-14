@@ -1,0 +1,48 @@
+<div class="setup-wizard-page">
+    <div class="setup-wizard-header">
+        <div class="step-indicator d-flex justify-content-center align-items-center gap-2 flex-wrap">
+            <div class="step-dot" data-step="1">1</div>
+            <div class="step-line"></div>
+            <div class="step-dot" data-step="2">2</div>
+            <div class="step-line"></div>
+            <div class="step-dot" data-step="3">3</div>
+            <div class="step-line"></div>
+            <div class="step-dot active" data-step="4">4</div>
+        </div>
+    </div>
+    <div class="setup-wizard-pages">
+        <div class="setup-wizard-page-content">
+            <div class="wizard-page-inner">
+                <h2 class="wizard-page-title">
+                    <i class="bi bi-shield-lock me-2"></i>
+                    {{ call .t "setup_wizard.security_vpn" "VPN" }}
+                </h2>
+                <p class="wizard-page-desc text-muted">{{ call .t "setup_wizard.step_security_desc" "Configura la VPN." }}</p>
+                <div class="card glass-card wizard-card">
+                    <div class="card-body">
+                        <p class="small text-muted">{{ call .t "setup_wizard.vpn_config_help" "Sube tu archivo .ovpn o pega la configuración. Guarda y conecta." }}</p>
+                        <div class="mb-3">
+                            <label for="wizard-openvpn-file" class="form-label">{{ call .t "vpn.upload_file" "Subir archivo .ovpn" }}</label>
+                            <input type="file" class="form-control form-control-sm" id="wizard-openvpn-file" accept=".ovpn,.conf,.txt">
+                        </div>
+                        <div class="mb-3">
+                            <label for="wizard-openvpn-config" class="form-label">{{ call .t "vpn.paste_config" "O pegar configuración" }}</label>
+                            <textarea class="form-control font-monospace" id="wizard-openvpn-config" rows="10" placeholder="client, dev tun, remote..."></textarea>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <button type="button" class="btn btn-primary" id="wizard-openvpn-save">{{ call .t "common.save" "Guardar" }}</button>
+                            <button type="button" class="btn btn-outline-success" id="wizard-openvpn-connect">{{ call .t "vpn.connect_vpn" "Conectar" }}</button>
+                        </div>
+                        <a href="/vpn" class="btn btn-outline-secondary btn-sm">{{ call .t "setup_wizard.open_full_config" "Abrir configuración VPN completa" }}</a>
+                        <div class="d-flex justify-content-between mt-4 flex-wrap gap-2">
+                            <a href="/setup-wizard" class="btn btn-outline-secondary">{{ call .t "setup_wizard.back" "Atrás" }}</a>
+                            <a href="/dashboard" class="btn btn-primary">{{ call .t "setup_wizard.finish" "Ir al panel" }}</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script defer src="/static/js/setup_wizard_step4.js{{ if .last_update }}?v={{ .last_update }}{{ end }}"></script>
+<script>window.WIZARD_STEP4 = 'vpn';</script>

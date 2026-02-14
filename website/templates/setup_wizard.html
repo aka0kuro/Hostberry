@@ -6,8 +6,6 @@
             <div class="step-dot" data-step="2" title="{{ call .t "setup_wizard.step_hostapd_title" "Configurar red Hostberry" }}">2</div>
             <div class="step-line"></div>
             <div class="step-dot" data-step="3" title="{{ call .t "setup_wizard.step_security_title" "Seguridad" }}">3</div>
-            <div class="step-line"></div>
-            <div class="step-dot" data-step="4" title="{{ call .t "setup_wizard.step_config_title" "Configuración" }}">4</div>
         </div>
     </div>
 
@@ -145,78 +143,6 @@
             </div>
         </div>
 
-        <!-- Página 4: Configuración (VPN / WireGuard / Tor según selección) -->
-        <div class="setup-wizard-page-content setup-step d-none" id="step4" data-step="4">
-            <div class="wizard-page-inner">
-                <h2 class="wizard-page-title" id="step4-title">
-                    <i class="bi bi-gear me-2"></i>
-                    <span id="step4-title-text">{{ call .t "setup_wizard.step_config_title" "Configuración" }}</span>
-                </h2>
-                <p class="wizard-page-desc text-muted" id="step4-desc"></p>
-                <div class="card glass-card wizard-card">
-                    <div class="card-body">
-                        <!-- Panel VPN: OpenVPN – subir archivo o pegar -->
-                        <div id="wizard-config-vpn" class="wizard-config-panel d-none">
-                            <p class="small text-muted">{{ call .t "setup_wizard.vpn_config_help" "Sube tu archivo .ovpn o pega la configuración. Guarda y conecta." }}</p>
-                            <div class="mb-3">
-                                <label for="wizard-openvpn-file" class="form-label">{{ call .t "vpn.upload_file" "Subir archivo .ovpn" }}</label>
-                                <input type="file" class="form-control form-control-sm" id="wizard-openvpn-file" accept=".ovpn,.conf,.txt">
-                            </div>
-                            <div class="mb-3">
-                                <label for="wizard-openvpn-config" class="form-label">{{ call .t "vpn.paste_config" "O pegar configuración" }}</label>
-                                <textarea class="form-control font-monospace" id="wizard-openvpn-config" rows="8" placeholder="client&#10;dev tun&#10;remote ..."></textarea>
-                            </div>
-                            <div class="d-flex flex-wrap gap-2 mb-2">
-                                <button type="button" class="btn btn-primary" id="wizard-openvpn-save">{{ call .t "common.save" "Guardar" }}</button>
-                                <button type="button" class="btn btn-outline-success" id="wizard-openvpn-connect">{{ call .t "vpn.connect_vpn" "Conectar" }}</button>
-                            </div>
-                            <a href="/vpn" class="btn btn-outline-secondary btn-sm">{{ call .t "setup_wizard.open_full_config" "Abrir configuración VPN completa" }}</a>
-                        </div>
-                        <!-- Panel WireGuard: manual o archivo .conf -->
-                        <div id="wizard-config-wireguard" class="wizard-config-panel d-none">
-                            <p class="small text-muted">{{ call .t "setup_wizard.wg_config_help" "Sube un archivo .conf o pega la configuración y guarda." }}</p>
-                            <div class="mb-3">
-                                <label for="wizard-wg-file" class="form-label">{{ call .t "wireguard.upload_file" "Subir archivo .conf" }}</label>
-                                <input type="file" class="form-control form-control-sm" id="wizard-wg-file" accept=".conf,.txt">
-                            </div>
-                            <div class="mb-3">
-                                <label for="wizard-wg-config" class="form-label">{{ call .t "wireguard.paste_config" "O pegar configuración" }}</label>
-                                <textarea class="form-control font-monospace" id="wizard-wg-config" rows="8" placeholder="[Interface]&#10;PrivateKey = ...&#10;Address = ..."></textarea>
-                            </div>
-                            <div class="d-flex flex-wrap gap-2 mb-2">
-                                <button type="button" class="btn btn-primary" id="wizard-wg-save">{{ call .t "common.save" "Guardar" }}</button>
-                            </div>
-                            <a href="/wireguard" class="btn btn-outline-secondary btn-sm">{{ call .t "setup_wizard.open_full_config" "Abrir WireGuard completo" }}</a>
-                        </div>
-                        <!-- Panel Tor: estado, instalar/habilitar y torificación -->
-                        <div id="wizard-config-tor" class="wizard-config-panel d-none">
-                            <div class="mb-3">
-                                <span class="status-indicator status-offline me-2" id="wizard-tor-status-dot"></span>
-                                <span id="wizard-tor-status-text">{{ call .t "tor.not_installed" "No instalado" }}</span>
-                            </div>
-                            <div class="d-flex flex-wrap gap-2 mb-3">
-                                <button type="button" class="btn btn-outline-primary" id="wizard-tor-install">{{ call .t "tor.install" "Instalar Tor" }}</button>
-                                <button type="button" class="btn btn-outline-success d-none" id="wizard-tor-enable">{{ call .t "tor.enable" "Habilitar" }}</button>
-                            </div>
-                            <hr class="my-3">
-                            <p class="small text-muted mb-2">{{ call .t "tor.torify_ap_title" "Redirigir tráfico del AP por Tor" }}</p>
-                            <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
-                                <span class="status-indicator status-offline" id="wizard-tor-iptables-dot"></span>
-                                <span id="wizard-tor-iptables-label" class="small">{{ call .t "tor.torify_inactive" "Inactivo" }}</span>
-                                <button type="button" class="btn btn-sm btn-outline-primary d-none" id="wizard-tor-iptables-enable">{{ call .t "tor.torify_enable" "Torificar red" }}</button>
-                                <button type="button" class="btn btn-sm btn-outline-danger d-none" id="wizard-tor-iptables-disable">{{ call .t "tor.torify_disable" "Dejar de torificar" }}</button>
-                            </div>
-                            <p class="small text-muted">{{ call .t "setup_wizard.tor_config_help" "Tras instalar y habilitar puedes torificar la red Hostberry. Más opciones en el panel Tor." }}</p>
-                            <a href="/tor" class="btn btn-outline-secondary btn-sm">{{ call .t "setup_wizard.open_full_config" "Abrir Tor completo" }}</a>
-                        </div>
-                        <div class="d-flex justify-content-between mt-4 flex-wrap gap-2">
-                            <button type="button" class="btn btn-outline-secondary" id="wizard-back-4">{{ call .t "setup_wizard.back" "Atrás" }}</button>
-                            <a href="/dashboard" class="btn btn-primary">{{ call .t "setup_wizard.finish" "Ir al panel" }}</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
