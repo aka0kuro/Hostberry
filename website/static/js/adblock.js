@@ -41,10 +41,20 @@
       const blockingValue = document.getElementById('blocky-blocking-value');
       const statService = document.getElementById('blocky-stat-service');
       const statBlocking = document.getElementById('blocky-stat-blocking');
+      const statBlocked = document.getElementById('blocky-stat-blocked');
+      const statTotal = document.getElementById('blocky-stat-total');
+      const statCached = document.getElementById('blocky-stat-cached');
       const statApi = document.getElementById('blocky-stat-api');
       const statGroups = document.getElementById('blocky-stat-groups');
 
       if (!indicator || !statusText) return;
+
+      function fmtNum(n) {
+        if (n === undefined || n === null) return '—';
+        const v = Number(n);
+        if (isNaN(v)) return '—';
+        return v.toLocaleString();
+      }
 
       if (statService) {
         statService.textContent = status?.installed
@@ -55,6 +65,15 @@
         statBlocking.textContent = status?.active && status?.blocking_enabled !== undefined
           ? (status.blocking_enabled ? t('adblock.adblock_enabled', 'Enabled') : t('adblock.adblock_disabled', 'Disabled'))
           : '—';
+      }
+      if (statBlocked) {
+        statBlocked.textContent = status?.active ? fmtNum(status.blocked_queries) : '—';
+      }
+      if (statTotal) {
+        statTotal.textContent = status?.active ? fmtNum(status.total_queries) : '—';
+      }
+      if (statCached) {
+        statCached.textContent = status?.active ? fmtNum(status.cached_queries) : '—';
       }
       if (statApi) {
         statApi.textContent = status?.active && status?.blocking_enabled !== undefined ? 'OK' : '—';
@@ -124,10 +143,91 @@
     }
   }
 
+  // Listas sugeridas para Blocky: url, clave de nombre, clave de descripción
+  const PRESET_LISTS = [
+    { url: 'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts', nameKey: 'blocky.list_stevenblack_name', descKey: 'blocky.list_stevenblack_desc' },
+    { url: 'https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt', nameKey: 'blocky.list_adguard_ads_name', descKey: 'blocky.list_adguard_ads_desc' },
+    { url: 'https://adguardteam.github.io/AdGuardSDNSFilter/Filters/tracking_filter.txt', nameKey: 'blocky.list_adguard_tracking_name', descKey: 'blocky.list_adguard_tracking_desc' },
+    { url: 'https://adguardteam.github.io/AdGuardSDNSFilter/Filters/social_filter.txt', nameKey: 'blocky.list_adguard_social_name', descKey: 'blocky.list_adguard_social_desc' },
+    { url: 'https://phishing.army/download/phishing_army_blocklist_extended.txt', nameKey: 'blocky.list_phishing_army_name', descKey: 'blocky.list_phishing_army_desc' },
+    { url: 'https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/pro.txt', nameKey: 'blocky.list_hagezi_name', descKey: 'blocky.list_hagezi_desc' },
+  ];
+
+  function buildPresetListsUI() {
+    const container = document.getElementById('blocky-preset-lists');
+    if (!container) return;
+    container.innerHTML = '';
+    PRESET_LISTS.forEach(function (preset) {
+      const id = 'preset-' + preset.url.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40);
+      const label = document.createElement('label');
+      label.className = 'd-block mb-2';
+      label.setAttribute('for', id);
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'form-check-input me-2';
+      cb.id = id;
+      cb.value = preset.url;
+      cb.dataset.url = preset.url;
+      const strong = document.createElement('strong');
+      strong.className = 'small';
+      strong.textContent = t(preset.nameKey, preset.url);
+      const desc = document.createElement('span');
+      desc.className = 'd-block small text-muted mt-0 mb-1';
+      desc.textContent = t(preset.descKey, '');
+      label.appendChild(cb);
+      label.appendChild(strong);
+      label.appendChild(document.createElement('br'));
+      label.appendChild(desc);
+      container.appendChild(label);
+    });
+  }
+
+  function getSelectedPresetUrls() {
+    const container = document.getElementById('blocky-preset-lists');
+    if (!container) return [];
+    const urls = [];
+    container.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
+      if (cb.value) urls.push(cb.value.trim());
+    });
+    return urls;
+  }
+
+  function setPresetCheckboxesFromUrls(urls) {
+    const set = new Set((urls || []).map(function (u) { return u.trim(); }));
+    const container = document.getElementById('blocky-preset-lists');
+    if (!container) return;
+    container.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+      cb.checked = set.has(cb.value.trim());
+    });
+  }
+
+  async function loadBlockyConfigIntoForm() {
+    try {
+      const resp = await api('/api/v1/adblock/blocky/config', { method: 'GET' });
+      if (!resp || !resp.ok) return;
+      const cfg = await readJson(resp);
+      const upstreams = cfg.upstreams || [];
+      const blockLists = cfg.block_lists || [];
+      const presetUrls = new Set(PRESET_LISTS.map(function (p) { return p.url; }));
+      const customUrls = (blockLists || []).filter(function (u) {
+        return !presetUrls.has(u.trim());
+      });
+      const upstreamEl = document.getElementById('blocky-upstreams');
+      const listsEl = document.getElementById('blocky-block-lists');
+      if (upstreamEl) upstreamEl.value = (upstreams.length ? upstreams.join('\n') : '1.1.1.1\n8.8.8.8\nhttps://dns.cloudflare.com/dns-query').trim();
+      if (listsEl) listsEl.value = customUrls.join('\n').trim();
+      setPresetCheckboxesFromUrls(blockLists);
+    } catch (e) {
+      console.error('Error loading Blocky config:', e);
+    }
+  }
+
   function showBlockyConfig() {
     const form = document.getElementById('blocky-config-form');
     if (!form) return;
-    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    const opening = form.style.display === 'none';
+    form.style.display = opening ? 'block' : 'none';
+    if (opening) loadBlockyConfigIntoForm();
   }
 
   async function enableBlocky() {
@@ -183,9 +283,11 @@
     document.getElementById('blockyConfigForm')?.addEventListener('submit', async function (e) {
       e.preventDefault();
       const upstreamsText = document.getElementById('blocky-upstreams')?.value || '';
-      const blockListsText = document.getElementById('blocky-block-lists')?.value || '';
       const upstreams = upstreamsText.split(/\n/).map(s => s.trim()).filter(Boolean);
-      const block_lists = blockListsText.split(/\n/).map(s => s.trim()).filter(Boolean);
+      const selectedPresets = getSelectedPresetUrls();
+      const customText = document.getElementById('blocky-block-lists')?.value || '';
+      const customUrls = customText.split(/\n/).map(s => s.trim()).filter(Boolean);
+      const block_lists = selectedPresets.concat(customUrls);
 
       try {
         const resp = await api('/api/v1/adblock/blocky/configure', {
@@ -216,6 +318,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     loadBlockyStatus();
+    buildPresetListsUI();
     bindForms();
     setInterval(loadBlockyStatus, 30000);
   });

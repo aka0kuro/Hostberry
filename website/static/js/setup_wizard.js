@@ -137,8 +137,12 @@
   async function saveHostapd() {
     const ssid = (document.getElementById('wizard-ap-ssid') || {}).value || 'hostberry';
     const open = (document.getElementById('wizard-ap-open') || {}).checked;
-    const password = (document.getElementById('wizard-ap-password') || {}).value || '';
+    const password = (document.getElementById('wizard-ap-password') || {}).value.trim();
     const saveBtn = document.getElementById('wizard-save-ap');
+    if (!open && (password.length < 8 || password.length > 63)) {
+      showAlert('warning', t('setup_wizard.ap_password_invalid', 'La contraseña debe tener entre 8 y 63 caracteres (estándar WiFi WPA2/WPA3).'));
+      return;
+    }
     if (saveBtn) {
       saveBtn.disabled = true;
       saveBtn.querySelector('.btn-text').textContent = t('common.saving', 'Guardando...');

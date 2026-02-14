@@ -438,6 +438,7 @@ func setupRoutes(app *fiber.App) {
 
 			// Blocky (proxy DNS y ad-blocker, configuración desde la web)
 			adblock.Get("/blocky/status", blockyStatusHandler)
+			adblock.Get("/blocky/config", blockyConfigHandler)
 			adblock.Post("/blocky/install", blockyInstallHandler)
 			adblock.Post("/blocky/configure", blockyConfigureHandler)
 			adblock.Post("/blocky/enable", blockyEnableHandler)

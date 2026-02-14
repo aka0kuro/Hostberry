@@ -1043,6 +1043,11 @@ func blockyStatusHandler(c *fiber.Ctx) error {
 	return c.JSON(result)
 }
 
+func blockyConfigHandler(c *fiber.Ctx) error {
+	cfg := getBlockyConfig()
+	return c.JSON(cfg)
+}
+
 func blockyInstallHandler(c *fiber.Ctx) error {
 	return RunActionWithUser(c, "adblock", "Blocky instalado por usuario %s", "Error instalando Blocky: %s (usuario: %s)", func(user *User) map[string]interface{} {
 		return installBlocky(user.Username)

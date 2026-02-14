@@ -10,8 +10,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 func getAdBlockStatus() map[string]interface{} {
@@ -511,6 +514,57 @@ func blockyAPIBlockingStatus() map[string]interface{} {
 	return out
 }
 
+// blockyMetrics obtiene estadísticas desde el endpoint Prometheus /metrics de Blocky.
+// Devuelve blocked (consultas bloqueadas), total (consultas totales), cached (desde caché).
+func blockyMetrics() (blocked, total, cached int64) {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get("http://127.0.0.1:" + blockyHTTPPort + "/metrics")
+	if err != nil || resp == nil {
+		return 0, 0, 0
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 0, 0, 0
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, 0, 0
+	}
+	lines := strings.Split(string(body), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		// blocky_response_total{..., response_type="Blocked"} 123
+		if strings.HasPrefix(line, "blocky_response_total") {
+			idx := strings.LastIndex(line, " ")
+			if idx <= 0 {
+				continue
+			}
+			valStr := strings.TrimSpace(line[idx:])
+			val, _ := strconv.ParseInt(valStr, 10, 64)
+			if strings.Contains(line, `response_type="Blocked"`) {
+				blocked += val
+			} else if strings.Contains(line, `response_type="Cached"`) {
+				cached += val
+			}
+			continue
+		}
+		// blocky_query_total{client="...", type="A"} 456
+		if strings.HasPrefix(line, "blocky_query_total") {
+			idx := strings.LastIndex(line, " ")
+			if idx <= 0 {
+				continue
+			}
+			valStr := strings.TrimSpace(line[idx:])
+			val, _ := strconv.ParseInt(valStr, 10, 64)
+			total += val
+		}
+	}
+	return blocked, total, cached
+}
+
 func getBlockyStatus() map[string]interface{} {
 	result := make(map[string]interface{})
 	installed := blockyBinaryExists()
@@ -545,8 +599,47 @@ func getBlockyStatus() map[string]interface{} {
 			result["blocking_enabled"] = apiStatus["enabled"]
 			result["disabled_groups"] = apiStatus["disabledGroups"]
 		}
+		// Estadísticas desde Prometheus /metrics (consultas bloqueadas, totales, caché)
+		blocked, total, cached := blockyMetrics()
+		result["blocked_queries"] = blocked
+		result["total_queries"] = total
+		result["cached_queries"] = cached
 	}
 
+	return result
+}
+
+// blockyConfigYAML refleja la estructura que escribimos en config.yml para poder leerla.
+type blockyConfigYAML struct {
+	Upstreams struct {
+		Groups map[string][]string `yaml:"groups"`
+	} `yaml:"upstreams"`
+	Blocking struct {
+		Denylists map[string][]string `yaml:"denylists"`
+	} `yaml:"blocking"`
+}
+
+// getBlockyConfig lee la configuración actual de Blocky y devuelve upstreams y block_lists.
+func getBlockyConfig() map[string]interface{} {
+	result := map[string]interface{}{
+		"upstreams":   []string{},
+		"block_lists": []string{},
+	}
+	cmd := exec.Command("sudo", "cat", blockyConfigPath)
+	out, err := cmd.Output()
+	if err != nil || len(out) == 0 {
+		return result
+	}
+	var cfg blockyConfigYAML
+	if err := yaml.Unmarshal(out, &cfg); err != nil {
+		return result
+	}
+	if g, ok := cfg.Upstreams.Groups["default"]; ok {
+		result["upstreams"] = g
+	}
+	if d, ok := cfg.Blocking.Denylists["default"]; ok {
+		result["block_lists"] = d
+	}
 	return result
 }
 

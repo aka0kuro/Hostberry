@@ -66,9 +66,14 @@
 https://dns.cloudflare.com/dns-query</textarea>
                         </div>
                         <div class="mb-3">
-                            <label for="blocky-block-lists" class="form-label">{{ call .t "blocky.block_lists" "Block lists (URLs, one per line)" }}</label>
-                            <textarea class="form-control font-monospace" id="blocky-block-lists" name="block_lists" rows="5" placeholder="https://...">https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
-https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt</textarea>
+                            <label class="form-label">{{ call .t "blocky.preset_lists" "Suggested block lists" }}</label>
+                            <p class="form-text small text-muted mb-2">{{ call .t "blocky.preset_lists_help" "Select the lists you want to use. Each blocks different types of content (ads, trackers, malware, etc.)." }}</p>
+                            <div id="blocky-preset-lists" class="border rounded p-3 bg-light bg-opacity-50 mb-2"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="blocky-block-lists" class="form-label">{{ call .t "blocky.custom_lists" "Additional URLs (one per line)" }}</label>
+                            <textarea class="form-control font-monospace" id="blocky-block-lists" name="block_lists" rows="3" placeholder="https://..."></textarea>
+                            <div class="form-text">{{ call .t "blocky.custom_lists_help" "Add any other block list URL not in the list above." }}</div>
                         </div>
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">
@@ -102,6 +107,24 @@ https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt</textarea>
                         <div class="p-3 rounded border text-center">
                             <div class="small text-muted mb-1">{{ call .t "blocky.blocking_status" "Blocking" }}</div>
                             <div class="fw-semibold" id="blocky-stat-blocking">—</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 rounded border text-center">
+                            <div class="small text-muted mb-1">{{ call .t "blocky.stat_blocked_queries" "Blocked queries" }}</div>
+                            <div class="fw-semibold" id="blocky-stat-blocked">—</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 rounded border text-center">
+                            <div class="small text-muted mb-1">{{ call .t "blocky.stat_total_queries" "Total queries" }}</div>
+                            <div class="fw-semibold" id="blocky-stat-total">—</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 rounded border text-center">
+                            <div class="small text-muted mb-1">{{ call .t "blocky.stat_cached" "Cached" }}</div>
+                            <div class="fw-semibold" id="blocky-stat-cached">—</div>
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
