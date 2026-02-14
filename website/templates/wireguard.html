@@ -147,7 +147,7 @@
         </div>
     </div>
 
-    <!-- Configuración de WireGuard (wg0.conf) -->
+    <!-- Configuración de WireGuard: manual o subir archivo .conf -->
     <div class="col-md-6 mb-4">
         <div class="card">
             <div class="card-header">
@@ -157,13 +157,16 @@
                 </h5>
             </div>
             <div class="card-body">
+                <p class="text-muted small">{{ call .t "wireguard.config_help_full" "Paste your configuration or upload a .conf file, then save." }}</p>
                 <form id="wireguardConfigForm">
                     <div class="mb-3">
-                        <label for="wg_config" class="form-label">{{ call .t "wireguard.configuration" "Configuration" }} (wg0.conf)</label>
-                        <textarea class="form-control font-monospace" id="wg_config" name="config" rows="12" placeholder="{{ call .t "wireguard.config_placeholder" "[Interface]\nAddress = ...\nPrivateKey = ...\n\n[Peer]\nPublicKey = ...\nAllowedIPs = ..." }}"></textarea>
-                        <small class="text-muted">{{ call .t "wireguard.config_hint" "Loaded from /etc/wireguard/wg0.conf (if exists) and saved via API." }}</small>
+                        <label for="wg_config_file" class="form-label">{{ call .t "wireguard.upload_file" "Upload .conf file" }}</label>
+                        <input type="file" class="form-control" id="wg_config_file" accept=".conf,.txt">
                     </div>
-                    
+                    <div class="mb-3">
+                        <label for="wg_config" class="form-label">{{ call .t "wireguard.paste_config" "Or paste configuration" }} (wg0.conf)</label>
+                        <textarea class="form-control font-monospace" id="wg_config" name="config" rows="12" placeholder="{{ call .t "wireguard.config_placeholder" "[Interface]\nAddress = ...\nPrivateKey = ...\n\n[Peer]\nPublicKey = ...\nAllowedIPs = ..." }}"></textarea>
+                    </div>
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-circle"></i>

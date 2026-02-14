@@ -375,6 +375,7 @@ func setupRoutes(app *fiber.App) {
 		vpn := api.Group("/vpn", requireAuth)
 		{
 			vpn.Get("/status", vpnStatusHandler)
+			vpn.Get("/config", vpnGetConfigHandler)
 			vpn.Post("/connect", vpnConnectHandler)
 			vpn.Get("/connections", vpnConnectionsHandler)
 			vpn.Get("/servers", vpnServersHandler)
@@ -456,6 +457,8 @@ func setupRoutes(app *fiber.App) {
 			tor.Post("/enable", torEnableHandler)
 			tor.Post("/disable", torDisableHandler)
 			tor.Get("/circuit", torCircuitHandler)
+			tor.Post("/iptables-enable", torIptablesEnableHandler)
+			tor.Post("/iptables-disable", torIptablesDisableHandler)
 		}
 	}
 

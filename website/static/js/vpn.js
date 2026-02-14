@@ -147,32 +147,79 @@
     window.location.href = '/system#system-logs';
   }
 
-  const cfgForm = document.getElementById('vpnConfigForm');
-  if (cfgForm) {
-    cfgForm.addEventListener('submit', async function (e) {
-      e.preventDefault();
-      const fd = new FormData(this);
-      const data = {
-        server_name: fd.get('server_name'),
-        server_address: fd.get('server_address'),
-        server_port: parseInt(fd.get('server_port'), 10),
-        protocol: fd.get('protocol'),
-        encryption: fd.get('encryption'),
-      };
-      try {
-        const resp = await api('/api/v1/vpn/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        if (resp && resp.ok) {
-          showAlert('success', t('messages.changes_saved', 'Changes saved'));
-        } else {
-          showAlert('danger', t('errors.configuration_error', 'Configuration error'));
-        }
-      } catch (_e) {
-        showAlert('danger', t('errors.network_error', 'Network error'));
+  async function loadOpenVPNConfig() {
+    try {
+      const resp = await api('/api/v1/vpn/config');
+      if (resp && resp.ok) {
+        const data = await resp.json();
+        const ta = document.getElementById('openvpn_config');
+        if (ta && data && typeof data.config === 'string') ta.value = data.config;
       }
+    } catch (e) {
+      console.error('Error loading OpenVPN config:', e);
+    }
+  }
+
+  async function saveOpenVPNConfig() {
+    const ta = document.getElementById('openvpn_config');
+    const config = (ta && ta.value) ? ta.value.trim() : '';
+    if (!config) {
+      showAlert('warning', t('vpn.config_required', 'Paste or upload a configuration first'));
+      return;
+    }
+    try {
+      const resp = await api('/api/v1/vpn/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: config }),
+      });
+      const result = await resp.json().catch(() => ({}));
+      if (resp && resp.ok && result && result.success !== false) {
+        showAlert('success', result.message || t('messages.changes_saved', 'Changes saved'));
+      } else {
+        showAlert('danger', result.error || t('errors.configuration_error', 'Configuration error'));
+      }
+    } catch (_e) {
+      showAlert('danger', t('errors.network_error', 'Network error'));
+    }
+  }
+
+  async function connectOpenVPN() {
+    const ta = document.getElementById('openvpn_config');
+    const config = (ta && ta.value) ? ta.value.trim() : '';
+    if (!config) {
+      showAlert('warning', t('vpn.config_required', 'Paste or upload a configuration first'));
+      return;
+    }
+    try {
+      const resp = await api('/api/v1/vpn/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: config, type: 'openvpn' }),
+      });
+      const result = await resp.json().catch(() => ({}));
+      if (resp && resp.ok && result && result.success !== false) {
+        showAlert('success', result.message || t('vpn.connect_vpn', 'Connect'));
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        showAlert('danger', result.error || t('errors.operation_failed', 'Operation failed'));
+      }
+    } catch (_e) {
+      showAlert('danger', t('errors.network_error', 'Network error'));
+    }
+  }
+
+  const openvpnFileInput = document.getElementById('openvpn_config_file');
+  if (openvpnFileInput) {
+    openvpnFileInput.addEventListener('change', function () {
+      const file = this.files && this.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function () {
+        const ta = document.getElementById('openvpn_config');
+        if (ta) ta.value = reader.result || '';
+      };
+      reader.readAsText(file);
     });
   }
 
@@ -180,6 +227,7 @@
     loadConnections();
     loadServers();
     loadClients();
+    loadOpenVPNConfig();
     setInterval(function () {
       loadConnections();
       loadServers();
@@ -189,6 +237,8 @@
 
   window.toggleVPN = toggleVPN;
   window.connectVPN = connectVPN;
+  window.connectOpenVPN = connectOpenVPN;
+  window.saveOpenVPNConfig = saveOpenVPNConfig;
   window.toggleConnection = toggleConnection;
   window.generateCertificates = generateCertificates;
   window.viewSecurityLogs = viewSecurityLogs;

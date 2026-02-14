@@ -111,6 +111,20 @@
     showAlert('info', t('wireguard.configuring_interface', 'Configuring interface') + ': ' + String(name ?? ''));
   }
 
+  const wgFileInput = document.getElementById('wg_config_file');
+  if (wgFileInput) {
+    wgFileInput.addEventListener('change', function () {
+      const file = this.files && this.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function () {
+        const ta = document.getElementById('wg_config');
+        if (ta) ta.value = reader.result || '';
+      };
+      reader.readAsText(file);
+    });
+  }
+
   const cfgForm = document.getElementById('wireguardConfigForm');
   if (cfgForm) {
     cfgForm.addEventListener('submit', async function (e) {

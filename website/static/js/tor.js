@@ -45,6 +45,11 @@
       const circuitInfo = document.getElementById('tor-circuit-info');
       const socksPortText = document.getElementById('tor-socks-port-text');
       const socksPortInput = document.getElementById('tor-socks-port');
+      const iptablesIndicator = document.getElementById('tor-iptables-indicator');
+      const iptablesLabel = document.getElementById('tor-iptables-label');
+      const iptablesInterface = document.getElementById('tor-iptables-interface');
+      const iptablesEnableBtn = document.getElementById('tor-iptables-enable-btn');
+      const iptablesDisableBtn = document.getElementById('tor-iptables-disable-btn');
 
       if (status?.installed) {
         if (installedIcon) installedIcon.style.display = 'inline';
@@ -70,6 +75,18 @@
             if (socksPortText) socksPortText.textContent = sp;
             if (socksPortInput) socksPortInput.value = sp;
           }
+          if (iptablesInterface) iptablesInterface.textContent = status?.iptables_interface || 'ap0';
+          if (status?.iptables_active) {
+            if (iptablesIndicator) iptablesIndicator.className = 'status-indicator status-online';
+            if (iptablesLabel) iptablesLabel.textContent = t('tor.torify_active', 'Active');
+            if (iptablesEnableBtn) iptablesEnableBtn.style.display = 'none';
+            if (iptablesDisableBtn) iptablesDisableBtn.style.display = 'inline-block';
+          } else {
+            if (iptablesIndicator) iptablesIndicator.className = 'status-indicator status-offline';
+            if (iptablesLabel) iptablesLabel.textContent = t('tor.torify_inactive', 'Inactive');
+            if (iptablesEnableBtn) iptablesEnableBtn.style.display = 'inline-block';
+            if (iptablesDisableBtn) iptablesDisableBtn.style.display = 'none';
+          }
         } else {
           if (statusIndicator) statusIndicator.className = 'status-indicator status-offline';
           if (statusLabel) statusLabel.textContent = t('tor.inactive', 'Inactive');
@@ -94,9 +111,51 @@
         if (disableBtn) disableBtn.style.display = 'none';
         if (circuitInfo) circuitInfo.style.display = 'none';
         if (torIpText) torIpText.textContent = '--';
+        if (iptablesIndicator) iptablesIndicator.className = 'status-indicator status-offline';
+        if (iptablesLabel) iptablesLabel.textContent = t('tor.torify_inactive', 'Inactive');
+        if (iptablesEnableBtn) iptablesEnableBtn.style.display = 'none';
+        if (iptablesDisableBtn) iptablesDisableBtn.style.display = 'none';
+      }
+      if (!status?.installed || !status?.active) {
+        if (iptablesEnableBtn) iptablesEnableBtn.style.display = 'none';
+        if (iptablesDisableBtn) iptablesDisableBtn.style.display = 'none';
+        if (iptablesIndicator) iptablesIndicator.className = 'status-indicator status-offline';
+        if (iptablesLabel) iptablesLabel.textContent = t('tor.torify_inactive', 'Inactive');
       }
     } catch (error) {
       console.error('Error loading Tor status:', error);
+    }
+  }
+
+  async function enableTorIptables() {
+    try {
+      const resp = await api('/api/v1/tor/iptables-enable', { method: 'POST' });
+      const result = await readJson(resp);
+      if (resp && resp.ok && result?.success !== false) {
+        notify('success', result?.message || t('tor.torify_enabled', 'Network traffic now goes through Tor'));
+        loadTorStatus();
+      } else {
+        notify('danger', result?.error || t('errors.operation_failed', 'Operation failed'));
+      }
+    } catch (error) {
+      console.error('Error enabling Tor iptables:', error);
+      notify('danger', t('errors.network_error', 'Network error. Please try again.'));
+    }
+  }
+
+  async function disableTorIptables() {
+    try {
+      const resp = await api('/api/v1/tor/iptables-disable', { method: 'POST' });
+      const result = await readJson(resp);
+      if (resp && resp.ok && result?.success !== false) {
+        notify('success', result?.message || t('tor.torify_disabled', 'Redirect disabled'));
+        loadTorStatus();
+      } else {
+        notify('danger', result?.error || t('errors.operation_failed', 'Operation failed'));
+      }
+    } catch (error) {
+      console.error('Error disabling Tor iptables:', error);
+      notify('danger', t('errors.network_error', 'Network error. Please try again.'));
     }
   }
 
@@ -191,6 +250,12 @@
         enable_control_port: formData.get('enable_control_port') === 'on',
         control_port: parseInt(String(formData.get('control_port') || '9051'), 10) || 9051,
         enable_hidden_service: formData.get('enable_hidden_service') === 'on',
+        enable_trans_port: formData.get('enable_trans_port') === 'on',
+        trans_port: parseInt(String(formData.get('trans_port') || '9040'), 10) || 9040,
+        enable_dns_port: formData.get('enable_dns_port') === 'on',
+        dns_port: parseInt(String(formData.get('dns_port') || '53'), 10) || 53,
+        client_only: formData.get('client_only') === 'on',
+        automap_hosts_on_resolve: formData.get('automap_hosts_on_resolve') === 'on',
       };
 
       try {
@@ -221,6 +286,8 @@
   window.enableTor = enableTor;
   window.disableTor = disableTor;
   window.loadTorCircuit = loadTorCircuit;
+  window.enableTorIptables = enableTorIptables;
+  window.disableTorIptables = disableTorIptables;
 
   document.addEventListener('DOMContentLoaded', function () {
     bindTorConfigForm();

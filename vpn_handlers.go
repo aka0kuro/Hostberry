@@ -7,6 +7,49 @@ import (
 	"strings"
 )
 
+const openvpnClientConfigPath = "/etc/openvpn/client.conf"
+
+func getOpenVPNConfig() map[string]interface{} {
+	result := make(map[string]interface{})
+	data, err := os.ReadFile(openvpnClientConfigPath)
+	if err != nil {
+		result["config"] = ""
+		result["exists"] = false
+		result["success"] = true
+		return result
+	}
+	result["config"] = string(data)
+	result["exists"] = true
+	result["success"] = true
+	return result
+}
+
+func saveOpenVPNConfig(config, user string) map[string]interface{} {
+	result := make(map[string]interface{})
+	if config == "" {
+		result["success"] = false
+		result["error"] = "Configuración requerida"
+		return result
+	}
+	if err := ValidateVPNConfig(config); err != nil {
+		result["success"] = false
+		result["error"] = err.Error()
+		return result
+	}
+	if user == "" {
+		user = "unknown"
+	}
+	if err := os.WriteFile(openvpnClientConfigPath, []byte(config), 0644); err != nil {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("Error guardando configuración: %v", err)
+		return result
+	}
+	LogTf("logs.vpn_openvpn_config_saved", user)
+	result["success"] = true
+	result["message"] = "Configuración OpenVPN guardada"
+	return result
+}
+
 func getVPNStatus() map[string]interface{} {
 	result := make(map[string]interface{})
 

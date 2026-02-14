@@ -95,6 +95,23 @@
                         {{ call .t "tor.disable" "Disable" }}
                     </button>
                 </div>
+                <hr class="my-3">
+                <div class="mb-2">
+                    <label class="form-label small text-muted">{{ call .t "tor.torify_ap_title" "Redirect AP traffic through Tor" }}</label>
+                    <p class="small text-muted mb-1">{{ call .t "tor.torify_ap_help" "All clients on the Hostberry WiFi will use Tor (Onion Pi style). Interface: " }}<span id="tor-iptables-interface">ap0</span></p>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="status-indicator status-offline" id="tor-iptables-indicator"></span>
+                        <span id="tor-iptables-label" class="small">{{ call .t "tor.torify_inactive" "Inactive" }}</span>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="tor-iptables-enable-btn" onclick="enableTorIptables()" style="display: none;">
+                            <i class="bi bi-funnel"></i>
+                            {{ call .t "tor.torify_enable" "Torify network" }}
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="tor-iptables-disable-btn" onclick="disableTorIptables()" style="display: none;">
+                            <i class="bi bi-funnel-fill"></i>
+                            {{ call .t "tor.torify_disable" "Stop torifying" }}
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -141,6 +158,46 @@
                                 <input class="form-check-input" type="checkbox" id="tor-enable-hidden" name="enable_hidden_service">
                                 <label class="form-check-label" for="tor-enable-hidden">
                                     {{ call .t "tor.enable_hidden_service" "Enable Hidden Service (Advanced)" }}
+                                </label>
+                            </div>
+                        </div>
+                        <hr class="my-4">
+                        <h6 class="text-muted mb-3"><i class="bi bi-onion me-1"></i> {{ call .t "tor.onion_pi_options" "Onion Pi style (transparent proxy + DNS)" }}</h6>
+                        <p class="small text-muted">{{ call .t "tor.onion_pi_help" "Redirect all traffic through Tor: transparent proxy (TransPort) and DNS (DNSPort). Use iptables to redirect traffic from an interface to these ports." }}</p>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="tor-enable-trans" name="enable_trans_port" checked>
+                                <label class="form-check-label" for="tor-enable-trans">
+                                    {{ call .t "tor.enable_trans_port" "Enable Transparent Proxy (TransPort)" }}
+                                </label>
+                            </div>
+                            <label for="tor-trans-port" class="form-label small">{{ call .t "tor.trans_port" "TransPort" }}</label>
+                            <input type="number" class="form-control form-control-sm" id="tor-trans-port" name="trans_port" value="9040" min="1024" max="65535">
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="tor-enable-dns" name="enable_dns_port" checked>
+                                <label class="form-check-label" for="tor-enable-dns">
+                                    {{ call .t "tor.enable_dns_port" "Enable DNS through Tor (DNSPort)" }}
+                                </label>
+                            </div>
+                            <label for="tor-dns-port" class="form-label small">{{ call .t "tor.dns_port" "DNSPort" }}</label>
+                            <input type="number" class="form-control form-control-sm" id="tor-dns-port" name="dns_port" value="53" min="1024" max="65535">
+                            <div class="form-text small">{{ call .t "tor.dns_port_help" "Port 53 may conflict with systemd-resolved or dnsmasq. Stop them or use another port." }}</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="tor-client-only" name="client_only" checked>
+                                <label class="form-check-label" for="tor-client-only">
+                                    {{ call .t "tor.client_only" "Client only (no relay/exit)" }}
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="tor-automap-hosts" name="automap_hosts_on_resolve" checked>
+                                <label class="form-check-label" for="tor-automap-hosts">
+                                    {{ call .t "tor.automap_hosts" "Resolve .onion and .exit through Tor" }}
                                 </label>
                             </div>
                         </div>

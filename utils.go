@@ -109,7 +109,7 @@ func executeCommandWithTimeout(cmd string, timeout time.Duration) (string, error
 		"ip", "wg", "wg-quick", "systemctl", "pgrep",
 		"sudo", "sh", "reboot", "shutdown", "poweroff",
 		"rfkill", "ifconfig", "iwconfig",
-		"hostapd", "hostapd_cli", "dnsmasq", "iptables", "sysctl", "tee", "cp", "mkdir", "echo", "chmod", "bash", "cat",
+		"hostapd", "hostapd_cli", "dnsmasq", "iptables", "iptables-save", "netfilter-persistent", "sysctl", "tee", "cp", "mkdir", "echo", "chmod", "bash", "cat",
 		"dhclient", "udhcpc", "wpa_supplicant", "wpa_cli", "pkill", "killall",
 	}
 

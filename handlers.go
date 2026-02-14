@@ -1196,11 +1196,17 @@ func torInstallHandler(c *fiber.Ctx) error {
 
 func torConfigureHandler(c *fiber.Ctx) error {
 	var req struct {
-		EnableSocks         bool `json:"enable_socks"`
-		SocksPort           int  `json:"socks_port"`
-		EnableControlPort   bool `json:"enable_control_port"`
-		ControlPort         int  `json:"control_port"`
-		EnableHiddenService bool `json:"enable_hidden_service"`
+		EnableSocks           bool `json:"enable_socks"`
+		SocksPort             int  `json:"socks_port"`
+		EnableControlPort     bool `json:"enable_control_port"`
+		ControlPort           int  `json:"control_port"`
+		EnableHiddenService   bool `json:"enable_hidden_service"`
+		EnableTransPort       bool `json:"enable_trans_port"`
+		TransPort             int  `json:"trans_port"`
+		EnableDNSPort         bool `json:"enable_dns_port"`
+		DNSPort               int  `json:"dns_port"`
+		ClientOnly            bool `json:"client_only"`
+		AutomapHostsOnResolve bool `json:"automap_hosts_on_resolve"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -1219,8 +1225,28 @@ func torConfigureHandler(c *fiber.Ctx) error {
 	if req.ControlPort == 0 {
 		req.ControlPort = 9051
 	}
+	if req.TransPort == 0 {
+		req.TransPort = 9040
+	}
+	if req.DNSPort == 0 {
+		req.DNSPort = 53
+	}
 
-	result := configureTor(req.EnableSocks, req.SocksPort, req.EnableControlPort, req.ControlPort, req.EnableHiddenService, user.Username)
+	opts := TorConfigOptions{
+		User:                  user.Username,
+		EnableSocks:           req.EnableSocks,
+		SocksPort:             req.SocksPort,
+		EnableControlPort:     req.EnableControlPort,
+		ControlPort:           req.ControlPort,
+		EnableHiddenService:   req.EnableHiddenService,
+		EnableTransPort:       req.EnableTransPort,
+		TransPort:             req.TransPort,
+		EnableDNSPort:         req.EnableDNSPort,
+		DNSPort:               req.DNSPort,
+		ClientOnly:            req.ClientOnly,
+		AutomapHostsOnResolve: req.AutomapHostsOnResolve,
+	}
+	result := configureTor(opts)
 	if success, ok := result["success"].(bool); ok && success {
 		InsertLog("INFO", fmt.Sprintf("Tor configurado por usuario %s", user.Username), "tor", &userID)
 		return c.JSON(result)
@@ -1237,6 +1263,18 @@ func torConfigureHandler(c *fiber.Ctx) error {
 func torEnableHandler(c *fiber.Ctx) error {
 	return RunActionWithUser(c, "tor", "Tor habilitado por usuario %s", "Error habilitando Tor: %s (usuario: %s)", func(user *User) map[string]interface{} {
 		return enableTor(user.Username)
+	})
+}
+
+func torIptablesEnableHandler(c *fiber.Ctx) error {
+	return RunActionWithUser(c, "tor", "Red Hostberry torificada por usuario %s", "Error torificando red: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return enableTorIptables(user.Username)
+	})
+}
+
+func torIptablesDisableHandler(c *fiber.Ctx) error {
+	return RunActionWithUser(c, "tor", "Torificación de red desactivada por usuario %s", "Error desactivando torificación: %s (usuario: %s)", func(user *User) map[string]interface{} {
+		return disableTorIptables(user.Username)
 	})
 }
 
