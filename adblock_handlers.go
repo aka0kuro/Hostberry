@@ -601,20 +601,61 @@ func installBlocky(user string) map[string]interface{} {
 	executeCommand("sudo rm -rf " + tmpDir)
 	executeCommand("sudo mkdir -p " + tmpDir)
 
-	// Descargar con curl
-	downloadCmd := fmt.Sprintf("sudo curl -sL -o %s/blocky.tar.gz %s", tmpDir, url)
-	if out, err := executeCommand(downloadCmd); err != nil {
+	// Descargar con HTTP desde Go (no depender de curl en PATH)
+	tarballPath := filepath.Join(os.TempDir(), "blocky_download.tar.gz")
+	client := &http.Client{Timeout: 120 * time.Second}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("Error preparando descarga: %v", err)
+		return result
+	}
+	req.Header.Set("User-Agent", "HostBerry/1.0")
+	resp, err := client.Do(req)
+	if err != nil {
 		result["success"] = false
 		result["error"] = fmt.Sprintf("Error descargando Blocky: %v", err)
-		if out != "" {
-			result["error"] = strings.TrimSpace(out)
-		}
 		LogTf("logs.blocky_install_error", err)
 		return result
 	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("Error descargando Blocky: HTTP %d", resp.StatusCode)
+		return result
+	}
+	tarballFile, err := os.Create(tarballPath)
+	if err != nil {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("Error creando archivo temporal: %v", err)
+		return result
+	}
+	_, err = io.Copy(tarballFile, resp.Body)
+	tarballFile.Close()
+	if err != nil {
+		os.Remove(tarballPath)
+		result["success"] = false
+		result["error"] = fmt.Sprintf("Error guardando descarga: %v", err)
+		LogTf("logs.blocky_install_error", err)
+		return result
+	}
+	defer os.Remove(tarballPath)
 
-	// Extraer y copiar a /usr/local/bin
-	extractCmd := fmt.Sprintf("sudo tar -xzf %s/blocky.tar.gz -C %s && sudo cp %s/blocky /usr/local/bin/blocky && sudo chmod +x /usr/local/bin/blocky", tmpDir, tmpDir, tmpDir)
+	// Copiar a dir con sudo y extraer con tar (ruta absoluta para no depender de PATH)
+	copyCmd := fmt.Sprintf("sudo cp %s %s/blocky.tar.gz", tarballPath, tmpDir)
+	if out, err := executeCommand(copyCmd); err != nil {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("Error copiando descarga: %v", err)
+		if out != "" {
+			result["error"] = strings.TrimSpace(out)
+		}
+		return result
+	}
+	tarPath := "/usr/bin/tar"
+	if _, err := os.Stat(tarPath); err != nil {
+		tarPath = "/bin/tar"
+	}
+	extractCmd := fmt.Sprintf("sudo %s -xzf %s/blocky.tar.gz -C %s && sudo cp %s/blocky /usr/local/bin/blocky && sudo chmod +x /usr/local/bin/blocky", tarPath, tmpDir, tmpDir, tmpDir)
 	if out, err := executeCommand(extractCmd); err != nil {
 		result["success"] = false
 		result["error"] = fmt.Sprintf("Error extrayendo Blocky: %v", err)
