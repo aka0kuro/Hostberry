@@ -1115,6 +1115,12 @@ EOF
         echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH restart systemd-resolved" >> "/etc/sudoers.d/hostberry"
     fi
     
+    # Tor: permitir start/stop/enable/disable sin contraseña (habilitar Tor desde la web)
+    echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH start tor" >> "/etc/sudoers.d/hostberry"
+    echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH stop tor" >> "/etc/sudoers.d/hostberry"
+    echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH enable tor" >> "/etc/sudoers.d/hostberry"
+    echo "$USER_NAME ALL=(ALL) NOPASSWD: $SYSTEMCTL_PATH disable tor" >> "/etc/sudoers.d/hostberry"
+    
     # Agregar permisos para hostnamectl y hostname (cambio de hostname)
     if command -v hostnamectl &> /dev/null; then
         HOSTNAMECTL_PATH=$(command -v hostnamectl)
