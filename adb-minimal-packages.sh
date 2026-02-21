@@ -575,13 +575,26 @@ is_kept() {
     return 1
 }
 
+# Paquetes dudosos: solo deshabilitar (no intentar uninstall)
+is_disable_only() {
+    local pkg_stripped="$1"
+    for d in "${DISABLE_ONLY[@]}"; do
+        if [[ "$d" == "$pkg_stripped" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 echo "=== ADB Minimal Packages (Wallet, System UI, BT, WiFi, NFC, Play Store, Launcher) ==="
-echo "Se deshabilitarán todos los paquetes que NO estén en la whitelist."
-echo "Método: pm disable-user --user 0 (reversible)."
+echo "Whitelist → no se tocan."
+echo "Con dudas (sistema/radio) → solo deshabilitar."
+echo "Resto → uninstall; si falla, deshabilitar."
 echo ""
 read -p "¿Continuar? (s/N): " -r
 [[ "${REPLY,,}" == "s" || "${REPLY,,}" == "si" ]] || exit 0
 
+UNINSTALLED=0
 DISABLED=0
 FAILED=0
 SKIPPED=0
@@ -593,7 +606,23 @@ for raw in "${ALL_PACKAGES[@]}"; do
         ((SKIPPED++)) || true
         continue
     fi
-    if adb shell pm disable-user --user 0 "$pkg" 2>/dev/null; then
+
+    if is_disable_only "$pkg"; then
+        if adb shell pm disable-user --user 0 "$pkg" 2>/dev/null; then
+            echo "[DESHABILITADO (duda)] $pkg"
+            ((DISABLED++)) || true
+        else
+            echo "[FALLO/NO INSTALADO] $pkg"
+            ((FAILED++)) || true
+        fi
+        continue
+    fi
+
+    # Intentar uninstall; si falla, deshabilitar
+    if adb shell pm uninstall -k --user 0 "$pkg" 2>/dev/null; then
+        echo "[DESINSTALADO] $pkg"
+        ((UNINSTALLED++)) || true
+    elif adb shell pm disable-user --user 0 "$pkg" 2>/dev/null; then
         echo "[DESHABILITADO] $pkg"
         ((DISABLED++)) || true
     else
@@ -605,8 +634,10 @@ done
 echo ""
 echo "=== Resumen ==="
 echo "Mantenidos: $SKIPPED"
+echo "Desinstalados (user): $UNINSTALLED"
 echo "Deshabilitados: $DISABLED"
 echo "Fallos / no instalados: $FAILED"
 echo ""
 echo "Reinicia el dispositivo para que los cambios se apliquen por completo."
-echo "Para revertir un paquete: adb shell pm enable <package>"
+echo "Revertir: adb shell pm enable <package>  (para deshabilitados)"
+echo "          Reinstalar por Play o adb install (para desinstalados)"
