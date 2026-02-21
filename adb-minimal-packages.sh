@@ -189,9 +189,6 @@ DISABLE_ONLY=(
     com.google.android.iwlan
     com.android.location.fused
     com.android.cameraextensions
-    com.android.qns
-    com.android.ons
-    com.android.telephony.imsmedia
     com.android.imsserviceentitlement
     com.google.android.telephony
     com.android.providers.telephony.auto_generated_characteristics_rro
@@ -207,7 +204,6 @@ DISABLE_ONLY=(
     com.android.internal.display.cutout.emulation.corner
     com.android.internal.display.cutout.emulation.tall
     com.android.internal.display.cutout.emulation.waterfall
-    com.android.internal.display.cutout.emulation.avoidAppsInCutout
     com.android.internal.display.cutout.emulation.avoidAppsInCutout
     com.android.internal.systemui.navbar.gestural
     com.android.internal.systemui.navbar.threebutton
