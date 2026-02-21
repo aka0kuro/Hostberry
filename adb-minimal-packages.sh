@@ -115,9 +115,9 @@ DISABLE_LIST=(
     com.google.android.sdksandbox
 )
 
-echo "=== ADB Minimal (SOLO lista negra - muy conservador) ==="
-echo "Solo se deshabilitan ${#DISABLE_LIST[@]} paquetes opcionales."
-echo "Todo lo demás (system ui, permisos, overlays, etc.) NO se toca."
+echo "=== Eliminar aplicaciones (mantener Play Store + Wallet) ==="
+echo "Se deshabilitan: YouTube, Drive, Gmail, Fotos, Maps y demás apps (${#DISABLE_LIST[@]} paquetes)."
+echo "Se mantienen: Play Store, Wallet y lo necesario para Wallet. Sistema no se toca."
 echo ""
 read -p "¿Continuar? (s/N): " -r
 [[ "${REPLY,,}" == "s" || "${REPLY,,}" == "si" ]] || exit 0
@@ -125,7 +125,7 @@ read -p "¿Continuar? (s/N): " -r
 OK=0
 FAIL=0
 for pkg in "${DISABLE_LIST[@]}"; do
-    if adb shell pm disable-user --user 0 "$pkg" 2>/dev/null; then
+    if adb shell pm uninstall --user 0 "$pkg" 2>/dev/null; then
         echo "[DESHABILITADO] $pkg"
         ((OK++)) || true
     else
