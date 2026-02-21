@@ -17,7 +17,7 @@
 # Haz backup antes. Puede requerir reinicio.
 #
 
-set -euo pipefail
+set -uo pipefail
 
 # Comprobar que ADB está disponible y hay dispositivo
 if ! command -v adb &>/dev/null; then
