@@ -135,6 +135,97 @@ KEEP=(
     com.android.server.telecom.auto_generated_rro_product__
 )
 
+# Paquetes con dudas: solo deshabilitar (no uninstall). Afectan sistema/radio/boot/seguridad.
+DISABLE_ONLY=(
+    com.android.omadm.service
+    com.android.omadm.service.auto_generated_rro_vendor__
+    com.android.omadm.service.auto_generated_rro_product__
+    com.google.omadm.trigger
+    com.android.companiondevicemanager
+    com.android.companiondevicemanager.auto_generated_characteristics_rro
+    com.android.DeviceAsWebcam
+    com.android.cts.priv.ctsshim
+    com.android.cts.ctsshim
+    com.android.sdm.plugins.diagmon
+    com.android.sdm.plugins.connmo
+    com.android.sdm.plugins.dcmo
+    com.android.devicediagnostics
+    com.android.devicediagnostics.auto_generated_rro_vendor__
+    com.android.devicediagnostics.auto_generated_rro_product__
+    com.android.pixeldisplayservice
+    com.android.pixeldisplayservice.auto_generated_rro_product__
+    com.android.traceur
+    com.android.traceur.auto_generated_rro_vendor__
+    com.android.traceur.auto_generated_rro_product__
+    com.google.android.mainline.adservices
+    com.google.mainline.telemetry
+    com.google.android.rilextension
+    com.google.RilConfigService
+    com.google.android.grilservice
+    com.samsung.slsi.telephony.oem.oemrilhookservice
+    com.samsung.slsi.telephony.oem.oemril
+    com.shannon.imsservice
+    com.shannon.rcsservice
+    com.verizon.mips.services
+    com.verizon.services
+    com.vzw.apnlib
+    com.android.angle
+    com.android.dynsystem
+    com.google.android.configupdater
+    com.google.android.modulemetadata
+    com.android.virtualization.terminal
+    com.google.android.as
+    com.google.android.as.oss
+    com.google.android.odad
+    com.google.android.pixelsystemservice
+    com.google.android.verifier
+    com.google.android.verifier.overlay
+    com.android.calllogbackup
+    com.android.providers.calendar
+    com.android.providers.contactkeys
+    com.google.android.euiccpixel.permissions
+    com.google.android.euiccpixel.overlay.zuma
+    com.google.android.carrier
+    com.google.android.iwlan
+    com.android.location.fused
+    com.android.cameraextensions
+    com.android.qns
+    com.android.ons
+    com.android.telephony.imsmedia
+    com.android.imsserviceentitlement
+    com.google.android.telephony
+    com.android.providers.telephony.auto_generated_characteristics_rro
+    com.android.phone.auto_generated_rro_vendor__
+    com.android.phone.auto_generated_characteristics_rro
+    com.google.android.server.deviceconfig.resources
+    com.google.android.rkpdapp
+    com.google.android.nfc.overlay
+    com.google.android.nfc.overlay.common
+    com.android.internal.display.cutout.emulation.double
+    com.android.internal.display.cutout.emulation.noCutout
+    com.android.internal.display.cutout.emulation.hole
+    com.android.internal.display.cutout.emulation.corner
+    com.android.internal.display.cutout.emulation.tall
+    com.android.internal.display.cutout.emulation.waterfall
+    com.android.internal.display.cutout.emulation.avoidAppsInCutout
+    com.android.internal.display.cutout.emulation.avoidAppsInCutout
+    com.android.internal.systemui.navbar.gestural
+    com.android.internal.systemui.navbar.threebutton
+    com.android.internal.systemui.navbar.transparent
+    com.android.systemui.auto_generated_rro_vendor__
+    com.android.settings.auto_generated_rro_vendor__
+    com.android.settings.husky
+    com.android.settings.overlay.husky
+    com.google.android.flipendo.auto_generated_rro_vendor__
+    com.google.android.flipendo.auto_generated_rro_product__
+    com.google.android.storagemanager.auto_generated_rro_vendor__
+    com.google.android.storagemanager.auto_generated_rro_product__
+    com.android.bips.auto_generated_rro_product__
+    com.android.safetyregulatoryinfo.auto_generated_rro_product__
+    com.android.simappdialog.auto_generated_rro_product__
+    com.android.systemui.accessibility.accessibilitymenu.auto_generated_rro_product__
+)
+
 # Lista completa de paquetes del dispositivo (la que proporcionaste)
 ALL_PACKAGES=(
     package:com.google.audio.hearing.visualization.accessibility.scribe
