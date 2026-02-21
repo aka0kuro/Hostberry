@@ -83,7 +83,7 @@ DISABLE_LIST=(
     com.google.assistant.hubui
     com.google.android.hotspot2.osulogin
     com.google.android.flipendo
-    com.google.android.ar.core
+    com.google.ar.core
     com.google.android.settings.intelligence
     com.google.SSRestartDetector
     com.google.android.health.connect.backuprestore
@@ -109,8 +109,6 @@ DISABLE_LIST=(
     com.google.android.ondevicepersonalization.services
     com.google.android.appsearch.apk
     com.google.android.sdksandbox
-    com.google.android.webview
-    com.google.android.inputmethod.latin
 )
 
 echo "=== ADB Minimal (SOLO lista negra - muy conservador) ==="
