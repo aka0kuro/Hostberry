@@ -12,8 +12,10 @@
 # Uso: conecta el dispositivo por USB con depuración ADB y ejecuta:
 #   ./adb-minimal-packages.sh
 #
-# IMPORTANTE: Usa "pm disable-user" (reversible). Para desinstalar de verdad
-# tendrías que usar "pm uninstall" y muchas apps de sistema no lo permiten sin root.
+# Lógica:
+# - Paquetes en whitelist KEEP → no se tocan.
+# - Paquetes en DISABLE_ONLY (dudas: sistema, radio, boot) → solo se deshabilitan.
+# - Resto → se intenta uninstall; si falla, se deshabilita.
 # Haz backup antes. Puede requerir reinicio.
 #
 
